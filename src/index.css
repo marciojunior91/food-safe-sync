@@ -77,8 +77,6 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  }
-
   /* Utility classes for kitchen system */
   .status-indicator {
     @apply inline-flex items-center justify-center w-3 h-3 rounded-full animate-pulse;
