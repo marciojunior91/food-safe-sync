@@ -47,6 +47,18 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Kitchen-specific status colors
+        status: {
+          critical: "hsl(var(--status-critical))",
+          warning: "hsl(var(--status-warning))",
+          safe: "hsl(var(--status-safe))",
+          unknown: "hsl(var(--status-unknown))",
+        },
+        kitchen: {
+          surface: "hsl(var(--kitchen-surface))",
+          accent: "hsl(var(--kitchen-accent))",
+          highlight: "hsl(var(--kitchen-highlight))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
