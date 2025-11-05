@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Clock, Users, AlertTriangle, ChefHat, Filter } from "lucide-react";
+import { Plus, Search, Clock, Users, AlertTriangle, ChefHat, Filter, Edit, Trash2, MessageSquare, Calendar, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,9 +7,21 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import { CreateRecipeDialog } from "@/components/recipes/CreateRecipeDialog";
 import { PrepareRecipeDialog } from "@/components/recipes/PrepareRecipeDialog";
+import { format } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Recipe {
   id: string;
@@ -25,6 +37,15 @@ interface Recipe {
   estimated_prep_minutes: number;
   service_gap_minutes: number;
   created_at: string;
+  created_by: string;
+  updated_at: string;
+  updated_by: string | null;
+  creator?: {
+    display_name: string;
+  } | null;
+  updater?: {
+    display_name: string;
+  } | null;
 }
 
 const recipeCategories = [
@@ -38,9 +59,27 @@ export default function Recipes() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isPrepareDialogOpen, setIsPrepareDialogOpen] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
+  const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
+  const { hasRole, roles, loading: rolesLoading } = useUserRole();
   const { toast } = useToast();
+  
+  // Check if user can manage recipes (admin or leader_chef)
+  const canManageRecipes = hasRole('admin') || hasRole('leader_chef');
+
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 Recipe Permissions Debug:', {
+      userId: user?.id,
+      roles: roles,
+      rolesLoading: rolesLoading,
+      hasAdminRole: hasRole('admin'),
+      hasLeaderChefRole: hasRole('leader_chef'),
+      canManageRecipes: canManageRecipes
+    });
+  }, [user, roles, rolesLoading, canManageRecipes]);
 
   useEffect(() => {
     fetchRecipes();
@@ -48,13 +87,40 @@ export default function Recipes() {
 
   const fetchRecipes = async () => {
     try {
-      const { data, error } = await supabase
+      // Fetch recipes first
+      const { data: recipesData, error: recipesError } = await supabase
         .from('recipes')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setRecipes(data || []);
+      if (recipesError) throw recipesError;
+
+      // Fetch all unique user IDs
+      const userIds = new Set<string>();
+      recipesData?.forEach(recipe => {
+        if (recipe.created_by) userIds.add(recipe.created_by);
+        if (recipe.updated_by) userIds.add(recipe.updated_by);
+      });
+
+      // Fetch profiles for these users
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('user_id, display_name')
+        .in('user_id', Array.from(userIds));
+
+      // Create a map of user_id to display_name
+      const profileMap = new Map(
+        profilesData?.map(p => [p.user_id, p.display_name]) || []
+      );
+
+      // Combine the data
+      const enrichedRecipes = recipesData?.map(recipe => ({
+        ...recipe,
+        creator: recipe.created_by ? { display_name: profileMap.get(recipe.created_by) || 'Unknown' } : null,
+        updater: recipe.updated_by ? { display_name: profileMap.get(recipe.updated_by) || 'Unknown' } : null,
+      }));
+
+      setRecipes(enrichedRecipes || []);
     } catch (error) {
       console.error('Error fetching recipes:', error);
       toast({
@@ -65,6 +131,40 @@ export default function Recipes() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteRecipe = async () => {
+    if (!recipeToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', recipeToDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Recipe deleted successfully",
+      });
+      
+      fetchRecipes();
+    } catch (error) {
+      console.error('Error deleting recipe:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete recipe",
+        variant: "destructive",
+      });
+    } finally {
+      setRecipeToDelete(null);
+    }
+  };
+
+  const handleEditRecipe = (recipe: Recipe) => {
+    setRecipeToEdit(recipe);
+    setIsCreateDialogOpen(true);
   };
 
   const handlePrepareRecipe = (recipe: Recipe) => {
@@ -116,15 +216,34 @@ export default function Recipes() {
 
   return (
     <div className="space-y-6">
+      {/* Debug Info - Remove after testing */}
+      <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200">
+        <CardContent className="pt-4">
+          <p className="text-sm font-mono">
+            <strong>Debug Info:</strong> User ID: {user?.id?.slice(0, 8)}... | 
+            Roles: [{roles.join(', ') || 'none'}] | 
+            Can Manage: {canManageRecipes ? '✅ YES' : '❌ NO'} | 
+            Loading: {rolesLoading ? 'Yes' : 'No'}
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recipes</h1>
-          <p className="text-muted-foreground">Manage your recipe collection</p>
+          <p className="text-muted-foreground">
+            {canManageRecipes ? "Manage your recipe collection" : "Browse available recipes"}
+          </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Recipe
-        </Button>
+        {canManageRecipes && (
+          <Button onClick={() => {
+            setRecipeToEdit(null);
+            setIsCreateDialogOpen(true);
+          }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Recipe
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center space-x-4">
@@ -162,11 +281,16 @@ export default function Recipes() {
               <div>
                 <h3 className="font-semibold text-lg">No recipes found</h3>
                 <p className="text-muted-foreground">
-                  {searchTerm ? "Try adjusting your search terms" : "Get started by creating your first recipe"}
+                  {searchTerm ? "Try adjusting your search terms" : 
+                   canManageRecipes ? "Get started by creating your first recipe" : 
+                   "No recipes available yet"}
                 </p>
               </div>
-              {!searchTerm && (
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
+              {!searchTerm && canManageRecipes && (
+                <Button onClick={() => {
+                  setRecipeToEdit(null);
+                  setIsCreateDialogOpen(true);
+                }}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Recipe
                 </Button>
@@ -248,7 +372,35 @@ export default function Recipes() {
                   </div>
                 )}
 
-                <div className="pt-2">
+                {/* Recipe Metadata */}
+                <div className="pt-2 border-t space-y-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-3 h-3" />
+                    <span className="font-medium">Created at:</span>
+                    <span>{format(new Date(recipe.created_at), "MMM dd, yyyy 'at' HH:mm")}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <User className="w-3 h-3" />
+                    <span className="font-medium">Created by:</span>
+                    <span>{recipe.creator?.display_name || 'Unknown'}</span>
+                  </div>
+                  {recipe.updated_by && recipe.updated_at !== recipe.created_at && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3 h-3" />
+                        <span className="font-medium">Last Updated:</span>
+                        <span>{format(new Date(recipe.updated_at), "MMM dd, yyyy 'at' HH:mm")}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <User className="w-3 h-3" />
+                        <span className="font-medium">Last Updated by:</span>
+                        <span>{recipe.updater?.display_name || 'Unknown'}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="pt-2 space-y-2">
                   <Button 
                     size="sm" 
                     onClick={() => handlePrepareRecipe(recipe)}
@@ -257,6 +409,51 @@ export default function Recipes() {
                     <ChefHat className="w-4 h-4 mr-2" />
                     Prepare Recipe
                   </Button>
+                  
+                  <div className="flex gap-2">
+                    {/* Comments button - available to all users */}
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        // TODO: Implement comments dialog
+                        toast({
+                          title: "Coming Soon",
+                          description: "Recipe comments feature will be available soon",
+                        });
+                      }}
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Notes
+                    </Button>
+                    
+                    {/* Edit/Delete buttons - only for admins and leader_chef */}
+                    {canManageRecipes && (
+                      <>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditRecipe(recipe);
+                          }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRecipeToDelete(recipe);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -266,8 +463,15 @@ export default function Recipes() {
 
       <CreateRecipeDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        onSuccess={fetchRecipes}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) setRecipeToEdit(null);
+        }}
+        onSuccess={() => {
+          fetchRecipes();
+          setRecipeToEdit(null);
+        }}
+        recipeToEdit={recipeToEdit}
       />
 
       <PrepareRecipeDialog
@@ -275,6 +479,24 @@ export default function Recipes() {
         onOpenChange={setIsPrepareDialogOpen}
         recipe={selectedRecipe}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!recipeToDelete} onOpenChange={() => setRecipeToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the recipe "{recipeToDelete?.name}". This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteRecipe} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete Recipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

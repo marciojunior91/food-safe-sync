@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // ⚠️ DEVELOPMENT MODE: Authentication temporarily disabled for testing
   // TODO: Re-enable authentication before production deployment
-  const DEV_MODE_SKIP_AUTH = true;
+  const DEV_MODE_SKIP_AUTH = false;
 
   const { user, loading } = useAuth();
 

@@ -16,6 +16,7 @@ interface CreateRecipeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  recipeToEdit?: any | null;
 }
 
 const allergenOptions = [
@@ -31,23 +32,23 @@ const recipeCategories = [
   "Entrees", "Mains", "Desserts", "Sides", "Sauces", "Beverages", "Bakery", "Other"
 ];
 
-export function CreateRecipeDialog({ open, onOpenChange, onSuccess }: CreateRecipeDialogProps) {
+export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit }: CreateRecipeDialogProps) {
   const [formData, setFormData] = useState({
-    name: "",
-    yieldAmount: "",
-    yieldUnit: "servings",
-    holdTimeDays: "3",
-    category: "Mains",
-    estimatedPrepMinutes: "30",
-    serviceGapMinutes: "0",
+    name: recipeToEdit?.name || "",
+    yieldAmount: recipeToEdit?.yield_amount?.toString() || "",
+    yieldUnit: recipeToEdit?.yield_unit || "servings",
+    holdTimeDays: recipeToEdit?.hold_time_days?.toString() || "3",
+    category: recipeToEdit?.category || "Mains",
+    estimatedPrepMinutes: recipeToEdit?.estimated_prep_minutes?.toString() || "30",
+    serviceGapMinutes: recipeToEdit?.service_gap_minutes?.toString() || "0",
   });
-  const [ingredients, setIngredients] = useState<string[]>([]);
+  const [ingredients, setIngredients] = useState<string[]>(recipeToEdit?.ingredients || []);
   const [newIngredient, setNewIngredient] = useState("");
-  const [prepSteps, setPrepSteps] = useState<string[]>([]);
+  const [prepSteps, setPrepSteps] = useState<string[]>(recipeToEdit?.prep_steps || []);
   const [newPrepStep, setNewPrepStep] = useState("");
-  const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
+  const [selectedAllergens, setSelectedAllergens] = useState<string[]>(recipeToEdit?.allergens || []);
   const [customAllergen, setCustomAllergen] = useState("");
-  const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
+  const [selectedDietary, setSelectedDietary] = useState<string[]>(recipeToEdit?.dietary_requirements || []);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -139,23 +140,40 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess }: CreateReci
         .eq('user_id', user.id)
         .single();
 
-      const { error } = await supabase
-        .from('recipes')
-        .insert({
-          name: formData.name.trim(),
-          ingredients,
-          prep_steps: prepSteps,
-          allergens: selectedAllergens,
-          dietary_requirements: selectedDietary,
-          yield_amount: parseInt(formData.yieldAmount) || 1,
-          yield_unit: formData.yieldUnit,
-          hold_time_days: parseInt(formData.holdTimeDays) || 3,
-          category: formData.category,
-          estimated_prep_minutes: parseInt(formData.estimatedPrepMinutes) || 30,
-          service_gap_minutes: parseInt(formData.serviceGapMinutes) || 0,
-          created_by: user.id,
-          organization_id: profile?.organization_id,
-        });
+      const recipeData = {
+        name: formData.name.trim(),
+        ingredients,
+        prep_steps: prepSteps,
+        allergens: selectedAllergens,
+        dietary_requirements: selectedDietary,
+        yield_amount: parseInt(formData.yieldAmount) || 1,
+        yield_unit: formData.yieldUnit,
+        hold_time_days: parseInt(formData.holdTimeDays) || 3,
+        category: formData.category,
+        estimated_prep_minutes: parseInt(formData.estimatedPrepMinutes) || 30,
+        service_gap_minutes: parseInt(formData.serviceGapMinutes) || 0,
+      };
+
+      let error;
+      
+      if (recipeToEdit) {
+        // Update existing recipe
+        const result = await supabase
+          .from('recipes')
+          .update(recipeData)
+          .eq('id', recipeToEdit.id);
+        error = result.error;
+      } else {
+        // Create new recipe
+        const result = await supabase
+          .from('recipes')
+          .insert({
+            ...recipeData,
+            created_by: user.id,
+            organization_id: profile?.organization_id,
+          });
+        error = result.error;
+      }
 
       if (error) throw error;
 

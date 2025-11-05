@@ -617,6 +617,7 @@ export type Database = {
           prep_steps: Json
           service_gap_minutes: number | null
           updated_at: string
+          updated_by: string | null
           yield_amount: number
           yield_unit: string
         }
@@ -635,6 +636,7 @@ export type Database = {
           prep_steps?: Json
           service_gap_minutes?: number | null
           updated_at?: string
+          updated_by?: string | null
           yield_amount: number
           yield_unit?: string
         }
@@ -653,6 +655,7 @@ export type Database = {
           prep_steps?: Json
           service_gap_minutes?: number | null
           updated_at?: string
+          updated_by?: string | null
           yield_amount?: number
           yield_unit?: string
         }

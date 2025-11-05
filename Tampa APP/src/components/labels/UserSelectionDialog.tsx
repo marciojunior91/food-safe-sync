@@ -18,9 +18,10 @@ interface UserSelectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelectUser: (user: UserProfile) => void;
+  organizationId?: string; // Optional: if provided, skip auth check
 }
 
-export function UserSelectionDialog({ open, onOpenChange, onSelectUser }: UserSelectionDialogProps) {
+export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organizationId }: UserSelectionDialogProps) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
@@ -35,36 +36,64 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser }: UserSe
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      // Get current user's organization
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error("Not authenticated");
+      let orgId = organizationId;
+
+      // If organization_id is not provided as prop, get it from logged-in user
+      if (!orgId) {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError) {
+          console.error("Auth error:", authError);
+          throw new Error(`Authentication failed: ${authError.message}`);
+        }
+        
+        if (!user) {
+          throw new Error("Not authenticated and no organization_id provided");
+        }
+
+        console.log("Current user ID:", user.id);
+
+        const { data: currentProfile, error: profileError } = await supabase
+          .from("profiles")
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.error("Profile error:", profileError);
+          throw new Error(`Failed to fetch profile: ${profileError.message}`);
+        }
+
+        console.log("Current profile organization_id:", currentProfile?.organization_id);
+
+        if (!currentProfile?.organization_id) {
+          toast({
+            title: "No Organization",
+            description: "You are not assigned to an organization.",
+            variant: "destructive",
+          });
+          setUsers([]);
+          return;
+        }
+
+        orgId = currentProfile.organization_id;
       }
 
-      const { data: currentProfile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      console.log("Fetching users for organization_id:", orgId);
 
-      if (!currentProfile?.organization_id) {
-        toast({
-          title: "No Organization",
-          description: "You are not assigned to an organization.",
-          variant: "destructive",
-        });
-        setUsers([]);
-        return;
+      // Direct database query - secure with RLS policies
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, user_id, display_name, position')
+        .eq('organization_id', orgId)
+        .order('display_name', { ascending: true });
+
+      if (error) {
+        console.error("Error fetching users:", error);
+        throw new Error(`Failed to fetch users: ${error.message}`);
       }
 
-      // Call edge function to get organization users
-      const { data, error } = await supabase.functions.invoke('get_org_users', {
-        body: { organization_id: currentProfile.organization_id }
-      });
-
-      if (error) throw error;
-      
+      console.log("Fetched users:", data);
       setUsers(data || []);
       
       if (!data || data.length === 0) {
@@ -77,7 +106,7 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser }: UserSe
       console.error("Error fetching users:", error);
       toast({
         title: "Error",
-        description: "Failed to load users",
+        description: error instanceof Error ? error.message : "Failed to load users",
         variant: "destructive",
       });
     } finally {
