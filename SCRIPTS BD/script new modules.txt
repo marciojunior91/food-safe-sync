@@ -1,0 +1,22 @@
+-- Phase 3: Daily Routine, Training, Enhanced Users, and Notifications/Chat modules
+
+-- ============================================
+-- DAILY ROUTINE MODULE
+-- ============================================
+
+CREATE TABLE public.daily_routines (
+  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  frequency text NOT NULL DEFAULT 'daily', -- daily, weekly, monthly
+  assigned_role app_role,
+  organization_id uuid,
+  is_active boolean DEFAULT true,
+  created_by uuid NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.daily_routines ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY \

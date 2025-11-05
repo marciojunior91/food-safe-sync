@@ -1,0 +1,188 @@
+-- Kitchen Inventory & Food Safety schema (public)
+
+-- Profiles linked to auth.users
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name text,
+  role text NOT NULL DEFAULT 'staff', -- admin, manager, staff
+  organization_id uuid,
+  metadata jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON public.profiles(user_id);
+
+-- Suppliers (fornecedor)
+CREATE TABLE IF NOT EXISTS public.fornecedor (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  name text NOT NULL,
+  contact jsonb,
+  certificates jsonb, -- documents metadata (links to storage)
+  is_active boolean NOT NULL DEFAULT true,
+  rating smallint CHECK (rating BETWEEN 0 AND 5),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+
+-- Categories (categoria) with hierarchical structure
+CREATE TABLE IF NOT EXISTS public.categoria (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  parent_id bigint REFERENCES public.categoria(id) ON DELETE SET NULL,
+  name text NOT NULL,
+  technical_spec jsonb,
+  safety_requirements jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_categoria_parent_id ON public.categoria(parent_id);
+
+-- Products (produto)
+CREATE TABLE IF NOT EXISTS public.produto (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  name text NOT NULL,
+  sku text UNIQUE,
+  category_id bigint REFERENCES public.categoria(id) ON DELETE SET NULL,
+  supplier_id bigint REFERENCES public.fornecedor(id) ON DELETE SET NULL,
+  specifications jsonb,
+  safety_requirements jsonb,
+  standard_portion numeric, -- base portion size (e.g., grams)
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_produto_category_id ON public.produto(category_id);
+CREATE INDEX IF NOT EXISTS idx_produto_supplier_id ON public.produto(supplier_id);
+
+-- Batch Management (lote)
+CREATE TABLE IF NOT EXISTS public.lote (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  lote_code text UNIQUE NOT NULL,
+  produto_id bigint NOT NULL REFERENCES public.produto(id) ON DELETE CASCADE,
+  created_at timestamp with time zone DEFAULT now(),
+  produced_at timestamp with time zone,
+  expires_at timestamp with time zone,
+  temperature_required jsonb, -- e.g., {"min_c":0,"max_c":4}
+  current_temperature numeric,
+  status text NOT NULL DEFAULT 'stored', -- stored, in_use, consumed, waste, quarantined
+  estimated_quantity numeric, -- e.g., grams or units
+  metadata jsonb,
+  updated_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_lote_produto_id ON public.lote(produto_id);
+CREATE INDEX IF NOT EXISTS idx_lote_lote_code ON public.lote(lote_code);
+
+-- Event-based consumption / Usage tracking
+CREATE TABLE IF NOT EXISTS public.usage_events (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  event_type text NOT NULL, -- consumption, transfer, prep, waste
+  produto_id bigint REFERENCES public.produto(id) ON DELETE SET NULL,
+  lote_id bigint REFERENCES public.lote(id) ON DELETE SET NULL,
+  quantity numeric NOT NULL,
+  unit text,
+  recorded_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  recorded_at timestamp with time zone DEFAULT now(),
+  shift text,
+  notes text,
+  metadata jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_usage_events_produto ON public.usage_events(produto_id);
+CREATE INDEX IF NOT EXISTS idx_usage_events_lote ON public.usage_events(lote_id);
+
+-- Daily / shift closures
+CREATE TABLE IF NOT EXISTS public.shift_closures (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  closed_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  shift text NOT NULL,
+  closed_at timestamp with time zone DEFAULT now(),
+  summary jsonb,
+  metadata jsonb
+);
+
+-- Waste logging
+CREATE TABLE IF NOT EXISTS public.waste_logs (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  produto_id bigint REFERENCES public.produto(id) ON DELETE SET NULL,
+  lote_id bigint REFERENCES public.lote(id) ON DELETE SET NULL,
+  quantity numeric NOT NULL,
+  reason text,
+  recorded_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  recorded_at timestamp with time zone DEFAULT now(),
+  notes text
+);
+CREATE INDEX IF NOT EXISTS idx_waste_produto ON public.waste_logs(produto_id);
+
+-- Audit system: actions log
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  actor uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  action text NOT NULL,
+  object_type text,
+  object_id text,
+  before jsonb,
+  after jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  metadata jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_audit_actor ON public.audit_logs(actor);
+
+-- Temperature logs (compliance checkpoints)
+CREATE TABLE IF NOT EXISTS public.temperature_logs (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  lote_id bigint REFERENCES public.lote(id) ON DELETE CASCADE,
+  recorded_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  temperature numeric NOT NULL,
+  recorded_at timestamp with time zone DEFAULT now(),
+  location text,
+  notes text
+);
+CREATE INDEX IF NOT EXISTS idx_temp_lote ON public.temperature_logs(lote_id);
+
+-- Labels & Documents storage metadata (blobs stored in Supabase Storage)
+CREATE TABLE IF NOT EXISTS public.labels (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  lote_id bigint REFERENCES public.lote(id) ON DELETE CASCADE,
+  storage_path text NOT NULL,
+  generated_at timestamp with time zone DEFAULT now(),
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_labels_lote ON public.labels(lote_id);
+
+CREATE TABLE IF NOT EXISTS public.documents (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  fornecedor_id bigint REFERENCES public.fornecedor(id) ON DELETE CASCADE,
+  doc_type text,
+  storage_path text NOT NULL,
+  uploaded_at timestamp with time zone DEFAULT now(),
+  uploaded_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_documents_fornecedor ON public.documents(fornecedor_id);
+
+-- Background job tracking (for automated tasks and reports)
+CREATE TABLE IF NOT EXISTS public.jobs (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  job_key text NOT NULL,
+  status text NOT NULL DEFAULT 'pending', -- pending, running, succeeded, failed
+  scheduled_at timestamp with time zone,
+  started_at timestamp with time zone,
+  finished_at timestamp with time zone,
+  result jsonb,
+  created_at timestamp with time zone DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_key ON public.jobs(job_key);
+
+-- Enable Row Level Security on key tables (informational: policies must be added separately)
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fornecedor ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categoria ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.produto ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.lote ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.usage_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shift_closures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.waste_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.temperature_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.labels ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
+
+-- Note: create necessary policies using auth.uid() and auth.jwt().
