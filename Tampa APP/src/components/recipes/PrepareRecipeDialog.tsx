@@ -363,9 +363,9 @@ export function PrepareRecipeDialog({ open, onOpenChange, recipe }: PrepareRecip
                     <SelectTrigger>
                       <SelectValue placeholder="Select staff member" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-background opacity-100">
                       {staff.map((member) => (
-                        <SelectItem key={member.id} value={member.id}>
+                        <SelectItem key={member.id} value={member.id} className="bg-background opacity-100">
                           <div className="flex items-center gap-2">
                             <Users className="w-4 h-4" />
                             <span>{member.name}</span>
@@ -396,10 +396,10 @@ export function PrepareRecipeDialog({ open, onOpenChange, recipe }: PrepareRecip
                         <SelectTrigger className="w-32">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="batch">batch</SelectItem>
-                          <SelectItem value="half">half</SelectItem>
-                          <SelectItem value="double">double</SelectItem>
+                        <SelectContent className="bg-background opacity-100">
+                          <SelectItem value="batch" className="bg-background opacity-100">batch</SelectItem>
+                          <SelectItem value="half" className="bg-background opacity-100">half</SelectItem>
+                          <SelectItem value="double" className="bg-background opacity-100">double</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

@@ -223,9 +223,9 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background opacity-100">
                   {recipeCategories.map((category) => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                    <SelectItem key={category} value={category} className="bg-background opacity-100">{category}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -262,11 +262,11 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="servings">servings</SelectItem>
-                    <SelectItem value="portions">portions</SelectItem>
-                    <SelectItem value="litres">litres</SelectItem>
-                    <SelectItem value="kg">kg</SelectItem>
+                  <SelectContent className="bg-background opacity-100">
+                    <SelectItem value="servings" className="bg-background opacity-100">servings</SelectItem>
+                    <SelectItem value="portions" className="bg-background opacity-100">portions</SelectItem>
+                    <SelectItem value="litres" className="bg-background opacity-100">litres</SelectItem>
+                    <SelectItem value="kg" className="bg-background opacity-100">kg</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

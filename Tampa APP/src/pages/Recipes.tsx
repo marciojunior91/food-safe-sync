@@ -262,9 +262,9 @@ export default function Recipes() {
             <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background opacity-100">
               {recipeCategories.map((category) => (
-                <SelectItem key={category} value={category}>{category}</SelectItem>
+                <SelectItem key={category} value={category} className="bg-background opacity-100">{category}</SelectItem>
               ))}
             </SelectContent>
           </Select>
