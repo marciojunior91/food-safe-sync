@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,24 +34,45 @@ const recipeCategories = [
 
 export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit }: CreateRecipeDialogProps) {
   const [formData, setFormData] = useState({
-    name: recipeToEdit?.name || "",
-    yieldAmount: recipeToEdit?.yield_amount?.toString() || "",
-    yieldUnit: recipeToEdit?.yield_unit || "servings",
-    holdTimeDays: recipeToEdit?.hold_time_days?.toString() || "3",
-    category: recipeToEdit?.category || "Mains",
-    estimatedPrepMinutes: recipeToEdit?.estimated_prep_minutes?.toString() || "30",
-    serviceGapMinutes: recipeToEdit?.service_gap_minutes?.toString() || "0",
+    name: "",
+    yieldAmount: "",
+    yieldUnit: "servings",
+    holdTimeDays: "3",
+    category: "Mains",
+    estimatedPrepMinutes: "30",
+    serviceGapMinutes: "0",
   });
-  const [ingredients, setIngredients] = useState<string[]>(recipeToEdit?.ingredients || []);
+  const [ingredients, setIngredients] = useState<string[]>([]);
   const [newIngredient, setNewIngredient] = useState("");
-  const [prepSteps, setPrepSteps] = useState<string[]>(recipeToEdit?.prep_steps || []);
+  const [prepSteps, setPrepSteps] = useState<string[]>([]);
   const [newPrepStep, setNewPrepStep] = useState("");
-  const [selectedAllergens, setSelectedAllergens] = useState<string[]>(recipeToEdit?.allergens || []);
+  const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
   const [customAllergen, setCustomAllergen] = useState("");
-  const [selectedDietary, setSelectedDietary] = useState<string[]>(recipeToEdit?.dietary_requirements || []);
+  const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Update form when recipeToEdit changes
+  useEffect(() => {
+    if (recipeToEdit) {
+      setFormData({
+        name: recipeToEdit.name || "",
+        yieldAmount: recipeToEdit.yield_amount?.toString() || "",
+        yieldUnit: recipeToEdit.yield_unit || "servings",
+        holdTimeDays: recipeToEdit.hold_time_days?.toString() || "3",
+        category: recipeToEdit.category || "Mains",
+        estimatedPrepMinutes: recipeToEdit.estimated_prep_minutes?.toString() || "30",
+        serviceGapMinutes: recipeToEdit.service_gap_minutes?.toString() || "0",
+      });
+      setIngredients(recipeToEdit.ingredients || []);
+      setPrepSteps(recipeToEdit.prep_steps || []);
+      setSelectedAllergens(recipeToEdit.allergens || []);
+      setSelectedDietary(recipeToEdit.dietary_requirements || []);
+    } else {
+      resetForm();
+    }
+  }, [recipeToEdit, open]);
 
   const resetForm = () => {
     setFormData({ 
@@ -179,7 +200,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
 
       toast({
         title: "Success",
-        description: "Recipe created successfully",
+        description: recipeToEdit ? "Recipe updated successfully" : "Recipe created successfully",
       });
 
       resetForm();
@@ -201,7 +222,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Recipe</DialogTitle>
+          <DialogTitle>{recipeToEdit ? "Edit Recipe" : "Create New Recipe"}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -414,7 +435,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Creating..." : "Create Recipe"}
+              {loading ? (recipeToEdit ? "Updating..." : "Creating...") : (recipeToEdit ? "Update Recipe" : "Create Recipe")}
             </Button>
           </div>
         </form>

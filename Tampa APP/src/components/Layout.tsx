@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BarChart3, ClipboardList, Package, Tags, ChefHat, Settings, Building2, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, Lightbulb } from "lucide-react";
+import { BarChart3, ClipboardList, Package, Tags, Settings, Building2, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,10 +19,6 @@ const navigation = [{
   name: "Labeling",
   href: "/labeling",
   icon: Tags
-}, {
-  name: "Kitchen",
-  href: "/kitchen",
-  icon: ChefHat
 }, {
   name: "Inventory",
   href: "/inventory",

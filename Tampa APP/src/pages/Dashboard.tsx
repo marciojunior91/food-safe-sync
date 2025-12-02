@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { StatsCard } from "@/components/StatsCard";
 import { AlertsDashboard } from "@/components/AlertsDashboard";
 import ExpiryAlerts from "@/components/ExpiryAlerts";
-import { StaffLogin } from "@/components/auth/StaffLogin";
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { WasteTracker } from "@/components/analytics/WasteTracker";
 import { ComplianceReports } from "@/components/analytics/ComplianceReports";
@@ -30,38 +29,14 @@ import { format, isAfter, isBefore, addDays } from "date-fns";
 export default function Dashboard() {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedStaff, setSelectedStaff] = useState<any>(null);
-  const [showStaffLogin, setShowStaffLogin] = useState(false);
   const [totalWaste, setTotalWaste] = useState<number>(0);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    // Temporarily disabled staff login - set default staff
-    setSelectedStaff({ name: 'Admin User', role: 'Administrator' });
+    fetchRecentActivity();
+    fetchWasteTotal();
   }, []);
-
-  useEffect(() => {
-    if (selectedStaff) {
-      fetchRecentActivity();
-      fetchWasteTotal();
-    }
-  }, [selectedStaff]);
-
-  const handleStaffSelected = (staff: any) => {
-    setSelectedStaff(staff);
-    setShowStaffLogin(false);
-    toast({
-      title: "Welcome!",
-      description: `Hello ${staff.name}, welcome to the kitchen dashboard`,
-    });
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('selectedStaff');
-    setSelectedStaff(null);
-    setShowStaffLogin(true);
-  };
 
   const fetchRecentActivity = async () => {
     try {
@@ -128,8 +103,6 @@ export default function Dashboard() {
     }
   };
 
-  // Staff login temporarily disabled
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -137,11 +110,10 @@ export default function Dashboard() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Kitchen Dashboard</h1>
           <p className="text-muted-foreground mt-2">
-            Welcome {selectedStaff?.name} - Monitor your kitchen operations and food safety
+            Monitor your kitchen operations and food safety
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={handleLogout}>Switch Staff</Button>
           <Button variant="hero">Generate Report</Button>
         </div>
       </div>

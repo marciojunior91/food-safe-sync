@@ -11,7 +11,6 @@ import { GlobalTimerManager } from "@/components/GlobalTimerManager";
 import Dashboard from "./pages/Dashboard";
 import Recipes from "./pages/Recipes";
 import Labeling from "./pages/Labeling";
-import Kitchen from "./pages/Kitchen";
 import Inventory from "./pages/Inventory";
 import Analytics from "./pages/Analytics";
 import Index from "./pages/Index";
@@ -43,7 +42,6 @@ const App = () => (
               <Route index element={<Dashboard />} />
               <Route path="recipes" element={<Recipes />} />
               <Route path="labeling" element={<Labeling />} />
-              {/* <Route path="kitchen" element={<Kitchen />} /> */}
               <Route path="inventory" element={<Inventory />} />
               <Route path="routines" element={<DailyRoutines />} />
               <Route path="training" element={<Training />} />

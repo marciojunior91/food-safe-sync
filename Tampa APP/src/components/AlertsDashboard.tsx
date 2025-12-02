@@ -67,7 +67,7 @@ export function AlertsDashboard({ items }: AlertsDashboardProps) {
           </div>
 
           {/* Tomorrow - Will Expire */}
-          <div className="flex items-center justify-between p-4 bg-success/10 rounded-lg border border-success/20">
+          <div className="flex items-center justify-between p-4 bg-success/10 rounded-lg border border-success/20 backdrop-blur-sm hover:bg-success/20 transition-all">
             <div className="flex items-center gap-3">
               <Badge variant="secondary" className="text-xs">Tomorrow</Badge>
               <span className="text-sm font-medium">Will expire</span>
