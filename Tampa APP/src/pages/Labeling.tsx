@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   Plus, 
   Printer, 
@@ -7,7 +7,9 @@ import {
   AlertTriangle,
   Search,
   Filter,
-  Settings
+  Settings,
+  Check,
+  ChevronsUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,60 +18,12 @@ import { LabelForm, LabelData } from "@/components/labels/LabelForm";
 import { TemplateManagement } from "@/components/labels/TemplateManagement";
 import { UserSelectionDialog } from "@/components/labels/UserSelectionDialog";
 import { useToast } from "@/hooks/use-toast";
-
-const labelTemplates = [
-  {
-    id: 1,
-    name: "Standard Food Label",
-    fields: ["Product Name", "Prep Date", "Expiry Date", "Allergens", "QR Code"],
-    usage: 156,
-    created: "2024-01-15"
-  },
-  {
-    id: 2,
-    name: "Allergen Alert Label",
-    fields: ["Product Name", "Major Allergens", "Warning Text", "Date"],
-    usage: 89,
-    created: "2024-01-10"
-  },
-  {
-    id: 3,
-    name: "HACCP Temperature Log",
-    fields: ["Product", "Temp", "Time", "Staff Initial", "QR Code"],
-    usage: 234,
-    created: "2024-01-05"
-  }
-];
-
-const recentLabels = [
-  {
-    id: 1,
-    product: "Chicken Salad",
-    template: "Standard Food Label",
-    expiry: "2024-08-22",
-    status: "Printed",
-    printedBy: "Sarah M.",
-    time: "10:30 AM"
-  },
-  {
-    id: 2,
-    product: "Beef Stew",
-    template: "Allergen Alert Label",
-    expiry: "2024-08-23",
-    status: "Ready",
-    printedBy: "Mike C.",
-    time: "11:15 AM"
-  },
-  {
-    id: 3,
-    product: "Soup Base",
-    template: "HACCP Temperature Log",
-    expiry: "2024-08-21",
-    status: "Expiring Soon",
-    printedBy: "Jennifer K.",
-    time: "9:45 AM"
-  }
-];
+import { supabase } from "@/integrations/supabase/client";
+import { printLabel } from "@/utils/zebraPrinter";
+import { getExpiryStatus, getStatusColor } from "@/utils/trafficLight";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export default function Labeling() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -81,6 +35,210 @@ export default function Labeling() {
     display_name: string | null;
   } | null>(null);
   const { toast } = useToast();
+
+  // Dashboard Stats State
+  const [labelsToday, setLabelsToday] = useState(0);
+  const [totalLabels, setTotalLabels] = useState(0);
+  const [expiringCount, setExpiringCount] = useState(0);
+  const [recentPrintedLabels, setRecentPrintedLabels] = useState<any[]>([]);
+
+  // Quick Actions State
+  const [products, setProducts] = useState<any[]>([]);
+  const [openProduct, setOpenProduct] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [quickQuantity, setQuickQuantity] = useState(1);
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchTemplates();
+    fetchDashboardStats();
+    fetchRecentLabels();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select(`
+          id,
+          name,
+          measuring_unit_id,
+          measuring_units:measuring_unit_id (
+            name,
+            abbreviation
+          )
+        `)
+        .order("name");
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("label_templates")
+        .select("*")
+        .order("name")
+        .returns<any[]>();
+
+      if (error) throw error;
+      setTemplates(data || []);
+      
+      // Set default template (first one or the one named "Standard Food Label")
+      if (data && data.length > 0) {
+        const defaultTemplate = data.find(t => t.name === "Standard Food Label") || data[0];
+        setSelectedTemplate(defaultTemplate);
+      }
+    } catch (error) {
+      console.error("Error fetching templates:", error);
+    }
+  };
+
+  const fetchDashboardStats = async () => {
+    try {
+      // Get today's date range
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // Get labels printed today
+      const { count: todayCount, error: todayError } = await supabase
+        .from("printed_labels")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", today.toISOString())
+        .lt("created_at", tomorrow.toISOString());
+
+      if (todayError) throw todayError;
+      setLabelsToday(todayCount || 0);
+
+      // Get total labels
+      const { count: totalCount, error: totalError } = await supabase
+        .from("printed_labels")
+        .select("*", { count: "exact", head: true });
+
+      if (totalError) throw totalError;
+      setTotalLabels(totalCount || 0);
+
+      // Get labels expiring in next 24 hours
+      const now = new Date();
+      const next24Hours = new Date();
+      next24Hours.setHours(next24Hours.getHours() + 24);
+
+      const { count: expiringCountData, error: expiringError } = await supabase
+        .from("printed_labels")
+        .select("*", { count: "exact", head: true })
+        .gte("expiry_date", now.toISOString().split('T')[0])
+        .lte("expiry_date", next24Hours.toISOString().split('T')[0]);
+
+      if (expiringError) throw expiringError;
+      setExpiringCount(expiringCountData || 0);
+
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+    }
+  };
+
+  const fetchRecentLabels = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("printed_labels")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setRecentPrintedLabels(data || []);
+    } catch (error) {
+      console.error("Error fetching recent labels:", error);
+    }
+  };
+
+  const handleQuickPrint = async () => {
+    if (!selectedProduct) {
+      toast({
+        title: "Product Required",
+        description: "Please select a product to print.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get current user info
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to print labels.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get user profile for display name
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", user.id)
+      .single();
+
+    const now = new Date();
+    const prepDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // Default expiry 3 days for quick print example
+    const expiryDateObj = new Date(now);
+    expiryDateObj.setDate(now.getDate() + 3);
+    const expiryDate = expiryDateObj.toISOString().split('T')[0];
+
+    const labelData = {
+      productId: selectedProduct.id,
+      productName: selectedProduct.name,
+      categoryId: null, // Quick print doesn't have category
+      categoryName: "Quick Print",
+      preparedBy: user.id,
+      preparedByName: profile?.display_name || user.email || "Unknown",
+      prepDate: prepDate,
+      expiryDate: expiryDate,
+      condition: "refrigerated", // Default condition for quick print
+      quantity: quickQuantity.toString(),
+      unit: selectedProduct.measuring_units?.abbreviation || "",
+      batchNumber: selectedProduct.batch_number || ""
+      };
+
+    try {
+      const result = await printLabel(labelData);
+      
+      if (result.success) {
+        toast({
+          title: "Label Sent to Printer",
+          description: `Printing ${quickQuantity} label(s) for ${selectedProduct.name}`,
+        });
+        
+        // Reload dashboard stats
+        fetchDashboardStats();
+        fetchRecentLabels();
+      } else {
+        toast({
+          title: "Print Failed",
+          description: result.error || "Could not connect to printer.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error in quick print:", error);
+      toast({
+        title: "Print Failed",
+        description: "An error occurred while printing.",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   const handleCreateLabel = () => {
     setUserDialogOpen(true);
@@ -99,12 +257,49 @@ export default function Labeling() {
     setCurrentView('overview');
   };
 
-  const handlePrintLabel = (data: LabelData) => {
-    toast({
-      title: "Label Printed",
-      description: `Label for ${data.productName} has been sent to the printer.`,
-    });
-    setCurrentView('overview');
+  const handlePrintLabel = async (data: LabelData) => {
+    try {
+      const result = await printLabel({
+        productId: data.productId,
+        productName: data.productName,
+        categoryId: data.categoryId === "all" ? null : data.categoryId,
+        categoryName: data.categoryName,
+        preparedBy: data.preparedBy,
+        preparedByName: data.preparedByName,
+        prepDate: data.prepDate,
+        expiryDate: data.expiryDate,
+        condition: data.condition,
+        quantity: data.quantity,
+        unit: data.unit,
+        batchNumber: data.batchNumber
+      });
+
+      if (result.success) {
+        toast({
+          title: "Label Printed Successfully",
+          description: `Label for ${data.productName} has been sent to the printer and saved to history.`,
+        });
+        
+        // Reload dashboard stats
+        fetchDashboardStats();
+        fetchRecentLabels();
+        
+        setCurrentView('overview');
+      } else {
+        toast({
+          title: "Print Failed",
+          description: result.error || "Could not connect to printer.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error printing label:", error);
+      toast({
+        title: "Print Error",
+        description: "An unexpected error occurred while printing.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleCancelForm = () => {
@@ -133,6 +328,7 @@ export default function Labeling() {
     return (
       <TemplateManagement
         onCreateNew={handleCreateLabel}
+        onBack={() => setCurrentView('overview')}
       />
     );
   }
@@ -176,29 +372,29 @@ export default function Labeling() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatsCard
           title="Labels Today"
-          value={247}
-          change="+12% from yesterday"
-          changeType="positive"
+          value={labelsToday}
+          change={`Total: ${totalLabels} labels`}
+          changeType="neutral"
           icon={Printer}
         />
         <StatsCard
-          title="Templates Active"
-          value={8}
-          change="3 recently updated"
+          title="Recent Labels"
+          value={recentPrintedLabels.length}
+          change="Last 10 printed"
           changeType="neutral"
           icon={QrCode}
         />
         <StatsCard
           title="Expiring Soon"
-          value={15}
+          value={expiringCount}
           change="Next 24 hours"
-          changeType="negative"
+          changeType={expiringCount > 10 ? "negative" : "neutral"}
           icon={AlertTriangle}
         />
         <StatsCard
           title="Compliance Rate"
-          value="98.5%"
-          change="+0.3% this week"
+          value={totalLabels > 0 ? "Active" : "No Data"}
+          change={`${totalLabels} printed`}
           changeType="positive"
           icon={Calendar}
         />
@@ -209,22 +405,84 @@ export default function Labeling() {
         <h3 className="font-semibold text-lg mb-4">Quick Print</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-3">
-            <label className="text-sm font-medium">Product Name</label>
-            <Input placeholder="Enter product name" />
+            <label className="text-sm font-medium">Product</label>
+            <Popover open={openProduct} onOpenChange={setOpenProduct}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openProduct}
+                  className="w-full justify-between"
+                >
+                  {selectedProduct
+                    ? products.find((p) => p.id === selectedProduct.id)?.name
+                    : "Select product..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0">
+                <Command>
+                  <CommandInput placeholder="Search product..." />
+                  <CommandList>
+                    <CommandEmpty>No product found.</CommandEmpty>
+                    <CommandGroup>
+                      {products.map((product) => (
+                        <CommandItem
+                          key={product.id}
+                          value={product.name}
+                          onSelect={() => {
+                            setSelectedProduct(product);
+                            setOpenProduct(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {product.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="space-y-3">
             <label className="text-sm font-medium">Template</label>
-            <select className="w-full h-10 px-3 py-2 text-sm border border-input bg-background rounded-md">
-              <option>Standard Food Label</option>
-              <option>Allergen Alert Label</option>
-              <option>HACCP Temperature Log</option>
+            <select 
+              className="w-full h-10 px-3 py-2 text-sm border border-input bg-background rounded-md"
+              value={selectedTemplate?.id || ""}
+              onChange={(e) => {
+                const template = templates.find(t => t.id === e.target.value);
+                setSelectedTemplate(template);
+              }}
+            >
+              {templates.length === 0 ? (
+                <option value="">No templates available</option>
+              ) : (
+                templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
           <div className="space-y-3">
             <label className="text-sm font-medium">Quantity</label>
             <div className="flex gap-2">
-              <Input type="number" placeholder="1" className="flex-1" />
-              <Button variant="default">
+              <Input 
+                type="number" 
+                placeholder="1" 
+                className="flex-1"
+                value={quickQuantity}
+                onChange={(e) => setQuickQuantity(parseInt(e.target.value) || 1)}
+                min="1"
+              />
+              <Button variant="default" onClick={handleQuickPrint}>
                 <Printer className="w-4 h-4 mr-2" />
                 Print
               </Button>
@@ -302,25 +560,48 @@ export default function Labeling() {
           </div>
 
           <div className="space-y-3">
-            {recentLabels.map((label) => (
-              <div key={label.id} className="bg-card rounded-lg border shadow-card p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium">{label.product}</h4>
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                    label.status === 'Printed' ? 'bg-success/10 text-success' :
-                    label.status === 'Ready' ? 'bg-primary/10 text-primary' :
-                    'bg-warning/10 text-warning'
-                  }`}>
-                    {label.status}
-                  </span>
-                </div>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>Template: {label.template}</p>
-                  <p>Expires: {new Date(label.expiry).toLocaleDateString()}</p>
-                  <p>By: {label.printedBy} at {label.time}</p>
-                </div>
+            {recentPrintedLabels.length === 0 ? (
+              <div className="bg-card rounded-lg border shadow-card p-8 text-center">
+                <Printer className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No labels printed yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Start printing labels to see them here
+                </p>
               </div>
-            ))}
+            ) : (
+              recentPrintedLabels
+                .filter(label => 
+                  searchTerm === "" || 
+                  label.product_name.toLowerCase().includes(searchTerm.toLowerCase())
+                )
+                .map((label) => {
+                  const expiryStatus = getExpiryStatus(label.expiry_date);
+                  const statusColor = getStatusColor(expiryStatus);
+                  
+                  return (
+                    <div key={label.id} className="bg-card rounded-lg border shadow-card p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-medium">{label.product_name}</h4>
+                        <span className={`px-2 py-1 rounded-md text-xs font-medium`}
+                          style={{ 
+                            backgroundColor: `${statusColor}20`, 
+                            color: statusColor 
+                          }}
+                        >
+                          {expiryStatus}
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <p>Category: {label.category_name || "N/A"}</p>
+                        <p>Condition: {label.condition}</p>
+                        <p>Prep: {new Date(label.prep_date).toLocaleDateString()} | Expires: {new Date(label.expiry_date).toLocaleDateString()}</p>
+                        <p>By: {label.prepared_by_name} at {new Date(label.created_at).toLocaleTimeString()}</p>
+                        {label.quantity && <p>Qty: {label.quantity} {label.unit}</p>}
+                      </div>
+                    </div>
+                  );
+                })
+            )}
           </div>
         </div>
       </div>

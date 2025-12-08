@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { BarChart3, ClipboardList, Package, Tags, Settings, Building2, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, Lightbulb } from "lucide-react";
+import { BarChart3, ClipboardList, Package, Tags, Settings, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
+import { TampaIcon } from "@/components/TampaIcon";
 const navigation = [{
   name: "Dashboard",
   href: "/",
@@ -80,9 +81,7 @@ export function Layout() {
         <div className="fixed inset-y-0 left-0 w-64 bg-card border-r shadow-modal">
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-primary-foreground" />
-              </div>
+              <TampaIcon className="w-8 h-8" />
               <h1 className="font-bold text-lg">Tampa APP</h1>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
@@ -105,10 +104,8 @@ export function Layout() {
       <div className="hidden lg:fixed lg:inset-y-0 lg:w-64 lg:flex lg:flex-col">
         <div className="flex flex-col flex-1 bg-card border-r shadow-card">
           <div className="flex items-center gap-2 p-6 border-b">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <h1 className="font-bold text-lg">FoodService Hub</h1>
+            <TampaIcon className="w-8 h-8" />
+            <h1 className="font-bold text-lg">Tampa APP</h1>
           </div>
           <nav className="flex-1 p-4 space-y-2">
             {navigation.map(item => {

@@ -937,6 +937,230 @@ export type Database = {
         }
         Relationships: []
       }
+      label_templates: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+          zpl_code: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name: string
+          updated_at?: string
+          zpl_code?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          updated_at?: string
+          zpl_code?: string | null
+        }
+        Relationships: []
+      }
+      printed_labels: {
+        Row: {
+          category_id: string | null
+          category_name: string | null
+          condition: string
+          created_at: string
+          expiry_date: string
+          id: string
+          prep_date: string
+          prepared_by: string | null
+          prepared_by_name: string | null
+          product_id: string | null
+          product_name: string
+          quantity: string | null
+          unit: string | null
+        }
+        Insert: {
+          category_id?: string | null
+          category_name?: string | null
+          condition: string
+          created_at?: string
+          expiry_date: string
+          id?: string
+          prep_date: string
+          prepared_by?: string | null
+          prepared_by_name?: string | null
+          product_id?: string | null
+          product_name: string
+          quantity?: string | null
+          unit?: string | null
+        }
+        Update: {
+          category_id?: string | null
+          category_name?: string | null
+          condition?: string
+          created_at?: string
+          expiry_date?: string
+          id?: string
+          prep_date?: string
+          prepared_by?: string | null
+          prepared_by_name?: string | null
+          product_id?: string | null
+          product_name?: string
+          quantity?: string | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "printed_labels_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "label_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "printed_labels_prepared_by_fkey"
+            columns: ["prepared_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "printed_labels_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      label_drafts: {
+        Row: {
+          id: string
+          user_id: string
+          draft_name: string
+          form_data: any
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          draft_name: string
+          form_data: any
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          draft_name?: string
+          form_data?: any
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "label_drafts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      print_queue: {
+        Row: {
+          batch_number: string | null
+          category_id: string | null
+          condition: string
+          created_at: string
+          expiry_date: string
+          id: string
+          notes: string | null
+          prep_date: string
+          prepared_by_name: string
+          priority: number | null
+          product_id: string | null
+          quantity: string | null
+          status: string
+          template_id: string | null
+          unit: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          batch_number?: string | null
+          category_id?: string | null
+          condition: string
+          created_at?: string
+          expiry_date: string
+          id?: string
+          notes?: string | null
+          prep_date?: string
+          prepared_by_name: string
+          priority?: number | null
+          product_id?: string | null
+          quantity?: string | null
+          status?: string
+          template_id?: string | null
+          unit?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          batch_number?: string | null
+          category_id?: string | null
+          condition?: string
+          created_at?: string
+          expiry_date?: string
+          id?: string
+          notes?: string | null
+          prep_date?: string
+          prepared_by_name?: string
+          priority?: number | null
+          product_id?: string | null
+          quantity?: string | null
+          status?: string
+          template_id?: string | null
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "print_queue_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "label_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_queue_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_queue_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "label_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "print_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       compliance_summary: {

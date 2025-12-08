@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { 
@@ -11,11 +12,24 @@ import {
   X, 
   Package,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  ArrowLeft,
+  Plus
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { LabelPreview } from "./LabelPreview";
 
 export interface LabelData {
   categoryId: string;
@@ -29,6 +43,7 @@ export interface LabelData {
   expiryDate: string;
   quantity: string;
   unit: string;
+  batchNumber: string;
 }
 
 interface LabelFormProps {
@@ -50,10 +65,15 @@ interface Category {
 interface Product {
   id: string;
   name: string;
+  category_id: string | null;
   measuring_unit_id: string | null;
   measuring_units?: {
     name: string;
     abbreviation: string;
+  };
+  label_categories?: {
+    id: string;
+    name: string;
   };
 }
 
@@ -69,9 +89,31 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
   const [openCategory, setOpenCategory] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
   const [openCondition, setOpenCondition] = useState(false);
+  
+  // New category creation states
+  const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
+  // New product creation states
+  const [showCreateProductDialog, setShowCreateProductDialog] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductCategory, setNewProductCategory] = useState("");
+  const [creatingProduct, setCreatingProduct] = useState(false);
+
+  // Draft saving states
+  const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
+
+  const filteredCategories = categories.filter(category => 
+    category.name.toLowerCase().includes(categorySearch.toLowerCase())
+  );
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -86,7 +128,8 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
     prepDate: today,
     expiryDate: "",
     quantity: "",
-    unit: ""
+    unit: "",
+    batchNumber: ""
   });
 
   useEffect(() => {
@@ -101,8 +144,14 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
   useEffect(() => {
     fetchCategories();
-    fetchProducts();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts(labelData.categoryId, productSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [labelData.categoryId, productSearch]);
 
   const fetchCategories = async () => {
     try {
@@ -112,31 +161,209 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         .order("name");
 
       if (error) throw error;
+      console.log("Fetched categories:", data);
       setCategories(data || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (categoryId?: string, search?: string) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("products")
         .select(`
           id,
           name,
+          category_id,
           measuring_unit_id,
           measuring_units:measuring_unit_id (
             name,
             abbreviation
+          ),
+          label_categories:category_id (
+            id,
+            name
           )
         `)
-        .order("name");
+        .order("name")
+        .limit(50);
+
+      if (categoryId && categoryId !== "all") {
+        query = query.eq("category_id", categoryId);
+      }
+
+      if (search) {
+        query = query.ilike("name", `%${search}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setProducts(data || []);
     } catch (error) {
       console.error("Error fetching products:", error);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter a category name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCreatingCategory(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("label_categories")
+        .insert({
+          name: newCategoryName.trim()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        // Check for duplicate error (PostgreSQL error code 23505)
+        if (error.code === "23505") {
+          toast({
+            title: "Category Already Exists",
+            description: `A category named "${newCategoryName}" already exists in your organization.`,
+            variant: "destructive"
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      toast({
+        title: "Category Created",
+        description: `"${newCategoryName}" has been created successfully.`
+      });
+
+      // Update local state and select the new category
+      setCategories(prev => [...prev, data]);
+      setLabelData(prev => ({
+        ...prev,
+        categoryId: data.id,
+        categoryName: data.name,
+        productId: "",
+        productName: ""
+      }));
+
+      // Reset dialog state
+      setNewCategoryName("");
+      setShowCreateCategoryDialog(false);
+      setCategorySearch("");
+      setOpenCategory(false);
+
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create category",
+        variant: "destructive"
+      });
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
+  const handleCreateProduct = async () => {
+    if (!newProductName.trim()) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter a product name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!newProductCategory) {
+      toast({
+        title: "Category Required",
+        description: "Please select a category for the product",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCreatingProduct(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .insert({
+          name: newProductName.trim(),
+          category_id: newProductCategory
+        })
+        .select(`
+          id,
+          name,
+          category_id,
+          measuring_unit_id,
+          measuring_units:measuring_unit_id (
+            name,
+            abbreviation
+          ),
+          label_categories:category_id (
+            id,
+            name
+          )
+        `)
+        .single();
+
+      if (error) {
+        // Check for duplicate error (PostgreSQL error code 23505)
+        if (error.code === "23505") {
+          toast({
+            title: "Product Already Exists",
+            description: `A product named "${newProductName}" already exists in your organization.`,
+            variant: "destructive"
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      toast({
+        title: "Product Created",
+        description: `"${newProductName}" has been created successfully.`
+      });
+
+      // Update local state and select the new product
+      setProducts(prev => [...prev, data]);
+      setLabelData(prev => ({
+        ...prev,
+        productId: data.id,
+        productName: data.name,
+        categoryId: data.category_id || prev.categoryId,
+        categoryName: data.label_categories?.name || prev.categoryName,
+        unit: data.measuring_units?.abbreviation || ""
+      }));
+
+      // Reset dialog state
+      setNewProductName("");
+      setNewProductCategory("");
+      setShowCreateProductDialog(false);
+      setProductSearch("");
+      setOpenProduct(false);
+
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive"
+      });
+    } finally {
+      setCreatingProduct(false);
     }
   };
 
@@ -180,13 +407,58 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       ...prev,
       productId: product.id,
       productName: product.name,
-      unit: product.measuring_units?.abbreviation || ""
+      unit: product.measuring_units?.abbreviation || "",
+      categoryId: product.category_id || prev.categoryId,
+      categoryName: product.label_categories?.name || prev.categoryName
     }));
     setOpenProduct(false);
   };
 
+  const handleSaveDraft = async () => {
+    if (!draftName.trim()) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter a draft name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingDraft(true);
+
+    try {
+      // user_id, created_at, updated_at são gerados automaticamente pelo banco
+      const { error } = await supabase
+        .from("label_drafts")
+        .insert({
+          draft_name: draftName.trim(),
+          form_data: labelData
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Draft Saved",
+        description: `Draft "${draftName}" has been saved successfully.`
+      });
+
+      setDraftName("");
+      setShowSaveDraftDialog(false);
+
+    } catch (error) {
+      console.error("Error saving draft:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save draft",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
   const handleSave = () => {
-    if (!labelData.productId || !labelData.categoryId || !labelData.condition) {
+    if (!labelData.productId || !labelData.condition) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -198,7 +470,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   };
 
   const handlePrint = () => {
-    if (!labelData.productId || !labelData.categoryId || !labelData.condition) {
+    if (!labelData.productId || !labelData.condition) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -212,12 +484,19 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Create Label</h2>
-          <p className="text-muted-foreground">Fill in the information for your food label</p>
+        <div className="flex items-center gap-4">
+          {onCancel && (
+            <Button onClick={onCancel} variant="ghost" size="icon">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+          <div>
+            <h2 className="text-2xl font-bold">Create Label</h2>
+            <p className="text-muted-foreground">Fill in the information for your food label</p>
+          </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleSave} variant="outline" className="flex items-center gap-2">
+          <Button onClick={() => setShowSaveDraftDialog(true)} variant="outline" className="flex items-center gap-2">
             <Save className="w-4 h-4" />
             Save Draft
           </Button>
@@ -225,11 +504,6 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
             <Printer className="w-4 h-4" />
             Print Label
           </Button>
-          {onCancel && (
-            <Button onClick={onCancel} variant="ghost">
-              <X className="w-4 h-4" />
-            </Button>
-          )}
         </div>
       </div>
 
@@ -256,13 +530,61 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search category..." />
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput 
+                    placeholder="Search category..." 
+                    value={categorySearch}
+                    onValueChange={setCategorySearch}
+                  />
                   <CommandList>
-                    <CommandEmpty>No category found.</CommandEmpty>
+                    {filteredCategories.length === 0 && (
+                      <CommandEmpty>
+                        <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            No category found. Would you like to create one?
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setNewCategoryName(categorySearch);
+                              setShowCreateCategoryDialog(true);
+                              setOpenCategory(false);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create "{categorySearch || 'New Category'}"
+                          </Button>
+                        </div>
+                      </CommandEmpty>
+                    )}
                     <CommandGroup>
-                      {categories.map((category) => (
+                      <CommandItem
+                        value="All Categories"
+                        onSelect={() => {
+                          setLabelData(prev => ({
+                            ...prev,
+                            categoryId: "all",
+                            categoryName: "All Categories",
+                            productId: "",
+                            productName: ""
+                          }));
+                          setProductSearch("");
+                          setCategorySearch("");
+                          setOpenCategory(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            labelData.categoryId === "all" ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        All Categories
+                      </CommandItem>
+                      {filteredCategories.map((category) => (
                         <CommandItem
                           key={category.id}
                           value={category.name}
@@ -270,8 +592,12 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                             setLabelData(prev => ({
                               ...prev,
                               categoryId: category.id,
-                              categoryName: category.name
+                              categoryName: category.name,
+                              productId: "",
+                              productName: ""
                             }));
+                            setProductSearch("");
+                            setCategorySearch("");
                             setOpenCategory(false);
                           }}
                         >
@@ -306,11 +632,37 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search product..." />
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput 
+                    placeholder="Search product..." 
+                    value={productSearch}
+                    onValueChange={setProductSearch}
+                  />
                   <CommandList>
-                    <CommandEmpty>No product found.</CommandEmpty>
+                    {products.length === 0 && (
+                      <CommandEmpty>
+                        <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            No product found. Would you like to create one?
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setNewProductName(productSearch);
+                              setNewProductCategory(labelData.categoryId === "all" ? "" : labelData.categoryId);
+                              setShowCreateProductDialog(true);
+                              setOpenProduct(false);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create "{productSearch || 'New Product'}"
+                          </Button>
+                        </div>
+                      </CommandEmpty>
+                    )}
                     <CommandGroup>
                       {products.map((product) => (
                         <CommandItem
@@ -431,53 +783,199 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
               />
             </div>
             <div className="space-y-2">
-              <Label>Unit</Label>
-              <Input
-                value={labelData.unit}
-                readOnly
-                className="bg-muted"
-                placeholder="Auto-loaded"
-              />
+              <Label htmlFor="unit">Unit</Label>
+              <Select 
+                value={labelData.unit} 
+                onValueChange={(value) => setLabelData(prev => ({ ...prev, unit: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kg">kg (Kilogram)</SelectItem>
+                  <SelectItem value="g">g (Gram)</SelectItem>
+                  <SelectItem value="L">L (Liter)</SelectItem>
+                  <SelectItem value="mL">mL (Milliliter)</SelectItem>
+                  <SelectItem value="pcs">pcs (Pieces)</SelectItem>
+                  <SelectItem value="oz">oz (Ounce)</SelectItem>
+                  <SelectItem value="lb">lb (Pound)</SelectItem>
+                  <SelectItem value="gal">gal (Gallon)</SelectItem>
+                  <SelectItem value="servings">Servings</SelectItem>
+                  <SelectItem value="portions">Portions</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Auto-loaded from product or select manually
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Label Preview */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Label Preview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 space-y-2 text-black">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-lg">{labelData.productName || "Product Name"}</h3>
-              <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                {labelData.categoryName || "Category"}
-              </span>
+      {/* Label Preview with QR Code */}
+      <LabelPreview
+        productName={labelData.productName}
+        categoryName={labelData.categoryName}
+        condition={labelData.condition}
+        preparedByName={labelData.preparedByName}
+        prepDate={labelData.prepDate}
+        expiryDate={labelData.expiryDate}
+        quantity={labelData.quantity}
+        unit={labelData.unit}
+        batchNumber={labelData.batchNumber}
+        productId={labelData.productId}
+        templateType="default"
+      />
+
+      {/* Create Category Confirmation Dialog */}
+      <AlertDialog open={showCreateCategoryDialog} onOpenChange={setShowCreateCategoryDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create New Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to create a new category with the following name?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <Label htmlFor="category-name">Category Name</Label>
+            <Input
+              id="category-name"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Enter category name..."
+              className="mt-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !creatingCategory) {
+                  handleCreateCategory();
+                }
+              }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creatingCategory}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCreateCategory} 
+              disabled={creatingCategory || !newCategoryName.trim()}
+            >
+              {creatingCategory ? "Creating..." : "Create Category"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Save Draft Dialog */}
+      <AlertDialog open={showSaveDraftDialog} onOpenChange={setShowSaveDraftDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Draft</AlertDialogTitle>
+            <AlertDialogDescription>
+              Give your draft a name to save your progress and continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <Label htmlFor="draft-name">Draft Name *</Label>
+            <Input
+              id="draft-name"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="e.g., Chicken Breast Label"
+              className="mt-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !savingDraft && draftName.trim()) {
+                  handleSaveDraft();
+                }
+              }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingDraft}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleSaveDraft} 
+              disabled={savingDraft || !draftName.trim()}
+            >
+              {savingDraft ? "Saving..." : "Save Draft"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Product Confirmation Dialog */}
+      <AlertDialog open={showCreateProductDialog} onOpenChange={setShowCreateProductDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create New Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Fill in the details to create a new product.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 my-4">
+            <div>
+              <Label htmlFor="product-name">Product Name *</Label>
+              <Input
+                id="product-name"
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+                placeholder="Enter product name..."
+                className="mt-2"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !creatingProduct && newProductName.trim() && newProductCategory) {
+                    handleCreateProduct();
+                  }
+                }}
+              />
             </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <strong>Condition:</strong> {CONDITIONS.find(c => c.value === labelData.condition)?.label || "N/A"}
-              </div>
-              <div>
-                <strong>Prepared by:</strong> {labelData.preparedByName || "N/A"}
-              </div>
-              <div>
-                <strong>Prep Date:</strong> {labelData.prepDate ? new Date(labelData.prepDate).toLocaleDateString() : "N/A"}
-              </div>
-              <div>
-                <strong>Expiry:</strong> {labelData.expiryDate ? new Date(labelData.expiryDate).toLocaleDateString() : "N/A"}
-              </div>
-              {labelData.quantity && (
-                <div className="col-span-2">
-                  <strong>Quantity:</strong> {labelData.quantity} {labelData.unit}
-                </div>
-              )}
+            <div>
+              <Label htmlFor="product-category">Category *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between mt-2"
+                  >
+                    {categories.find(c => c.id === newProductCategory)?.name || "Select category..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search category..." />
+                    <CommandList>
+                      <CommandEmpty>No category found.</CommandEmpty>
+                      <CommandGroup>
+                        {categories.map((category) => (
+                          <CommandItem
+                            key={category.id}
+                            value={category.name}
+                            onSelect={() => setNewProductCategory(category.id)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                newProductCategory === category.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {category.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creatingProduct}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCreateProduct} 
+              disabled={creatingProduct || !newProductName.trim() || !newProductCategory}
+            >
+              {creatingProduct ? "Creating..." : "Create Product"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
