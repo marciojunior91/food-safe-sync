@@ -17,6 +17,7 @@ import { StatsCard } from "@/components/StatsCard";
 import { LabelForm, LabelData } from "@/components/labels/LabelForm";
 import { TemplateManagement } from "@/components/labels/TemplateManagement";
 import { UserSelectionDialog } from "@/components/labels/UserSelectionDialog";
+import { QuickPrintGrid } from "@/components/labels/QuickPrintGrid";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { printLabel } from "@/utils/zebraPrinter";
@@ -239,6 +240,74 @@ export default function Labeling() {
     }
   };
 
+  // Handler for QuickPrintGrid
+  const handleQuickPrintFromGrid = async (product: any) => {
+    // Get current user info
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to print labels.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get user profile for display name
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("user_id", user.id)
+      .single();
+
+    const now = new Date();
+    const prepDate = now.toISOString().split('T')[0];
+    const expiryDateObj = new Date(now);
+    expiryDateObj.setDate(now.getDate() + 3); // Default 3 days
+    const expiryDate = expiryDateObj.toISOString().split('T')[0];
+
+    const labelData = {
+      productId: product.id,
+      productName: product.name,
+      categoryId: product.label_categories?.id || null,
+      categoryName: product.label_categories?.name || "Quick Print",
+      preparedBy: user.id,
+      preparedByName: profile?.display_name || user.email || "Unknown",
+      prepDate: prepDate,
+      expiryDate: expiryDate,
+      condition: "refrigerated",
+      quantity: "1",
+      unit: product.measuring_units?.abbreviation || "",
+      batchNumber: ""
+    };
+
+    try {
+      const result = await printLabel(labelData);
+      
+      if (result.success) {
+        toast({
+          title: "Label Sent to Printer",
+          description: `Printing label for ${product.name}`,
+        });
+        fetchDashboardStats();
+        fetchRecentLabels();
+      } else {
+        toast({
+          title: "Print Failed",
+          description: result.error || "Could not connect to printer.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error in quick print:", error);
+      toast({
+        title: "Print Failed",
+        description: "An error occurred while printing.",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   const handleCreateLabel = () => {
     setUserDialogOpen(true);
@@ -314,6 +383,7 @@ export default function Labeling() {
           onPrint={handlePrintLabel}
           onCancel={handleCancelForm}
           selectedUser={selectedUser || undefined}
+          selectedTemplate={selectedTemplate || undefined}
         />
         <UserSelectionDialog
           open={userDialogOpen}
@@ -367,6 +437,12 @@ export default function Labeling() {
           </Button>
         </div>
       </div>
+
+      {/* Quick Print Grid - Touch Friendly */}
+      <QuickPrintGrid 
+        products={products}
+        onQuickPrint={handleQuickPrintFromGrid}
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

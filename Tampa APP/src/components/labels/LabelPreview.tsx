@@ -1,8 +1,11 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { Eye } from "lucide-react";
+import { AllergenWarningBox } from "./AllergenBadge";
+import { useAllergens } from "@/hooks/useAllergens";
 
 interface LabelPreviewProps {
   productName: string;
@@ -16,6 +19,8 @@ interface LabelPreviewProps {
   batchNumber: string;
   productId?: string;
   templateType?: "default" | "recipe" | "allergen";
+  templateName?: string; // To detect "Blank" template
+  isBlankTemplate?: boolean; // Direct flag for blank templates
 }
 
 const CONDITION_COLORS = {
@@ -39,7 +44,37 @@ export function LabelPreview({
   batchNumber,
   productId,
   templateType = "default",
+  templateName,
+  isBlankTemplate = false,
 }: LabelPreviewProps) {
+  const { getProductAllergens } = useAllergens();
+  const [allergens, setAllergens] = useState<any[]>([]);
+  const [loadingAllergens, setLoadingAllergens] = useState(false);
+
+  // Load allergens when productId changes
+  useEffect(() => {
+    if (productId) {
+      loadAllergens();
+    } else {
+      setAllergens([]);
+    }
+  }, [productId]);
+
+  const loadAllergens = async () => {
+    if (!productId) return;
+    
+    setLoadingAllergens(true);
+    try {
+      const productAllergens = await getProductAllergens(productId);
+      setAllergens(productAllergens);
+    } catch (error) {
+      console.error("Error loading allergens for preview:", error);
+      setAllergens([]);
+    } finally {
+      setLoadingAllergens(false);
+    }
+  };
+
   // Generate QR code data
   const qrData = JSON.stringify({
     productId: productId || "",
@@ -57,6 +92,9 @@ export function LabelPreview({
   // Get condition color
   const conditionColor = CONDITION_COLORS[condition as keyof typeof CONDITION_COLORS] || "bg-gray-100 text-gray-800";
 
+  // Check if this is a blank template (either by name or explicit flag)
+  const isBlank = isBlankTemplate || templateName?.toLowerCase() === "blank";
+
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
@@ -67,13 +105,33 @@ export function LabelPreview({
       </CardHeader>
       <CardContent>
         <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 space-y-4 bg-white dark:bg-gray-950">
-          {/* Header Section */}
-          <div className="text-center border-b-2 border-gray-200 dark:border-gray-800 pb-4">
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{productName || "Product Name"}</h3>
-            {categoryName && (
-              <p className="text-sm text-muted-foreground mt-1">{categoryName}</p>
-            )}
-          </div>
+          {/* Blank Template - Show Empty Preview */}
+          {isBlank ? (
+            <div className="flex flex-col items-center justify-center py-16 space-y-3">
+              <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                <Eye className="w-10 h-10 text-gray-400 dark:text-gray-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                Blank Template
+              </h3>
+              <p className="text-sm text-muted-foreground text-center max-w-xs">
+                This template has no predefined layout. The printer will use its own formatting or custom ZPL code.
+              </p>
+              {templateName && (
+                <Badge variant="outline" className="text-xs mt-2">
+                  {templateName.toUpperCase()}
+                </Badge>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Header Section */}
+              <div className="text-center border-b-2 border-gray-200 dark:border-gray-800 pb-4">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{productName || "Product Name"}</h3>
+                {categoryName && (
+                  <p className="text-sm text-muted-foreground mt-1">{categoryName}</p>
+                )}
+              </div>
 
           {/* Main Content Section */}
           <div className="grid grid-cols-2 gap-4">
@@ -157,16 +215,32 @@ export function LabelPreview({
             </div>
           </div>
 
-          {/* Footer - Template Type Badge */}
-          <div className="border-t-2 border-gray-200 dark:border-gray-800 pt-3 flex justify-between items-center">
-            <Badge variant="outline" className="text-xs">
-              {templateType.toUpperCase()} TEMPLATE
-            </Badge>
-            <p className="text-xs text-muted-foreground">
-              {format(new Date(), "yyyy-MM-dd HH:mm")}
-            </p>
-          </div>
+              {/* Footer - Template Type Badge */}
+              <div className="border-t-2 border-gray-200 dark:border-gray-800 pt-3 flex justify-between items-center">
+                <Badge variant="outline" className="text-xs">
+                  {templateType.toUpperCase()} TEMPLATE
+                </Badge>
+                <p className="text-xs text-muted-foreground">
+                  {format(new Date(), "yyyy-MM-dd HH:mm")}
+                </p>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Allergen Warning Box */}
+        {productId && allergens.length > 0 && (
+          <div className="mt-4">
+            <AllergenWarningBox allergens={allergens} />
+          </div>
+        )}
+
+        {/* Loading State for Allergens */}
+        {productId && loadingAllergens && (
+          <div className="mt-4 text-sm text-muted-foreground text-center animate-pulse">
+            Loading allergen information...
+          </div>
+        )}
 
         {/* Info Note */}
         <div className="mt-4 text-xs text-muted-foreground text-center">

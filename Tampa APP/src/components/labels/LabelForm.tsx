@@ -30,10 +30,15 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { LabelPreview } from "./LabelPreview";
+import { AllergenSelectorEnhanced } from "./AllergenSelectorEnhanced";
+import { SubcategorySelectorSimple } from "./SubcategorySelectorSimple";
+import { useAllergens } from "@/hooks/useAllergens";
 
 export interface LabelData {
   categoryId: string;
   categoryName: string;
+  subcategoryId?: string;
+  subcategoryName?: string;
   productId: string;
   productName: string;
   condition: string;
@@ -54,6 +59,11 @@ interface LabelFormProps {
     id: string;
     user_id: string;
     display_name: string | null;
+  };
+  selectedTemplate?: {
+    id: string;
+    name: string;
+    zpl_code?: string | null;
   };
 }
 
@@ -85,8 +95,9 @@ const CONDITIONS = [
   { value: "refrigerated", label: "Refrigerated", days: 7 },
 ];
 
-export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelFormProps) {
+export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTemplate }: LabelFormProps) {
   const { toast } = useToast();
+  const { updateProductAllergens } = useAllergens();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [productSearch, setProductSearch] = useState("");
@@ -94,6 +105,9 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   const [openCategory, setOpenCategory] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
   const [openCondition, setOpenCondition] = useState(false);
+  
+  // Allergen state
+  const [selectedAllergenIds, setSelectedAllergenIds] = useState<string[]>([]);
   
   // New category creation states
   const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
@@ -120,6 +134,8 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   const [labelData, setLabelData] = useState<LabelData>({
     categoryId: "",
     categoryName: "",
+    subcategoryId: "",
+    subcategoryName: "",
     productId: "",
     productName: "",
     condition: "",
@@ -432,7 +448,8 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         .from("label_drafts")
         .insert({
           draft_name: draftName.trim(),
-          form_data: labelData
+          form_data: labelData as any, // Cast to any to match Json type
+          user_id: (await supabase.auth.getUser()).data.user?.id || ''
         });
 
       if (error) throw error;
@@ -457,7 +474,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!labelData.productId || !labelData.condition) {
       toast({
         title: "Missing Information",
@@ -466,10 +483,16 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       });
       return;
     }
+
+    // Save allergens to product if any are selected
+    if (labelData.productId && selectedAllergenIds.length > 0) {
+      await updateProductAllergens(labelData.productId, selectedAllergenIds);
+    }
+
     onSave?.(labelData);
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (!labelData.productId || !labelData.condition) {
       toast({
         title: "Missing Information",
@@ -478,6 +501,19 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       });
       return;
     }
+
+    // Save allergens to product if any are selected
+    if (labelData.productId && selectedAllergenIds.length > 0) {
+      const success = await updateProductAllergens(labelData.productId, selectedAllergenIds);
+      if (!success) {
+        toast({
+          title: "Warning",
+          description: "Failed to save allergen information, but continuing with print",
+          variant: "destructive"
+        });
+      }
+    }
+
     onPrint?.(labelData);
   };
 
@@ -616,6 +652,21 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
               </PopoverContent>
             </Popover>
           </div>
+
+          {/* Subcategory */}
+          {labelData.categoryId && labelData.categoryId !== "all" && (
+            <SubcategorySelectorSimple
+              categoryId={labelData.categoryId}
+              value={labelData.subcategoryId || ""}
+              onChange={(subcategoryId, subcategoryName) => {
+                setLabelData(prev => ({
+                  ...prev,
+                  subcategoryId,
+                  subcategoryName,
+                }));
+              }}
+            />
+          )}
 
           {/* Product */}
           <div className="space-y-2">
@@ -812,6 +863,23 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         </CardContent>
       </Card>
 
+      {/* Allergen Selector - Only show if product is selected */}
+      {labelData.productId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Allergen Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AllergenSelectorEnhanced
+              selectedAllergenIds={selectedAllergenIds}
+              onChange={setSelectedAllergenIds}
+              productId={labelData.productId}
+              showCommonOnly={false}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Label Preview with QR Code */}
       <LabelPreview
         productName={labelData.productName}
@@ -825,6 +893,8 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         batchNumber={labelData.batchNumber}
         productId={labelData.productId}
         templateType="default"
+        templateName={selectedTemplate?.name}
+        isBlankTemplate={selectedTemplate?.name?.toLowerCase() === "blank"}
       />
 
       {/* Create Category Confirmation Dialog */}
