@@ -58,10 +58,9 @@ export function SubcategorySelector({
     try {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from("product_subcategories")
+        .from("label_subcategories")
         .select("*")
         .eq("category_id", categoryId)
-        .eq("is_active", true)
         .order("display_order");
 
       if (error) throw error;

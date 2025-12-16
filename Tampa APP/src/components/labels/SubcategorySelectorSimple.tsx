@@ -18,36 +18,37 @@ export function SubcategorySelectorSimple({
 }: SubcategorySelectorSimpleProps) {
   const { subcategories, loading } = useSubcategories(categoryId);
 
-  if (!categoryId) {
+  // Safety check: don't render if no categoryId
+  if (!categoryId || categoryId === "all") {
     return null;
   }
 
   if (loading) {
     return (
-      <div className="space-y-2">
-        <Label>Subcategory (Optional)</Label>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Loading subcategories...
-        </div>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading subcategories...
       </div>
     );
   }
 
   if (subcategories.length === 0) {
     return (
-      <div className="space-y-2">
-        <Label className="text-muted-foreground">Subcategory (Optional)</Label>
+      <div>
         <p className="text-xs text-muted-foreground">
           No subcategories available for this category
         </p>
+        <Select disabled>
+          <SelectTrigger id="subcategory">
+            <SelectValue placeholder="No subcategories available" />
+          </SelectTrigger>
+        </Select>
       </div>
     );
   }
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor="subcategory">Subcategory (Optional)</Label>
+    <>
       <Select
         value={value}
         onValueChange={(val) => {
@@ -75,6 +76,6 @@ export function SubcategorySelectorSimple({
       <p className="text-xs text-muted-foreground">
         {subcategories.length} subcategor{subcategories.length === 1 ? 'y' : 'ies'} available
       </p>
-    </div>
+    </>
   );
 }

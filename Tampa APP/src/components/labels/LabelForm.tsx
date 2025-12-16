@@ -29,10 +29,12 @@ import {
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { LabelPreview } from "./LabelPreview";
 import { AllergenSelectorEnhanced } from "./AllergenSelectorEnhanced";
-import { SubcategorySelectorSimple } from "./SubcategorySelectorSimple";
+import { DuplicateProductWarning } from "./DuplicateProductWarning";
 import { useAllergens } from "@/hooks/useAllergens";
+import { useDuplicateDetection } from "@/hooks/useDuplicateDetection";
 
 export interface LabelData {
   categoryId: string;
@@ -76,12 +78,17 @@ interface Product {
   id: string;
   name: string;
   category_id: string | null;
+  subcategory_id?: string | null;
   measuring_unit_id: string | null;
   measuring_units?: {
     name: string;
     abbreviation: string;
   };
   label_categories?: {
+    id: string;
+    name: string;
+  };
+  label_subcategories?: {
     id: string;
     name: string;
   };
@@ -98,7 +105,19 @@ const CONDITIONS = [
 export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTemplate }: LabelFormProps) {
   const { toast } = useToast();
   const { updateProductAllergens } = useAllergens();
+  const { user } = useAuth();
+  
+  // Organization ID fetched from user profile
+  const [organizationId, setOrganizationId] = useState<string>("");
+  
   const [categories, setCategories] = useState<Category[]>([]);
+  
+  // Separate subcategory states for main form and dialog
+  const [formSubcategories, setFormSubcategories] = useState<{ id: string; name: string }[]>([]);
+  const [loadingFormSubcategories, setLoadingFormSubcategories] = useState(false);
+  const [dialogSubcategories, setDialogSubcategories] = useState<{ id: string; name: string }[]>([]);
+  const [loadingDialogSubcategories, setLoadingDialogSubcategories] = useState(false);
+  
   const [products, setProducts] = useState<Product[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [categorySearch, setCategorySearch] = useState("");
@@ -118,12 +137,27 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
   const [showCreateProductDialog, setShowCreateProductDialog] = useState(false);
   const [newProductName, setNewProductName] = useState("");
   const [newProductCategory, setNewProductCategory] = useState("");
+  const [newProductSubcategory, setNewProductSubcategory] = useState("");
   const [creatingProduct, setCreatingProduct] = useState(false);
 
   // Draft saving states
   const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
+  
+  // Duplicate detection for new product creation (only active when organizationId is loaded)
+  const {
+    similarProducts,
+    isLoading: isDuplicateCheckLoading,
+    isDuplicate,
+    error: duplicateCheckError,
+    checkDuplicate
+  } = useDuplicateDetection({
+    productName: newProductName,
+    organizationId: organizationId,
+    minSimilarity: 0.3, // 30% similarity threshold for suggestions
+    debounceMs: 500
+  });
 
   const filteredCategories = categories.filter(category => 
     category.name.toLowerCase().includes(categorySearch.toLowerCase())
@@ -148,6 +182,36 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     batchNumber: ""
   });
 
+  // Fetch organization_id from user profile
+  useEffect(() => {
+    const fetchOrganizationId = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (profile?.organization_id) {
+          setOrganizationId(profile.organization_id);
+        }
+      } catch (error) {
+        console.error("Error fetching organization_id:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load organization information",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    fetchOrganizationId();
+  }, [user, toast]);
+
   useEffect(() => {
     if (selectedUser) {
       setLabelData(prev => ({
@@ -162,12 +226,82 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     fetchCategories();
   }, []);
 
+  // Fetch subcategories for MAIN FORM when category changes
+  useEffect(() => {
+    const fetchFormSubcategories = async () => {
+      if (!labelData.categoryId || labelData.categoryId === "all") {
+        setFormSubcategories([]);
+        return;
+      }
+
+      try {
+        setLoadingFormSubcategories(true);
+        const { data, error } = await supabase
+          .from("label_subcategories")
+          .select("id, name")
+          .eq("category_id", labelData.categoryId)
+          .order("name");
+
+        if (error) throw error;
+        
+        // Defensive: Ensure data is valid
+        const validSubcategories = (data || []).filter(sub => 
+          sub && typeof sub.id === 'string' && typeof sub.name === 'string'
+        );
+        
+        setFormSubcategories(validSubcategories);
+      } catch (error) {
+        console.error("Error fetching form subcategories:", error);
+        setFormSubcategories([]);
+      } finally {
+        setLoadingFormSubcategories(false);
+      }
+    };
+
+    fetchFormSubcategories();
+  }, [labelData.categoryId]);
+
+  // Fetch subcategories for CREATE PRODUCT DIALOG when category changes
+  useEffect(() => {
+    const fetchDialogSubcategories = async () => {
+      if (!newProductCategory) {
+        setDialogSubcategories([]);
+        return;
+      }
+
+      try {
+        setLoadingDialogSubcategories(true);
+        const { data, error } = await supabase
+          .from("label_subcategories")
+          .select("id, name")
+          .eq("category_id", newProductCategory)
+          .order("name");
+
+        if (error) throw error;
+        
+        // Defensive: Ensure data is valid
+        const validSubcategories = (data || []).filter(sub => 
+          sub && typeof sub.id === 'string' && typeof sub.name === 'string'
+        );
+        
+        setDialogSubcategories(validSubcategories);
+      } catch (error) {
+        console.error("Error fetching dialog subcategories:", error);
+        setDialogSubcategories([]);
+      } finally {
+        setLoadingDialogSubcategories(false);
+      }
+    };
+
+    fetchDialogSubcategories();
+  }, [newProductCategory]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchProducts(labelData.categoryId, productSearch);
+      fetchProducts(labelData.categoryId, labelData.subcategoryId, productSearch);
     }, 300);
     return () => clearTimeout(timer);
-  }, [labelData.categoryId, productSearch]);
+  }, [labelData.categoryId, labelData.subcategoryId, productSearch]);
 
   const fetchCategories = async () => {
     try {
@@ -184,7 +318,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     }
   };
 
-  const fetchProducts = async (categoryId?: string, search?: string) => {
+  const fetchProducts = async (categoryId?: string, subcategoryId?: string, search?: string) => {
     try {
       let query = supabase
         .from("products")
@@ -192,12 +326,17 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
           id,
           name,
           category_id,
+          subcategory_id,
           measuring_unit_id,
           measuring_units:measuring_unit_id (
             name,
             abbreviation
           ),
           label_categories:category_id (
+            id,
+            name
+          ),
+          label_subcategories:subcategory_id (
             id,
             name
           )
@@ -209,6 +348,11 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
         query = query.eq("category_id", categoryId);
       }
 
+      // Filter by subcategory if one is selected
+      if (subcategoryId) {
+        query = query.eq("subcategory_id", subcategoryId);
+      }
+
       if (search) {
         query = query.ilike("name", `%${search}%`);
       }
@@ -216,9 +360,19 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
       const { data, error } = await query;
 
       if (error) throw error;
-      setProducts(data || []);
+      
+      // Defensive: Ensure data is array and filter out any malformed products
+      const validProducts = (data || []).filter(product => 
+        product && 
+        typeof product.id === 'string' && 
+        typeof product.name === 'string'
+      );
+      
+      console.log("Fetched products:", validProducts.length, "valid products");
+      setProducts(validProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
+      setProducts([]); // Set to empty array on error
     }
   };
 
@@ -316,18 +470,25 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
         .from("products")
         .insert({
           name: newProductName.trim(),
-          category_id: newProductCategory
+          category_id: newProductCategory,
+          subcategory_id: newProductSubcategory || null,
+          organization_id: organizationId  // Add organization_id to pass RLS
         })
         .select(`
           id,
           name,
           category_id,
+          subcategory_id,
           measuring_unit_id,
           measuring_units:measuring_unit_id (
             name,
             abbreviation
           ),
           label_categories:category_id (
+            id,
+            name
+          ),
+          label_subcategories:subcategory_id (
             id,
             name
           )
@@ -355,18 +516,26 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
 
       // Update local state and select the new product
       setProducts(prev => [...prev, data]);
+      
+      // Update form with the newly created product
+      // This will also update category/subcategory if they differ from current selection
       setLabelData(prev => ({
         ...prev,
         productId: data.id,
         productName: data.name,
+        // Update category (may be different from current if dialog category != form category)
         categoryId: data.category_id || prev.categoryId,
         categoryName: data.label_categories?.name || prev.categoryName,
+        // Update subcategory (may be empty or different)
+        subcategoryId: data.subcategory_id || "",
+        subcategoryName: data.label_subcategories?.name || "",
         unit: data.measuring_units?.abbreviation || ""
       }));
 
       // Reset dialog state
       setNewProductName("");
       setNewProductCategory("");
+      setNewProductSubcategory("");
       setShowCreateProductDialog(false);
       setProductSearch("");
       setOpenProduct(false);
@@ -419,13 +588,18 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
+    // When selecting a product, update ALL related fields including category and subcategory
     setLabelData(prev => ({
       ...prev,
       productId: product.id,
       productName: product.name,
       unit: product.measuring_units?.abbreviation || "",
+      // Update category from product (this will trigger subcategory fetch)
       categoryId: product.category_id || prev.categoryId,
-      categoryName: product.label_categories?.name || prev.categoryName
+      categoryName: product.label_categories?.name || prev.categoryName,
+      // Update subcategory from product
+      subcategoryId: product.subcategory_id || "",
+      subcategoryName: product.label_subcategories?.name || ""
     }));
     setOpenProduct(false);
   };
@@ -517,6 +691,18 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     onPrint?.(labelData);
   };
 
+  // Show loading state while organization ID is being fetched
+  if (!organizationId && user?.id) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading organization information...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -566,7 +752,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+              <PopoverContent className="w-full p-0" align="start" side="bottom">
                 <Command shouldFilter={false}>
                   <CommandInput 
                     placeholder="Search category..." 
@@ -600,10 +786,16 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                       <CommandItem
                         value="All Categories"
                         onSelect={() => {
+                          // "All Categories" selection:
+                          // - Clears subcategory (disabled when "all")
+                          // - Clears product (will show all products)
+                          // - Clears search to start fresh
                           setLabelData(prev => ({
                             ...prev,
                             categoryId: "all",
                             categoryName: "All Categories",
+                            subcategoryId: "",
+                            subcategoryName: "",
                             productId: "",
                             productName: ""
                           }));
@@ -625,10 +817,17 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                           key={category.id}
                           value={category.name}
                           onSelect={() => {
+                            // Category selection:
+                            // - Sets new category
+                            // - Clears subcategory (will load new subcategories via useEffect)
+                            // - Clears product (will filter by new category)
+                            // - Clears search to start fresh
                             setLabelData(prev => ({
                               ...prev,
                               categoryId: category.id,
                               categoryName: category.name,
+                              subcategoryId: "",
+                              subcategoryName: "",
                               productId: "",
                               productName: ""
                             }));
@@ -653,20 +852,67 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
             </Popover>
           </div>
 
-          {/* Subcategory */}
-          {labelData.categoryId && labelData.categoryId !== "all" && (
-            <SubcategorySelectorSimple
-              categoryId={labelData.categoryId}
-              value={labelData.subcategoryId || ""}
-              onChange={(subcategoryId, subcategoryName) => {
-                setLabelData(prev => ({
-                  ...prev,
-                  subcategoryId,
-                  subcategoryName,
-                }));
-              }}
-            />
-          )}
+          {/* Subcategory - Always visible */}
+          <div className="space-y-2">
+            <Label htmlFor="subcategory">
+              Subcategory (Optional)
+              {!labelData.categoryId && <span className="text-xs text-muted-foreground ml-2">- Select a category first</span>}
+            </Label>
+            {labelData.categoryId && labelData.categoryId !== "all" ? (
+              loadingFormSubcategories ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  Loading subcategories...
+                </div>
+              ) : (
+                <Select
+                  value={labelData.subcategoryId || "none"}
+                  onValueChange={(value) => {
+                    // Subcategory selection:
+                    // - Keeps current category
+                    // - Sets new subcategory (or "" for "None")
+                    // - Clears product (will filter by category + subcategory)
+                    // - Clears search to start fresh
+                    const subcategory = formSubcategories.find(s => s.id === value);
+                    setLabelData(prev => ({
+                      ...prev,
+                      subcategoryId: value === "none" ? "" : value,
+                      subcategoryName: value === "none" ? "" : (subcategory?.name || ""),
+                      productId: "",
+                      productName: ""
+                    }));
+                    // Clear product search when subcategory changes
+                    setProductSearch("");
+                  }}
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue placeholder="Select a subcategory..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {Array.isArray(formSubcategories) && formSubcategories.map((subcategory) => (
+                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                        {subcategory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            ) : (
+              <Select disabled>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category first..." />
+                </SelectTrigger>
+              </Select>
+            )}
+            {labelData.categoryId && labelData.categoryId !== "all" && !loadingFormSubcategories && (
+              <p className="text-xs text-muted-foreground">
+                {formSubcategories.length > 0 
+                  ? `${formSubcategories.length} subcategor${formSubcategories.length === 1 ? 'y' : 'ies'} available`
+                  : "No subcategories available for this category"}
+              </p>
+            )}
+          </div>
 
           {/* Product */}
           <div className="space-y-2">
@@ -683,7 +929,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+              <PopoverContent className="w-full p-0" align="start" side="bottom">
                 <Command shouldFilter={false}>
                   <CommandInput 
                     placeholder="Search product..." 
@@ -714,23 +960,25 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                         </div>
                       </CommandEmpty>
                     )}
-                    <CommandGroup>
-                      {products.map((product) => (
-                        <CommandItem
-                          key={product.id}
-                          value={product.name}
-                          onSelect={() => handleProductChange(product.id)}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              labelData.productId === product.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {product.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
+                    {Array.isArray(products) && products.length > 0 && (
+                      <CommandGroup>
+                        {products.map((product) => (
+                          <CommandItem
+                            key={product.id}
+                            value={product.name}
+                            onSelect={() => handleProductChange(product.id)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                labelData.productId === product.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {product.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
                   </CommandList>
                 </Command>
               </PopoverContent>
@@ -993,6 +1241,41 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                   }
                 }}
               />
+              
+              {/* Duplicate Product Warning */}
+              {organizationId && (
+                <DuplicateProductWarning
+                  similarProducts={similarProducts}
+                  isLoading={isDuplicateCheckLoading}
+                  isDuplicate={isDuplicate}
+                  error={duplicateCheckError}
+                  onSelectProduct={(product) => {
+                    // Close the create product dialog
+                    setShowCreateProductDialog(false);
+                    
+                    // Find the full product details
+                    const existingProduct = products.find(p => p.id === product.product_id);
+                    if (existingProduct) {
+                      // Set the selected product in the main form
+                      setLabelData(prev => ({
+                        ...prev,
+                        productId: existingProduct.id,
+                        productName: existingProduct.name,
+                        categoryId: existingProduct.category_id || "",
+                        categoryName: existingProduct.label_categories?.name || "",
+                        subcategoryId: existingProduct.subcategory_id || "",
+                        subcategoryName: existingProduct.label_subcategories?.name || ""
+                      }));
+                      
+                      toast({
+                        title: "Product Selected",
+                        description: `Using existing product: ${existingProduct.name}`,
+                      });
+                    }
+                  }}
+                  showProceedButton={false}
+                />
+              )}
             </div>
             <div>
               <Label htmlFor="product-category">Category *</Label>
@@ -1034,12 +1317,53 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                 </PopoverContent>
               </Popover>
             </div>
+            
+            {/* Subcategory Selection - Always visible */}
+            <div>
+              <Label htmlFor="product-subcategory">
+                Subcategory (Optional)
+                {!newProductCategory && <span className="text-xs text-muted-foreground ml-2">- Select a category first</span>}
+              </Label>
+              <div className="mt-2">
+                {newProductCategory ? (
+                  loadingDialogSubcategories ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      Loading subcategories...
+                    </div>
+                  ) : (
+                    <Select
+                      value={newProductSubcategory || "none"}
+                      onValueChange={(value) => setNewProductSubcategory(value === "none" ? "" : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a subcategory..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {Array.isArray(dialogSubcategories) && dialogSubcategories.map((subcategory) => (
+                          <SelectItem key={subcategory.id} value={subcategory.id}>
+                            {subcategory.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )
+                ) : (
+                  <Select disabled>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category first..." />
+                    </SelectTrigger>
+                  </Select>
+                )}
+              </div>
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={creatingProduct}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleCreateProduct} 
-              disabled={creatingProduct || !newProductName.trim() || !newProductCategory}
+              disabled={creatingProduct || !newProductName.trim() || !newProductCategory || isDuplicate}
             >
               {creatingProduct ? "Creating..." : "Create Product"}
             </AlertDialogAction>

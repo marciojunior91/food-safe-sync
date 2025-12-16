@@ -9,7 +9,8 @@ import {
   Filter,
   Settings,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  GitMerge
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,10 @@ import { LabelForm, LabelData } from "@/components/labels/LabelForm";
 import { TemplateManagement } from "@/components/labels/TemplateManagement";
 import { UserSelectionDialog } from "@/components/labels/UserSelectionDialog";
 import { QuickPrintGrid } from "@/components/labels/QuickPrintGrid";
+import { MergeProductsAdmin } from "@/components/admin/MergeProductsAdmin";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { supabase } from "@/integrations/supabase/client";
 import { printLabel } from "@/utils/zebraPrinter";
 import { getExpiryStatus, getStatusColor } from "@/utils/trafficLight";
@@ -28,7 +32,7 @@ import { cn } from "@/lib/utils";
 
 export default function Labeling() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentView, setCurrentView] = useState<'overview' | 'templates' | 'form'>('overview');
+  const [currentView, setCurrentView] = useState<'overview' | 'templates' | 'form' | 'admin'>('overview');
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{
     id: string;
@@ -36,6 +40,9 @@ export default function Labeling() {
     display_name: string | null;
   } | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { isAdmin, loading: roleLoading } = useUserRole();
+  const [organizationId, setOrganizationId] = useState<string>("");
 
   // Dashboard Stats State
   const [labelsToday, setLabelsToday] = useState(0);
@@ -56,7 +63,28 @@ export default function Labeling() {
     fetchTemplates();
     fetchDashboardStats();
     fetchRecentLabels();
+    fetchOrganizationId();
   }, []);
+
+  const fetchOrganizationId = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (error) throw error;
+      
+      if (profile?.organization_id) {
+        setOrganizationId(profile.organization_id);
+      }
+    } catch (error) {
+      console.error("Error fetching organization_id:", error);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -196,6 +224,29 @@ export default function Labeling() {
     expiryDateObj.setDate(now.getDate() + 3);
     const expiryDate = expiryDateObj.toISOString().split('T')[0];
 
+    // Fetch allergens for the product
+    let productAllergens: any[] = [];
+    try {
+      const { data: allergenData } = await supabase
+        .from("product_allergens")
+        .select(`
+          allergen_id,
+          allergens (
+            id,
+            name,
+            icon,
+            severity
+          )
+        `)
+        .eq("product_id", selectedProduct.id);
+      
+      productAllergens = (allergenData || [])
+        .map((pa: any) => pa.allergens)
+        .filter(Boolean);
+    } catch (error) {
+      console.error("Error fetching allergens for quick print:", error);
+    }
+
     const labelData = {
       productId: selectedProduct.id,
       productName: selectedProduct.name,
@@ -208,7 +259,8 @@ export default function Labeling() {
       condition: "refrigerated", // Default condition for quick print
       quantity: quickQuantity.toString(),
       unit: selectedProduct.measuring_units?.abbreviation || "",
-      batchNumber: selectedProduct.batch_number || ""
+      batchNumber: selectedProduct.batch_number || "",
+      allergens: productAllergens,
       };
 
     try {
@@ -266,6 +318,31 @@ export default function Labeling() {
     expiryDateObj.setDate(now.getDate() + 3); // Default 3 days
     const expiryDate = expiryDateObj.toISOString().split('T')[0];
 
+    // Fetch allergens for the product (if not already in product object)
+    let productAllergens = product.allergens || [];
+    if (!productAllergens || productAllergens.length === 0) {
+      try {
+        const { data: allergenData } = await supabase
+          .from("product_allergens")
+          .select(`
+            allergen_id,
+            allergens (
+              id,
+              name,
+              icon,
+              severity
+            )
+          `)
+          .eq("product_id", product.id);
+        
+        productAllergens = (allergenData || [])
+          .map((pa: any) => pa.allergens)
+          .filter(Boolean);
+      } catch (error) {
+        console.error("Error fetching allergens for quick print:", error);
+      }
+    }
+
     const labelData = {
       productId: product.id,
       productName: product.name,
@@ -278,7 +355,8 @@ export default function Labeling() {
       condition: "refrigerated",
       quantity: "1",
       unit: product.measuring_units?.abbreviation || "",
-      batchNumber: ""
+      batchNumber: "",
+      allergens: productAllergens,
     };
 
     try {
@@ -328,6 +406,31 @@ export default function Labeling() {
 
   const handlePrintLabel = async (data: LabelData) => {
     try {
+      // Fetch allergens for the product
+      let productAllergens: any[] = [];
+      if (data.productId) {
+        try {
+          const { data: allergenData } = await supabase
+            .from("product_allergens")
+            .select(`
+              allergen_id,
+              allergens (
+                id,
+                name,
+                icon,
+                severity
+              )
+            `)
+            .eq("product_id", data.productId);
+          
+          productAllergens = (allergenData || [])
+            .map((pa: any) => pa.allergens)
+            .filter(Boolean);
+        } catch (error) {
+          console.error("Error fetching allergens for print:", error);
+        }
+      }
+      
       const result = await printLabel({
         productId: data.productId,
         productName: data.productName,
@@ -340,7 +443,8 @@ export default function Labeling() {
         condition: data.condition,
         quantity: data.quantity,
         unit: data.unit,
-        batchNumber: data.batchNumber
+        batchNumber: data.batchNumber,
+        allergens: productAllergens,
       });
 
       if (result.success) {
@@ -403,6 +507,64 @@ export default function Labeling() {
     );
   }
 
+  if (currentView === 'admin') {
+    if (!isAdmin) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Admin Access Required</h1>
+            <Button variant="outline" onClick={() => setCurrentView('overview')}>
+              Back to Overview
+            </Button>
+          </div>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-6 text-center">
+            <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-destructive" />
+            <h3 className="text-lg font-semibold mb-2">Access Denied</h3>
+            <p className="text-muted-foreground">
+              You need administrator privileges to access product duplicate management.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!organizationId) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Product Duplicate Management</h1>
+            <Button variant="outline" onClick={() => setCurrentView('overview')}>
+              Back to Overview
+            </Button>
+          </div>
+          <div className="flex items-center justify-center p-12">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">Loading organization information...</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Product Duplicate Management</h1>
+            <p className="text-muted-foreground mt-2">
+              Identify and merge duplicate products to maintain data integrity
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => setCurrentView('overview')}>
+            Back to Overview
+          </Button>
+        </div>
+        <MergeProductsAdmin organizationId={organizationId} />
+      </div>
+    );
+  }
+
   return (
     <>
       <UserSelectionDialog
@@ -416,10 +578,20 @@ export default function Labeling() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Label Management</h1>
           <p className="text-muted-foreground mt-2">
-            Create templates, print labels, and track compliance
+            Quick print labels with one tap - designed for busy kitchens
           </p>
         </div>
         <div className="flex gap-3">
+          {isAdmin && (
+            <Button 
+              variant="outline"
+              onClick={() => setCurrentView('admin')}
+              className="flex items-center gap-2"
+            >
+              <GitMerge className="w-4 h-4" />
+              Manage Duplicates
+            </Button>
+          )}
           <Button variant="outline">
             <Printer className="w-4 h-4 mr-2" />
             Print Queue
@@ -438,135 +610,61 @@ export default function Labeling() {
         </div>
       </div>
 
-      {/* Quick Print Grid - Touch Friendly */}
-      <QuickPrintGrid 
-        products={products}
-        onQuickPrint={handleQuickPrintFromGrid}
-      />
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard
-          title="Labels Today"
-          value={labelsToday}
-          change={`Total: ${totalLabels} labels`}
-          changeType="neutral"
-          icon={Printer}
-        />
-        <StatsCard
-          title="Recent Labels"
-          value={recentPrintedLabels.length}
-          change="Last 10 printed"
-          changeType="neutral"
-          icon={QrCode}
-        />
-        <StatsCard
-          title="Expiring Soon"
-          value={expiringCount}
-          change="Next 24 hours"
-          changeType={expiringCount > 10 ? "negative" : "neutral"}
-          icon={AlertTriangle}
-        />
-        <StatsCard
-          title="Compliance Rate"
-          value={totalLabels > 0 ? "Active" : "No Data"}
-          change={`${totalLabels} printed`}
-          changeType="positive"
-          icon={Calendar}
+      {/* SECTION 1: Quick Print Grid - PROMINENT & TOUCH-FRIENDLY */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Quick Print</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tap any product to print a label instantly
+            </p>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {products.length} products available
+          </div>
+        </div>
+        <QuickPrintGrid 
+          products={products}
+          onQuickPrint={handleQuickPrintFromGrid}
         />
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-card rounded-lg border shadow-card p-6">
-        <h3 className="font-semibold text-lg mb-4">Quick Print</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Product</label>
-            <Popover open={openProduct} onOpenChange={setOpenProduct}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={openProduct}
-                  className="w-full justify-between"
-                >
-                  {selectedProduct
-                    ? products.find((p) => p.id === selectedProduct.id)?.name
-                    : "Select product..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0">
-                <Command>
-                  <CommandInput placeholder="Search product..." />
-                  <CommandList>
-                    <CommandEmpty>No product found.</CommandEmpty>
-                    <CommandGroup>
-                      {products.map((product) => (
-                        <CommandItem
-                          key={product.id}
-                          value={product.name}
-                          onSelect={() => {
-                            setSelectedProduct(product);
-                            setOpenProduct(false);
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              selectedProduct?.id === product.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {product.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Template</label>
-            <select 
-              className="w-full h-10 px-3 py-2 text-sm border border-input bg-background rounded-md"
-              value={selectedTemplate?.id || ""}
-              onChange={(e) => {
-                const template = templates.find(t => t.id === e.target.value);
-                setSelectedTemplate(template);
-              }}
-            >
-              {templates.length === 0 ? (
-                <option value="">No templates available</option>
-              ) : (
-                templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
-          <div className="space-y-3">
-            <label className="text-sm font-medium">Quantity</label>
-            <div className="flex gap-2">
-              <Input 
-                type="number" 
-                placeholder="1" 
-                className="flex-1"
-                value={quickQuantity}
-                onChange={(e) => setQuickQuantity(parseInt(e.target.value) || 1)}
-                min="1"
-              />
-              <Button variant="default" onClick={handleQuickPrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                Print
-              </Button>
-            </div>
-          </div>
+      {/* SECTION 2: Dashboard Stats */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4 text-foreground">Today's Overview</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatsCard
+            title="Labels Today"
+            value={labelsToday}
+            change={`Total: ${totalLabels} labels`}
+            changeType="neutral"
+            icon={Printer}
+          />
+          <StatsCard
+            title="Recent Labels"
+            value={recentPrintedLabels.length}
+            change="Last 10 printed"
+            changeType="neutral"
+            icon={QrCode}
+          />
+          <StatsCard
+            title="Expiring Soon"
+            value={expiringCount}
+            change="Next 24 hours"
+            changeType={expiringCount > 10 ? "negative" : "neutral"}
+            icon={AlertTriangle}
+          />
+          <StatsCard
+            title="Compliance Rate"
+            value={totalLabels > 0 ? "Active" : "No Data"}
+            change={`${totalLabels} printed`}
+            changeType="positive"
+            icon={Calendar}
+          />
         </div>
       </div>
 
+      {/* SECTION 3: Template Preview & Recent Labels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Label Template */}
         <div className="space-y-6">

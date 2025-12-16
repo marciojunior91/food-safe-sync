@@ -14,16 +14,34 @@ export interface LabelPrintData {
   unit?: string;
   qrCodeData?: string;
   batchNumber: string;
+  allergens?: Array<{
+    id: string;
+    name: string;
+    icon: string | null;
+    severity: string;
+  }>;
 }
 
 /**
  * Generate ZPL code from label data
  */
 const generateZPL = (data: LabelPrintData): string => {
-  const { productName, categoryName, condition, prepDate, expiryDate, preparedByName, quantity, unit } = data;
+  const { productName, categoryName, condition, prepDate, expiryDate, preparedByName, quantity, unit, allergens } = data;
   
   // Generate QR Code data (can be a URL or product identifier)
   const qrData = `PRODUCT:${productName}|PREP:${prepDate}|EXP:${expiryDate}`;
+  
+  // Check for critical allergens
+  const hasCriticalAllergens = allergens?.some(a => a.severity === 'critical');
+  const criticalAllergens = allergens?.filter(a => a.severity === 'critical') || [];
+  
+  // Format allergen text for printing
+  const allergenText = allergens && allergens.length > 0
+    ? allergens.map(a => `${a.icon || ''} ${a.name}`).join(', ')
+    : '';
+  
+  // Calculate Y position for allergen section (below quantity or last standard field)
+  const allergenYStart = quantity ? 290 : 255;
   
   // ZPL Command to generate the label
   // ^XA - Start Format
@@ -32,6 +50,7 @@ const generateZPL = (data: LabelPrintData): string => {
   // ^FD - Field Data
   // ^FS - Field Separator
   // ^BQ - QR Code
+  // ^GB - Graphic Box (for warning borders)
   // ^XZ - End Format
   
   const zpl = `
@@ -43,6 +62,12 @@ const generateZPL = (data: LabelPrintData): string => {
 ^FO50,185^A0N,25,25^FDExpiry: ${expiryDate}^FS
 ^FO50,220^A0N,25,25^FDBy: ${preparedByName}^FS
 ${quantity ? `^FO50,255^A0N,25,25^FDQty: ${quantity} ${unit || ''}^FS` : ''}
+${allergens && allergens.length > 0 ? `
+^FO30,${allergenYStart}^GB540,${hasCriticalAllergens ? '90' : '70'},3^FS
+^FO40,${allergenYStart + 10}^A0N,30,30^FD${hasCriticalAllergens ? '!!! ALLERGEN WARNING !!!' : 'ALLERGENS:'}^FS
+^FO40,${allergenYStart + 45}^A0N,20,20^FD${allergenText.substring(0, 50)}^FS
+${allergenText.length > 50 ? `^FO40,${allergenYStart + 70}^A0N,20,20^FD${allergenText.substring(50, 100)}^FS` : ''}
+` : ''}
 ^FO450,50^BQN,2,6^FDQA,${qrData}^FS
 ^XZ
 `;
@@ -55,6 +80,9 @@ ${quantity ? `^FO50,255^A0N,25,25^FDQty: ${quantity} ${unit || ''}^FS` : ''}
  */
 const saveLabelToDatabase = async (data: LabelPrintData): Promise<string | null> => {
   try {
+    // Format allergens as array of names for storage
+    const allergenNames = data.allergens?.map(a => a.name) || [];
+    
     const { data: insertedData, error } = await supabase
       .from("printed_labels")
       .insert({
@@ -69,6 +97,7 @@ const saveLabelToDatabase = async (data: LabelPrintData): Promise<string | null>
         condition: data.condition,
         quantity: data.quantity || null,
         unit: data.unit || null,
+        allergens: allergenNames.length > 0 ? allergenNames : null,
       })
       .select()
       .single();
