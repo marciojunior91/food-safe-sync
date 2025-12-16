@@ -72,6 +72,7 @@ interface LabelFormProps {
 interface Category {
   id: string;
   name: string;
+  icon?: string | null;
 }
 
 interface Product {
@@ -87,10 +88,12 @@ interface Product {
   label_categories?: {
     id: string;
     name: string;
+    icon?: string | null;
   };
   label_subcategories?: {
     id: string;
     name: string;
+    icon?: string | null;
   };
 }
 
@@ -113,9 +116,9 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
   const [categories, setCategories] = useState<Category[]>([]);
   
   // Separate subcategory states for main form and dialog
-  const [formSubcategories, setFormSubcategories] = useState<{ id: string; name: string }[]>([]);
+  const [formSubcategories, setFormSubcategories] = useState<{ id: string; name: string; icon?: string | null }[]>([]);
   const [loadingFormSubcategories, setLoadingFormSubcategories] = useState(false);
-  const [dialogSubcategories, setDialogSubcategories] = useState<{ id: string; name: string }[]>([]);
+  const [dialogSubcategories, setDialogSubcategories] = useState<{ id: string; name: string; icon?: string | null }[]>([]);
   const [loadingDialogSubcategories, setLoadingDialogSubcategories] = useState(false);
   
   const [products, setProducts] = useState<Product[]>([]);
@@ -748,7 +751,16 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                   aria-expanded={openCategory}
                   className="w-full justify-between"
                 >
-                  {labelData.categoryName || "Select category..."}
+                  <span className="flex items-center gap-2">
+                    {labelData.categoryId && labelData.categoryId !== "all" && 
+                      categories.find(c => c.id === labelData.categoryId)?.icon && (
+                        <span className="text-lg">
+                          {categories.find(c => c.id === labelData.categoryId)?.icon}
+                        </span>
+                      )
+                    }
+                    <span>{labelData.categoryName || "Select category..."}</span>
+                  </span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
@@ -842,6 +854,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                               labelData.categoryId === category.id ? "opacity-100" : "opacity-0"
                             )}
                           />
+                          {category.icon && <span className="mr-2 text-lg">{category.icon}</span>}
                           {category.name}
                         </CommandItem>
                       ))}
@@ -886,13 +899,27 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                   }}
                 >
                   <SelectTrigger id="subcategory">
-                    <SelectValue placeholder="Select a subcategory..." />
+                    <SelectValue placeholder="Select a subcategory...">
+                      {labelData.subcategoryId && formSubcategories.find(s => s.id === labelData.subcategoryId) && (
+                        <span className="flex items-center gap-2">
+                          {formSubcategories.find(s => s.id === labelData.subcategoryId)?.icon && (
+                            <span className="text-lg">
+                              {formSubcategories.find(s => s.id === labelData.subcategoryId)?.icon}
+                            </span>
+                          )}
+                          <span>{labelData.subcategoryName}</span>
+                        </span>
+                      )}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     {Array.isArray(formSubcategories) && formSubcategories.map((subcategory) => (
                       <SelectItem key={subcategory.id} value={subcategory.id}>
-                        {subcategory.name}
+                        <span className="flex items-center gap-2">
+                          {subcategory.icon && <span className="text-lg">{subcategory.icon}</span>}
+                          <span>{subcategory.name}</span>
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1308,6 +1335,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                                 newProductCategory === category.id ? "opacity-100" : "opacity-0"
                               )}
                             />
+                            {category.icon && <span className="mr-2 text-lg">{category.icon}</span>}
                             {category.name}
                           </CommandItem>
                         ))}
@@ -1343,7 +1371,10 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
                         <SelectItem value="none">None</SelectItem>
                         {Array.isArray(dialogSubcategories) && dialogSubcategories.map((subcategory) => (
                           <SelectItem key={subcategory.id} value={subcategory.id}>
-                            {subcategory.name}
+                            <span className="flex items-center gap-2">
+                              {subcategory.icon && <span className="text-lg">{subcategory.icon}</span>}
+                              <span>{subcategory.name}</span>
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
