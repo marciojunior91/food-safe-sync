@@ -1,18 +1,19 @@
 import { useState, useEffect } from "react";
-import { Loader2, Check, Printer, Package } from "lucide-react";
+import { Loader2, Check, Printer, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   NavigationLevel,
-  getCategoryIcon,
-  getSubcategoryIcon,
   getProductIcon,
 } from "@/constants/quickPrintIcons";
+import { QuickAddToQueueDialog } from "./QuickAddToQueueDialog";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 interface Category {
   id: string;
   name: string;
+  icon?: string | null;
   subcategory_count?: number;
   product_count?: number;
 }
@@ -20,17 +21,21 @@ interface Category {
 interface Subcategory {
   id: string;
   name: string;
+  icon?: string | null;
   product_count?: number;
 }
 
 interface Product {
   id: string;
   name: string;
+  category_id?: string;
+  subcategory_id?: string;
   measuring_units?: {
     name: string;
     abbreviation: string;
   };
   label_categories?: {
+    id: string;
     name: string;
   };
 }
@@ -64,6 +69,15 @@ export function QuickPrintCategoryView({
   onProductSelect,
   className,
 }: QuickPrintCategoryViewProps) {
+  const { user } = useAuth();
+  const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
+  const [quickAddDialogOpen, setQuickAddDialogOpen] = useState(false);
+
+  const handleQuickAdd = (e: React.MouseEvent, product: Product) => {
+    e.stopPropagation(); // Prevent triggering onProductSelect
+    setQuickAddProduct(product);
+    setQuickAddDialogOpen(true);
+  };
   // Determine current view level
   const currentLevel = navigationStack.length === 0 
     ? 'categories' 
@@ -87,7 +101,7 @@ export function QuickPrintCategoryView({
               onClick={() => onCategorySelect(category)}
             >
               <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">
-                {getCategoryIcon(category.name)}
+                {category.icon || '📁'}
               </div>
               <span className="text-sm font-medium text-center line-clamp-2 leading-tight">
                 {category.name}
@@ -151,7 +165,7 @@ export function QuickPrintCategoryView({
               onClick={() => onSubcategorySelect(subcategory)}
             >
               <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">
-                {getSubcategoryIcon(subcategory.name)}
+                {subcategory.icon || '📂'}
               </div>
               <span className="text-sm font-medium text-center line-clamp-2 leading-tight">
                 {subcategory.name}
@@ -191,7 +205,7 @@ export function QuickPrintCategoryView({
     return (
       <div className={cn("space-y-4", className)}>
         <p className="text-sm text-muted-foreground">
-          Tap any product to print a label
+          Tap to print instantly • Long-press + icon to add to queue
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {products.map((product) => {
@@ -199,46 +213,68 @@ export function QuickPrintCategoryView({
             const isSuccess = successProductId === product.id;
 
             return (
-              <Button
-                key={product.id}
-                variant="outline"
-                disabled={isLoading}
-                className={cn(
-                  "h-36 sm:h-40 flex flex-col items-center justify-center p-4 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md",
-                  isSuccess
-                    ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
-                    : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                )}
-                onClick={() => onProductSelect(product)}
-              >
-                <div
+              <div key={product.id} className="relative">
+                <Button
+                  variant="outline"
+                  disabled={isLoading}
                   className={cn(
-                    "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-3 transition-colors",
+                    "w-full h-36 sm:h-40 flex flex-col items-center justify-center p-4 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md",
                     isSuccess
-                      ? "bg-green-600"
-                      : "bg-primary/10 group-hover:bg-primary-foreground/20"
+                      ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
+                      : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
                   )}
+                  onClick={() => onProductSelect(product)}
                 >
-                  {isLoading ? (
-                    <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 animate-spin" />
-                  ) : isSuccess ? (
-                    <Check className="w-7 h-7 sm:w-8 sm:h-8 animate-in zoom-in duration-300" />
-                  ) : (
-                    <span className="text-3xl">{getProductIcon()}</span>
-                  )}
-                </div>
-                <span className="text-sm font-medium text-center line-clamp-2 leading-tight px-1">
-                  {isLoading ? "Printing..." : isSuccess ? "Sent!" : product.name}
-                </span>
-                {!isLoading && !isSuccess && product.measuring_units && (
-                  <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
-                    {product.measuring_units.abbreviation}
+                  <div
+                    className={cn(
+                      "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-3 transition-colors",
+                      isSuccess
+                        ? "bg-green-600"
+                        : "bg-primary/10 group-hover:bg-primary-foreground/20"
+                    )}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 animate-spin" />
+                    ) : isSuccess ? (
+                      <Check className="w-7 h-7 sm:w-8 sm:h-8 animate-in zoom-in duration-300" />
+                    ) : (
+                      <span className="text-3xl">{getProductIcon()}</span>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-center line-clamp-2 leading-tight px-1">
+                    {isLoading ? "Printing..." : isSuccess ? "Sent!" : product.name}
                   </span>
+                  {!isLoading && !isSuccess && product.measuring_units && (
+                    <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
+                      {product.measuring_units.abbreviation}
+                    </span>
+                  )}
+                </Button>
+                
+                {/* Quick Add to Queue button */}
+                {!isLoading && !isSuccess && (
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg hover:scale-110 transition-transform z-10"
+                    onClick={(e) => handleQuickAdd(e, product)}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
                 )}
-              </Button>
+              </div>
             );
           })}
         </div>
+
+        {/* Quick Add Dialog */}
+        <QuickAddToQueueDialog
+          product={quickAddProduct}
+          open={quickAddDialogOpen}
+          onOpenChange={setQuickAddDialogOpen}
+          preparedBy={user?.id || ""}
+          preparedByName={user?.email || "Unknown User"}
+        />
       </div>
     );
   }

@@ -2,6 +2,13 @@
 -- Migration: 20251216000000_add_category_emojis.sql
 -- Iteration 11: Epic 1 - Category & Subcategory Emojis
 
+-- Add icon column to label_categories
+ALTER TABLE label_categories 
+ADD COLUMN IF NOT EXISTS icon TEXT;
+
+-- Add icon column to label_subcategories
+ALTER TABLE label_subcategories 
+ADD COLUMN IF NOT EXISTS icon TEXT;
 
 -- Populate default emojis for ACTUAL categories (from quickPrintIcons.ts)
 UPDATE label_categories SET icon = '🥩' WHERE name = 'Meat & Poultry' AND icon IS NULL;

@@ -78,7 +78,7 @@ ${allergenText.length > 50 ? `^FO40,${allergenYStart + 70}^A0N,20,20^FD${allerge
 /**
  * Save printed label to database history
  */
-const saveLabelToDatabase = async (data: LabelPrintData): Promise<string | null> => {
+export const saveLabelToDatabase = async (data: LabelPrintData): Promise<string | null> => {
   try {
     // Format allergens as array of names for storage
     const allergenNames = data.allergens?.map(a => a.name) || [];

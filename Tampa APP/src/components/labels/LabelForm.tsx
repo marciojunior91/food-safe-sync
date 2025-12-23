@@ -35,6 +35,10 @@ import { AllergenSelectorEnhanced } from "./AllergenSelectorEnhanced";
 import { DuplicateProductWarning } from "./DuplicateProductWarning";
 import { useAllergens } from "@/hooks/useAllergens";
 import { useDuplicateDetection } from "@/hooks/useDuplicateDetection";
+import { usePrinter } from "@/hooks/usePrinter";
+import { usePrintQueue } from "@/hooks/usePrintQueue";
+import { saveLabelToDatabase } from "@/utils/zebraPrinter";
+import { Settings } from "lucide-react";
 
 export interface LabelData {
   categoryId: string;
@@ -109,6 +113,8 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
   const { toast } = useToast();
   const { updateProductAllergens } = useAllergens();
   const { user } = useAuth();
+  const { print, printer, settings, changePrinter, availablePrinters, isLoading: isPrinting } = usePrinter();
+  const { addToQueue } = usePrintQueue();
   
   // Organization ID fetched from user profile
   const [organizationId, setOrganizationId] = useState<string>("");
@@ -691,7 +697,69 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
       }
     }
 
-    onPrint?.(labelData);
+    // Save label to database first
+    try {
+      await saveLabelToDatabase({
+        productId: labelData.productId,
+        productName: labelData.productName,
+        categoryId: labelData.categoryId === "all" ? null : labelData.categoryId,
+        categoryName: labelData.categoryName,
+        preparedBy: labelData.preparedBy,
+        preparedByName: labelData.preparedByName,
+        prepDate: labelData.prepDate,
+        expiryDate: labelData.expiryDate,
+        condition: labelData.condition,
+        quantity: labelData.quantity,
+        unit: labelData.unit,
+        batchNumber: labelData.batchNumber,
+      });
+
+      // Print using the new printer system
+      const success = await print({
+        productName: labelData.productName,
+        categoryName: labelData.categoryName,
+        subcategoryName: labelData.subcategoryName,
+        preparedDate: labelData.prepDate,
+        useByDate: labelData.expiryDate,
+        allergens: [], // Will be fetched from DB if needed
+        storageInstructions: `Condition: ${labelData.condition}`,
+        barcode: labelData.batchNumber,
+      });
+
+      if (success && onPrint) {
+        onPrint(labelData);
+      }
+    } catch (error) {
+      console.error("Error in print process:", error);
+      toast({
+        title: "Print Error",
+        description: "Failed to complete print operation",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Handle add to print queue
+  const handleAddToQueue = () => {
+    // Validate required fields
+    if (!labelData.productId || !labelData.prepDate || !labelData.expiryDate) {
+      toast({
+        title: "Incomplete Form",
+        description: "Please fill in all required fields before adding to queue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get quantity (default to 1 if not specified or invalid)
+    const quantity = parseInt(labelData.quantity) || 1;
+
+    // Add to queue
+    addToQueue(labelData, quantity);
+
+    // Optional: Reset form after adding to queue
+    // Uncomment the lines below if you want to clear the form
+    // resetForm();
   };
 
   // Show loading state while organization ID is being fetched
@@ -725,12 +793,59 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
             <Save className="w-4 h-4" />
             Save Draft
           </Button>
-          <Button onClick={handlePrint} className="flex items-center gap-2">
+          <Button 
+            onClick={handleAddToQueue} 
+            variant="outline" 
+            disabled={isPrinting || !labelData.productId || !labelData.prepDate || !labelData.expiryDate}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add to Queue ({labelData.quantity || 1})
+          </Button>
+          <Button onClick={handlePrint} disabled={isPrinting} variant="hero" className="flex items-center gap-2">
             <Printer className="w-4 h-4" />
-            Print Label
+            {isPrinting ? 'Printing...' : 'Print Now'}
           </Button>
         </div>
       </div>
+
+      {/* Printer Selection Card */}
+      <Card className="bg-muted/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <Settings className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <Label className="text-sm font-medium">Current Printer</Label>
+                <p className="text-sm text-muted-foreground truncate">
+                  {settings?.name || 'No printer selected'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {settings?.paperWidth}mm × {settings?.paperHeight}mm
+                </p>
+              </div>
+            </div>
+            <Select value={settings?.type || 'generic'} onValueChange={changePrinter}>
+              <SelectTrigger className="w-[200px] flex-shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePrinters.map(p => (
+                  <SelectItem key={p.type} value={p.type}>
+                    <div className="flex items-center gap-2">
+                      <Printer className="h-4 w-4 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium">{p.name}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-1">{p.description}</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

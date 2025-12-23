@@ -12,15 +12,18 @@ import {
   Check,
   Loader2,
   Zap,
-  AlertTriangle
+  AlertTriangle,
+  Plus
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PrintMode, NavigationLevel, getCategoryIcon, getSubcategoryIcon } from "@/constants/quickPrintIcons";
+import { PrintMode, NavigationLevel } from "@/constants/quickPrintIcons";
 import { QuickPrintModeToggle } from "./QuickPrintModeToggle";
 import { QuickPrintBreadcrumb } from "./QuickPrintBreadcrumb";
 import { QuickPrintCategoryView } from "./QuickPrintCategoryView";
+import { QuickAddToQueueDialog } from "./QuickAddToQueueDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { AllergenBadge } from "./AllergenBadge";
+import { useAuth } from "@/hooks/useAuth";
 import type { Allergen } from "@/hooks/useAllergens";
 
 interface Product {
@@ -42,6 +45,7 @@ interface Product {
 interface Category {
   id: string;
   name: string;
+  icon?: string | null;
   subcategory_count?: number;
   product_count?: number;
 }
@@ -49,6 +53,7 @@ interface Category {
 interface Subcategory {
   id: string;
   name: string;
+  icon?: string | null;
   category_id: string;
   product_count?: number;
 }
@@ -60,8 +65,10 @@ interface QuickPrintGridProps {
 }
 
 export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrintGridProps) {
+  const { user } = useAuth();
+  
   // View mode state
-  const [printMode, setPrintMode] = useState<PrintMode>('products');
+  const [printMode, setPrintMode] = useState<PrintMode>('categories');
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -79,6 +86,10 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
   // Print states
   const [printingProductId, setPrintingProductId] = useState<string | null>(null);
   const [successProductId, setSuccessProductId] = useState<string | null>(null);
+  
+  // Quick add to queue dialog state
+  const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
+  const [quickAddDialogOpen, setQuickAddDialogOpen] = useState(false);
 
   // Fetch categories with counts
   useEffect(() => {
@@ -105,6 +116,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
         .select(`
           id,
           name,
+          icon,
           label_subcategories(count),
           products(count)
         `)
@@ -115,6 +127,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
       const formattedCategories = (data || []).map((cat: any) => ({
         id: cat.id,
         name: cat.name,
+        icon: cat.icon,
         subcategory_count: cat.label_subcategories?.[0]?.count || 0,
         product_count: cat.products?.[0]?.count || 0,
       }));
@@ -135,6 +148,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
         .select(`
           id,
           name,
+          icon,
           category_id,
           products(count)
         `)
@@ -146,6 +160,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
       const formattedSubcategories = (data || []).map((sub: any) => ({
         id: sub.id,
         name: sub.name,
+        icon: sub.icon,
         category_id: sub.category_id,
         product_count: sub.products?.[0]?.count || 0,
       }));
@@ -237,7 +252,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
       type: 'category',
       id: category.id,
       name: category.name,
-      icon: getCategoryIcon(category.name),
+      icon: category.icon || '📁', // Use database icon or fallback
     };
     setNavigationStack([newLevel]);
 
@@ -255,7 +270,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
       type: 'subcategory',
       id: subcategory.id,
       name: subcategory.name,
-      icon: getSubcategoryIcon(subcategory.name),
+      icon: subcategory.icon || '📂', // Use database icon or fallback
     };
     setNavigationStack(prev => [...prev, newLevel]);
 
@@ -323,7 +338,15 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
     }
   };
 
+  // Handler for quick add to queue
+  const handleQuickAdd = (e: React.MouseEvent, product: Product) => {
+    e.stopPropagation();
+    setQuickAddProduct(product);
+    setQuickAddDialogOpen(true);
+  };
+
   return (
+    <>
     <Card className={cn("w-full", className)}>
       <CardHeader className="pb-3">
         {/* Mode Toggle */}
@@ -451,20 +474,25 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             )}
                             onClick={() => handleQuickPrint(product)}
                           >
-                            <div className={cn(
-                              "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-2 transition-colors",
-                              isSuccess 
-                                ? "bg-green-600" 
-                                : "bg-primary/10 group-hover:bg-primary-foreground/20"
-                            )}>
-                              {isLoading ? (
+                            {isLoading ? (
+                              <div className={cn(
+                                "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-2 transition-colors",
+                                "bg-primary/10 group-hover:bg-primary-foreground/20"
+                              )}>
                                 <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 animate-spin" />
-                              ) : isSuccess ? (
+                              </div>
+                            ) : isSuccess ? (
+                              <div className={cn(
+                                "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-2 transition-colors",
+                                "bg-green-600"
+                              )}>
                                 <Check className="w-7 h-7 sm:w-8 sm:h-8" />
-                              ) : (
-                                <Package className="w-7 h-7 sm:w-8 sm:h-8" />
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="text-4xl sm:text-5xl mb-2">
+                                📦
+                              </div>
+                            )}
                             <span className="text-sm sm:text-base font-medium text-center line-clamp-2 px-1 mb-1">
                               {product.name}
                             </span>
@@ -480,12 +508,24 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             )}
                           </Button>
                           
-                          {/* Allergen Count Badge (Top-Right Corner) */}
+                          {/* Quick Add "+" Button (Top-Right Corner) */}
+                          {!isLoading && !isSuccess && (
+                            <Button
+                              size="icon"
+                              variant="secondary"
+                              className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg hover:scale-110 z-10 bg-primary text-primary-foreground hover:bg-primary/90"
+                              onClick={(e) => handleQuickAdd(e, product)}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </Button>
+                          )}
+                          
+                          {/* Allergen Count Badge (Top-Left Corner) */}
                           {product.allergens && product.allergens.length > 0 && (
                             <Badge 
                               variant="secondary"
                               className={cn(
-                                "absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold shadow-md",
+                                "absolute top-2 left-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold shadow-md",
                                 hasCriticalAllergens 
                                   ? "bg-red-500 text-white border-red-600" 
                                   : "bg-yellow-500 text-white border-yellow-600"
@@ -522,20 +562,25 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                           onClick={() => handleQuickPrint(product)}
                         >
                           <div className="flex items-center gap-4 flex-1">
-                            <div className={cn(
-                              "w-12 h-12 rounded-full flex items-center justify-center transition-colors shrink-0",
-                              isSuccess 
-                                ? "bg-green-600" 
-                                : "bg-primary/10 group-hover:bg-primary-foreground/20"
-                            )}>
-                              {isLoading ? (
+                            {isLoading ? (
+                              <div className={cn(
+                                "w-12 h-12 rounded-full flex items-center justify-center transition-colors shrink-0",
+                                "bg-primary/10 group-hover:bg-primary-foreground/20"
+                              )}>
                                 <Loader2 className="w-6 h-6 animate-spin" />
-                              ) : isSuccess ? (
+                              </div>
+                            ) : isSuccess ? (
+                              <div className={cn(
+                                "w-12 h-12 rounded-full flex items-center justify-center transition-colors shrink-0",
+                                "bg-green-600"
+                              )}>
                                 <Check className="w-6 h-6" />
-                              ) : (
-                                <Package className="w-6 h-6" />
-                              )}
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="text-3xl shrink-0">
+                                📦
+                              </div>
+                            )}
                             
                             <div className="flex-1 text-left">
                               <span className="text-base font-medium block mb-1">
@@ -574,5 +619,15 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
         )}
       </CardContent>
     </Card>
+    
+    {/* Quick Add to Queue Dialog */}
+    <QuickAddToQueueDialog
+      product={quickAddProduct}
+      open={quickAddDialogOpen}
+      onOpenChange={setQuickAddDialogOpen}
+      preparedBy={user?.id || ""}
+      preparedByName={user?.email || "Unknown User"}
+    />
+    </>
   );
 }

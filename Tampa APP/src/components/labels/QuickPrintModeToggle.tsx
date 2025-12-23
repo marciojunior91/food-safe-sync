@@ -17,17 +17,6 @@ export function QuickPrintModeToggle({
   return (
     <div className={cn("flex gap-2 p-1 bg-muted rounded-lg", className)}>
       <Button
-        variant={mode === 'products' ? 'default' : 'ghost'}
-        className={cn(
-          "flex-1 transition-all",
-          mode === 'products' && "shadow-sm"
-        )}
-        onClick={() => onModeChange('products')}
-      >
-        <Package className="w-4 h-4 mr-2" />
-        By Products
-      </Button>
-      <Button
         variant={mode === 'categories' ? 'default' : 'ghost'}
         className={cn(
           "flex-1 transition-all",
@@ -37,6 +26,17 @@ export function QuickPrintModeToggle({
       >
         <FolderTree className="w-4 h-4 mr-2" />
         By Categories
+      </Button>
+      <Button
+        variant={mode === 'products' ? 'default' : 'ghost'}
+        className={cn(
+          "flex-1 transition-all",
+          mode === 'products' && "shadow-sm"
+        )}
+        onClick={() => onModeChange('products')}
+      >
+        <Package className="w-4 h-4 mr-2" />
+        By Products
       </Button>
     </div>
   );

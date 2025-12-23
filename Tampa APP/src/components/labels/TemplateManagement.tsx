@@ -286,10 +286,6 @@ export function TemplateManagement({ onCreateNew, onBack }: TemplateManagementPr
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={onCreateNew} variant="outline" className="flex items-center gap-2">
-            <Plus className="w-4 h-4" />
-            Create Label
-          </Button>
           {canManageTemplates && (
             <Button onClick={() => setShowCreateDialog(true)} className="flex items-center gap-2">
               <Plus className="w-4 h-4" />

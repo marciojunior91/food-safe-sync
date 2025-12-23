@@ -13,6 +13,7 @@ import {
   GitMerge
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { StatsCard } from "@/components/StatsCard";
 import { LabelForm, LabelData } from "@/components/labels/LabelForm";
@@ -20,11 +21,15 @@ import { TemplateManagement } from "@/components/labels/TemplateManagement";
 import { UserSelectionDialog } from "@/components/labels/UserSelectionDialog";
 import { QuickPrintGrid } from "@/components/labels/QuickPrintGrid";
 import { MergeProductsAdmin } from "@/components/admin/MergeProductsAdmin";
+import { PrintQueue } from "@/components/shopping/PrintQueue";
+import { PrintQueueBadge } from "@/components/shopping/PrintQueueBadge";
+import { usePrintQueue } from "@/hooks/usePrintQueue";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePrinter } from "@/hooks/usePrinter";
 import { supabase } from "@/integrations/supabase/client";
-import { printLabel } from "@/utils/zebraPrinter";
+import { saveLabelToDatabase } from "@/utils/zebraPrinter";
 import { getExpiryStatus, getStatusColor } from "@/utils/trafficLight";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -34,6 +39,7 @@ export default function Labeling() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentView, setCurrentView] = useState<'overview' | 'templates' | 'form' | 'admin'>('overview');
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [pendingQuickPrint, setPendingQuickPrint] = useState<any | null>(null);
   const [selectedUser, setSelectedUser] = useState<{
     id: string;
     user_id: string;
@@ -42,6 +48,8 @@ export default function Labeling() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
+  const { print, isLoading: isPrinting } = usePrinter();
+  const { openQueue, totalLabels: queueTotalLabels, items: queueItems, printAll: printQueueAll } = usePrintQueue();
   const [organizationId, setOrganizationId] = useState<string>("");
 
   // Dashboard Stats State
@@ -264,9 +272,20 @@ export default function Labeling() {
       };
 
     try {
-      const result = await printLabel(labelData);
+      // Save to database first
+      await saveLabelToDatabase(labelData);
       
-      if (result.success) {
+      // Print using new printer system
+      const success = await print({
+        productName: selectedProduct.name,
+        categoryName: "Quick Print",
+        preparedDate: prepDate,
+        useByDate: expiryDate,
+        allergens: productAllergens.map(a => a.name),
+        storageInstructions: "Refrigerated",
+      });
+      
+      if (success) {
         toast({
           title: "Label Sent to Printer",
           description: `Printing ${quickQuantity} label(s) for ${selectedProduct.name}`,
@@ -278,7 +297,7 @@ export default function Labeling() {
       } else {
         toast({
           title: "Print Failed",
-          description: result.error || "Could not connect to printer.",
+          description: "Could not connect to printer.",
           variant: "destructive"
         });
       }
@@ -293,54 +312,60 @@ export default function Labeling() {
   };
 
   // Handler for QuickPrintGrid
+  // Handler for QuickPrintGrid
   const handleQuickPrintFromGrid = async (product: any) => {
-    // Get current user info
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to print labels.",
-        variant: "destructive"
-      });
-      return;
+    // Store product and open user selection dialog
+    setPendingQuickPrint(product);
+    setUserDialogOpen(true);
+  };
+
+
+  const handleCreateLabel = () => {
+    setPendingQuickPrint(null);
+    setUserDialogOpen(true);
+  };
+
+  const handleUserSelected = (selectedUserData: { id: string; user_id: string; display_name: string | null }) => {
+    setSelectedUser(selectedUserData);
+    
+    if (pendingQuickPrint) {
+      // Execute pending quick print with selected user
+      executeQuickPrint(pendingQuickPrint, selectedUserData);
+      setPendingQuickPrint(null);
+    } else {
+      // Open form for new label creation
+      setCurrentView('form');
     }
+  };
 
-    // Get user profile for display name
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("user_id", user.id)
-      .single();
-
+  const executeQuickPrint = async (product: any, selectedUserData: { id: string; user_id: string; display_name: string | null }) => {
     const now = new Date();
     const prepDate = now.toISOString().split('T')[0];
     const expiryDateObj = new Date(now);
-    expiryDateObj.setDate(now.getDate() + 3); // Default 3 days
+    expiryDateObj.setDate(now.getDate() + 3);
     const expiryDate = expiryDateObj.toISOString().split('T')[0];
 
-    // Fetch allergens for the product (if not already in product object)
-    let productAllergens = product.allergens || [];
-    if (!productAllergens || productAllergens.length === 0) {
-      try {
-        const { data: allergenData } = await supabase
-          .from("product_allergens")
-          .select(`
-            allergen_id,
-            allergens (
-              id,
-              name,
-              icon,
-              severity
-            )
-          `)
-          .eq("product_id", product.id);
-        
-        productAllergens = (allergenData || [])
-          .map((pa: any) => pa.allergens)
-          .filter(Boolean);
-      } catch (error) {
-        console.error("Error fetching allergens for quick print:", error);
-      }
+    // Fetch allergens for the product
+    let productAllergens: any[] = [];
+    try {
+      const { data: allergenData } = await supabase
+        .from("product_allergens")
+        .select(`
+          allergen_id,
+          allergens (
+            id,
+            name,
+            icon,
+            severity
+          )
+        `)
+        .eq("product_id", product.id);
+      
+      productAllergens = (allergenData || [])
+        .map((pa: any) => pa.allergens)
+        .filter(Boolean);
+    } catch (error) {
+      console.error("Error fetching allergens for quick print:", error);
     }
 
     const labelData = {
@@ -348,8 +373,8 @@ export default function Labeling() {
       productName: product.name,
       categoryId: product.label_categories?.id || null,
       categoryName: product.label_categories?.name || "Quick Print",
-      preparedBy: user.id,
-      preparedByName: profile?.display_name || user.email || "Unknown",
+      preparedBy: selectedUserData.user_id,
+      preparedByName: selectedUserData.display_name || "Unknown",
       prepDate: prepDate,
       expiryDate: expiryDate,
       condition: "refrigerated",
@@ -360,9 +385,20 @@ export default function Labeling() {
     };
 
     try {
-      const result = await printLabel(labelData);
+      // Save to database first
+      await saveLabelToDatabase(labelData);
       
-      if (result.success) {
+      // Print using new printer system
+      const success = await print({
+        productName: product.name,
+        categoryName: product.label_categories?.name || "Quick Print",
+        preparedDate: prepDate,
+        useByDate: expiryDate,
+        allergens: productAllergens.map((a: any) => a.name),
+        storageInstructions: "Refrigerated",
+      });
+      
+      if (success) {
         toast({
           title: "Label Sent to Printer",
           description: `Printing label for ${product.name}`,
@@ -372,7 +408,7 @@ export default function Labeling() {
       } else {
         toast({
           title: "Print Failed",
-          description: result.error || "Could not connect to printer.",
+          description: "Could not connect to printer.",
           variant: "destructive"
         });
       }
@@ -384,16 +420,6 @@ export default function Labeling() {
         variant: "destructive"
       });
     }
-  };
-
-
-  const handleCreateLabel = () => {
-    setUserDialogOpen(true);
-  };
-
-  const handleUserSelected = (user: { id: string; user_id: string; display_name: string | null }) => {
-    setSelectedUser(user);
-    setCurrentView('form');
   };
 
   const handleSaveLabel = (data: LabelData) => {
@@ -431,7 +457,8 @@ export default function Labeling() {
         }
       }
       
-      const result = await printLabel({
+      // Save to database first
+      await saveLabelToDatabase({
         productId: data.productId,
         productName: data.productName,
         categoryId: data.categoryId === "all" ? null : data.categoryId,
@@ -447,7 +474,19 @@ export default function Labeling() {
         allergens: productAllergens,
       });
 
-      if (result.success) {
+      // Print using new printer system
+      const success = await print({
+        productName: data.productName,
+        categoryName: data.categoryName,
+        subcategoryName: data.subcategoryName,
+        preparedDate: data.prepDate,
+        useByDate: data.expiryDate,
+        allergens: productAllergens.map(a => a.name),
+        storageInstructions: `Condition: ${data.condition}`,
+        barcode: data.batchNumber,
+      });
+
+      if (success) {
         toast({
           title: "Label Printed Successfully",
           description: `Label for ${data.productName} has been sent to the printer and saved to history.`,
@@ -461,7 +500,7 @@ export default function Labeling() {
       } else {
         toast({
           title: "Print Failed",
-          description: result.error || "Could not connect to printer.",
+          description: "Could not connect to printer.",
           variant: "destructive"
         });
       }
@@ -592,9 +631,14 @@ export default function Labeling() {
               Manage Duplicates
             </Button>
           )}
-          <Button variant="outline">
+          <Button variant="outline" onClick={openQueue}>
             <Printer className="w-4 h-4 mr-2" />
             Print Queue
+            {queueTotalLabels > 0 && (
+              <Badge variant="default" className="ml-2">
+                {queueTotalLabels}
+              </Badge>
+            )}
           </Button>
           <Button 
             variant="outline"
@@ -780,6 +824,10 @@ export default function Labeling() {
         </div>
       </div>
       </div>
+
+      {/* Print Queue Components */}
+      <PrintQueue />
+      <PrintQueueBadge />
     </>
   );
 }
