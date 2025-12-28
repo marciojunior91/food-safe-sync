@@ -14,7 +14,12 @@ import {
   Check,
   ChevronsUpDown,
   ArrowLeft,
-  Plus
+  Plus,
+  Eye,
+  EyeOff,
+  ZoomIn,
+  ZoomOut,
+  Minus
 } from "lucide-react";
 import {
   AlertDialog,
@@ -31,6 +36,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { LabelPreview } from "./LabelPreview";
+import { LabelPreviewCanvas, type LabelFormat, type PreviewScale } from "./LabelPreviewCanvas";
 import { AllergenSelectorEnhanced } from "./AllergenSelectorEnhanced";
 import { DuplicateProductWarning } from "./DuplicateProductWarning";
 import { useAllergens } from "@/hooks/useAllergens";
@@ -39,6 +45,7 @@ import { usePrinter } from "@/hooks/usePrinter";
 import { usePrintQueue } from "@/hooks/usePrintQueue";
 import { saveLabelToDatabase } from "@/utils/zebraPrinter";
 import { Settings } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 
 export interface LabelData {
   categoryId: string;
@@ -153,6 +160,14 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
   const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [savingDraft, setSavingDraft] = useState(false);
+  
+  // Canvas preview states
+  const [showCanvasPreview, setShowCanvasPreview] = useState(false);
+  const [previewFormat, setPreviewFormat] = useState<LabelFormat>('generic');
+  const [previewScale, setPreviewScale] = useState<PreviewScale>(1);
+  
+  // Template selection state (for React preview)
+  const [selectedPreviewTemplate, setSelectedPreviewTemplate] = useState<'default' | 'recipe' | 'allergen' | 'blank'>('default');
   
   // Duplicate detection for new product creation (only active when organizationId is loaded)
   const {
@@ -1215,13 +1230,50 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity (Optional)</Label>
-              <Input
-                id="quantity"
-                type="number"
-                value={labelData.quantity}
-                onChange={(e) => setLabelData(prev => ({ ...prev, quantity: e.target.value }))}
-                placeholder="0"
-              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    const currentQty = parseInt(labelData.quantity) || 0;
+                    if (currentQty > 0) {
+                      setLabelData(prev => ({ ...prev, quantity: String(currentQty - 1) }));
+                    }
+                  }}
+                  disabled={!labelData.quantity || parseInt(labelData.quantity) <= 0}
+                  className="h-10 w-10 shrink-0"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={labelData.quantity}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Only allow positive numbers
+                    if (value === '' || parseInt(value) >= 0) {
+                      setLabelData(prev => ({ ...prev, quantity: value }));
+                    }
+                  }}
+                  placeholder="0"
+                  min="0"
+                  className="text-center"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    const currentQty = parseInt(labelData.quantity) || 0;
+                    setLabelData(prev => ({ ...prev, quantity: String(currentQty + 1) }));
+                  }}
+                  className="h-10 w-10 shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit">Unit</Label>
@@ -1271,21 +1323,229 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
       )}
 
       {/* Label Preview with QR Code */}
-      <LabelPreview
-        productName={labelData.productName}
-        categoryName={labelData.categoryName}
-        condition={labelData.condition}
-        preparedByName={labelData.preparedByName}
-        prepDate={labelData.prepDate}
-        expiryDate={labelData.expiryDate}
-        quantity={labelData.quantity}
-        unit={labelData.unit}
-        batchNumber={labelData.batchNumber}
-        productId={labelData.productId}
-        templateType="default"
-        templateName={selectedTemplate?.name}
-        isBlankTemplate={selectedTemplate?.name?.toLowerCase() === "blank"}
-      />
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" />
+              Label Preview
+            </CardTitle>
+            {/* Template Selector */}
+            <Select 
+              value={selectedPreviewTemplate} 
+              onValueChange={(value) => setSelectedPreviewTemplate(value as 'default' | 'recipe' | 'allergen' | 'blank')}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    <span>Default Template</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="recipe">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    <span>Recipe Template</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="allergen">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    <span>Allergen Template</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="blank">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    <span>Blank Template</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Preview how your label will look with different template types
+          </p>
+        </CardHeader>
+        <CardContent>
+          <LabelPreview
+            productName={labelData.productName}
+            categoryName={labelData.categoryName}
+            condition={labelData.condition}
+            preparedByName={labelData.preparedByName}
+            prepDate={labelData.prepDate}
+            expiryDate={labelData.expiryDate}
+            quantity={labelData.quantity}
+            unit={labelData.unit}
+            batchNumber={labelData.batchNumber}
+            productId={labelData.productId}
+            templateType={selectedPreviewTemplate}
+            templateName={selectedPreviewTemplate === 'blank' ? 'Blank' : `${selectedPreviewTemplate.charAt(0).toUpperCase() + selectedPreviewTemplate.slice(1)} Template`}
+            isBlankTemplate={selectedPreviewTemplate === 'blank'}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Canvas-Based Preview (Multi-Format) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              {showCanvasPreview ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+              Multi-Format Label Preview
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCanvasPreview(!showCanvasPreview)}
+              className="flex items-center gap-2"
+            >
+              {showCanvasPreview ? (
+                <>
+                  <EyeOff className="w-4 h-4" />
+                  Hide Preview
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4" />
+                  Show Preview
+                </>
+              )}
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            View your label in different formats: Generic (visual), PDF (paper), or Zebra (thermal printer)
+          </p>
+        </CardHeader>
+        
+        {showCanvasPreview && (
+          <CardContent className="space-y-4">
+            {/* Preview Controls */}
+            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/50 rounded-lg">
+              {/* Format Selector */}
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="preview-format" className="text-xs font-medium">Format</Label>
+                <Select value={previewFormat} onValueChange={(value) => setPreviewFormat(value as LabelFormat)}>
+                  <SelectTrigger id="preview-format">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="generic">
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4" />
+                        <div>
+                          <div className="font-medium">Generic</div>
+                          <div className="text-xs text-muted-foreground">Visual label design</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="pdf">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        <div>
+                          <div className="font-medium">PDF</div>
+                          <div className="text-xs text-muted-foreground">A4 paper layout</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="zebra">
+                      <div className="flex items-center gap-2">
+                        <Printer className="w-4 h-4" />
+                        <div>
+                          <div className="font-medium">Zebra</div>
+                          <div className="text-xs text-muted-foreground">Thermal printer</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Zoom Control */}
+              <div className="flex-1 space-y-2">
+                <Label className="text-xs font-medium flex items-center justify-between">
+                  <span>Zoom</span>
+                  <span className="text-muted-foreground">{Math.round(previewScale * 100)}%</span>
+                </Label>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
+                      const currentIndex = scales.indexOf(previewScale);
+                      if (currentIndex > 0) {
+                        setPreviewScale(scales[currentIndex - 1]);
+                      }
+                    }}
+                    disabled={previewScale <= 0.5}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                  <Slider
+                    value={[previewScale * 100]}
+                    onValueChange={([value]) => {
+                      const scale = value / 100;
+                      if (scale >= 0.5 && scale <= 1.5) {
+                        // Round to nearest valid scale
+                        const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
+                        const closest = scales.reduce((prev, curr) => 
+                          Math.abs(curr - scale) < Math.abs(prev - scale) ? curr : prev
+                        );
+                        setPreviewScale(closest);
+                      }
+                    }}
+                    min={50}
+                    max={150}
+                    step={25}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
+                      const currentIndex = scales.indexOf(previewScale);
+                      if (currentIndex < scales.length - 1) {
+                        setPreviewScale(scales[currentIndex + 1]);
+                      }
+                    }}
+                    disabled={previewScale >= 1.5}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Canvas Preview */}
+            <LabelPreviewCanvas
+              labelData={labelData}
+              format={previewFormat}
+              scale={previewScale}
+              className="min-h-[400px]"
+            />
+
+            {/* Format Info */}
+            <div className="text-xs text-muted-foreground text-center p-4 bg-muted/30 rounded-lg">
+              {previewFormat === 'generic' && (
+                <p>Generic format shows a visual representation of your label with color and styling.</p>
+              )}
+              {previewFormat === 'pdf' && (
+                <p>PDF format shows how your label will appear on A4 paper (210mm × 297mm).</p>
+              )}
+              {previewFormat === 'zebra' && (
+                <p>Zebra format simulates a thermal printer label in monochrome (black & white).</p>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
 
       {/* Create Category Confirmation Dialog */}
       <AlertDialog open={showCreateCategoryDialog} onOpenChange={setShowCreateCategoryDialog}>

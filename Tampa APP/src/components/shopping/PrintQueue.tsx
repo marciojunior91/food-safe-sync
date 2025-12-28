@@ -182,21 +182,21 @@ export function PrintQueue() {
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-3">
                 {items.map((item, index) => (
-                  <Card key={item.id} className="p-4 relative">
-                    {/* Item number badge */}
-                    <div className="absolute -top-2 -left-2 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-bold">
-                      {index + 1}
-                    </div>
-
+                  <Card key={item.id} className="p-4">
                     <div className="space-y-3">
-                      {/* Product info */}
-                      <div className="pr-8">
-                        <h3 className="font-semibold text-base leading-tight mb-1">
-                          {item.productName}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          {item.categoryName}
-                        </p>
+                      {/* Product info with index number */}
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-7 h-7 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-bold">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-base leading-tight mb-1">
+                            {item.productName}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {item.categoryName}
+                          </p>
+                        </div>
                       </div>
 
                       {/* Dates info */}

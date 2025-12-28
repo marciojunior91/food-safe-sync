@@ -18,7 +18,7 @@ interface LabelPreviewProps {
   unit: string;
   batchNumber: string;
   productId?: string;
-  templateType?: "default" | "recipe" | "allergen";
+  templateType?: "default" | "recipe" | "allergen" | "blank";
   templateName?: string; // To detect "Blank" template
   isBlankTemplate?: boolean; // Direct flag for blank templates
 }
@@ -98,10 +98,18 @@ export function LabelPreview({
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Eye className="w-5 h-5" />
-          Label Preview
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Eye className="w-5 h-5" />
+            Label Preview
+          </CardTitle>
+          <Badge variant="secondary" className="text-xs font-mono">
+            60mm × 60mm
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          Standard label dimensions for thermal printers
+        </p>
       </CardHeader>
       <CardContent>
         <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 space-y-4 bg-white dark:bg-gray-950">

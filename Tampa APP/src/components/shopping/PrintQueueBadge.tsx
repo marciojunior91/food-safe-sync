@@ -1,5 +1,5 @@
 // PrintQueueBadge - Floating action button to open print queue
-import { ShoppingCart } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { usePrintQueue } from '@/hooks/usePrintQueue';
@@ -34,7 +34,7 @@ export function PrintQueueBadge() {
       variant="hero"
       size="icon"
     >
-      <ShoppingCart className="w-6 h-6" />
+      <Printer className="w-6 h-6" />
       <Badge 
         className={cn(
           "absolute -top-2 -right-2",
