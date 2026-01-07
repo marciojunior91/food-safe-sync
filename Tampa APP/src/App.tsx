@@ -17,12 +17,13 @@ import Analytics from "./pages/Analytics";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import DailyRoutines from "./pages/DailyRoutines";
+import RoutineTasks from "./pages/RoutineTasks";
 import Training from "./pages/Training";
 import People from "./pages/People";
-import Notifications from "./pages/Notifications";
+import Feed from "./pages/Feed";
 import ProductTrafficLight from "./pages/ProductTrafficLight";
 import DraftManagement from "./pages/DraftManagement";
+import UserProfile from "./components/people/UserProfile";
 
 const queryClient = new QueryClient();
 
@@ -46,10 +47,11 @@ const App = () => (
                 <Route path="recipes" element={<Recipes />} />
                 <Route path="labeling" element={<Labeling />} />
                 <Route path="inventory" element={<Inventory />} />
-                <Route path="routines" element={<DailyRoutines />} />
+                <Route path="routine-tasks" element={<RoutineTasks />} />
                 <Route path="training" element={<Training />} />
                 <Route path="people" element={<People />} />
-                <Route path="notifications" element={<Notifications />} />
+                <Route path="people/:userId" element={<UserProfile />} />
+                <Route path="feed" element={<Feed />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="traffic-light" element={<ProductTrafficLight />} />
               <Route path="drafts" element={<DraftManagement />} />

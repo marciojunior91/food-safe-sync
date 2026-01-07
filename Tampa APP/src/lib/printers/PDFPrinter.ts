@@ -1,9 +1,13 @@
-// PDFPrinter - Export labels to PDF using jsPDF
+// PDFPrinter - Export labels to PDF using canvas renderer
+// Updated to use unified BOPP design with labelId tracking
 import { jsPDF } from 'jspdf';
-import QRCode from 'qrcode';
 import { PrinterDriver, PrinterCapabilities, PrinterSettings, PrinterStatus } from '@/types/printer';
+import { renderPdfLabel } from '@/utils/labelRenderers/pdfRenderer';
+import { saveLabelToDatabase, type LabelPrintData } from '@/utils/zebraPrinter';
+import { supabase } from '@/integrations/supabase/client';
+import type { LabelData } from '@/components/labels/LabelForm';
 
-interface LabelData {
+interface IncomingLabelData {
   productName: string;
   categoryName?: string;
   subcategoryName?: string;
@@ -12,6 +16,14 @@ interface LabelData {
   allergens?: string[];
   storageInstructions?: string;
   barcode?: string;
+  preparedBy?: string;
+  preparedByName?: string;
+  productId?: string;
+  categoryId?: string;
+  quantity?: string;
+  unit?: string;
+  condition?: string;
+  organizationId?: string;
 }
 
 export class PDFPrinter implements PrinterDriver {
@@ -91,17 +103,12 @@ export class PDFPrinter implements PrinterDriver {
     };
   }
 
-  private async createPDF(labels: LabelData[]): Promise<jsPDF> {
-    const { paperWidth, paperHeight } = this.settings;
-    
-    // Convert mm to points (1mm = 2.83465 points)
-    const widthPt = paperWidth * 2.83465;
-    const heightPt = paperHeight * 2.83465;
-    
+  private async createPDF(labels: IncomingLabelData[]): Promise<jsPDF> {
+    // A4 dimensions for PDF output
     const pdf = new jsPDF({
-      orientation: paperWidth > paperHeight ? 'landscape' : 'portrait',
+      orientation: 'portrait',
       unit: 'mm',
-      format: [paperWidth, paperHeight]
+      format: 'a4'
     });
 
     for (let index = 0; index < labels.length; index++) {
@@ -115,163 +122,153 @@ export class PDFPrinter implements PrinterDriver {
     return pdf;
   }
 
-  private async renderLabel(pdf: jsPDF, label: LabelData): Promise<void> {
-    const margin = 8;
-    let y = margin;
-    const contentWidth = this.settings.paperWidth - (margin * 2);
-    
-    // Generate QR Code data
-    const qrData = `PRODUCT:${label.productName}|PREP:${label.preparedDate}|EXP:${label.useByDate}`;
-    let qrCodeDataUrl: string | null = null;
-    
+  private async renderLabel(pdf: jsPDF, incomingData: IncomingLabelData): Promise<void> {
     try {
-      qrCodeDataUrl = await QRCode.toDataURL(qrData, {
-        width: 200,
-        margin: 1,
-        errorCorrectionLevel: 'M'
-      });
+      // Step 1: Convert incoming data to LabelPrintData and save to database
+      const printData = await this.convertToLabelPrintData(incomingData);
+      const labelId = await saveLabelToDatabase(printData);
+      
+      // Step 2: Convert to LabelData format with labelId
+      const labelData: LabelData = {
+        labelId: labelId || undefined,
+        categoryId: printData.categoryId || '',
+        categoryName: printData.categoryName,
+        subcategoryId: undefined,
+        subcategoryName: incomingData.subcategoryName,
+        productId: printData.productId,
+        productName: printData.productName,
+        condition: printData.condition,
+        preparedBy: printData.preparedBy,
+        preparedByName: printData.preparedByName,
+        prepDate: printData.prepDate,
+        expiryDate: printData.expiryDate,
+        quantity: printData.quantity || '',
+        unit: printData.unit || '',
+        batchNumber: printData.batchNumber,
+        allergens: printData.allergens,
+        organizationDetails: printData.organizationDetails // ✅ Pass organization details to renderer
+      };
+      
+      // Step 3: Create canvas and render with BOPP design
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        throw new Error('Failed to get canvas context');
+      }
+      
+      // A4 dimensions in pixels at 96 DPI (scaled for canvas)
+      const canvasWidth = 600;
+      const canvasHeight = 848;
+      
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      
+      // Render label with updated BOPP design renderer (includes labelId in QR)
+      await renderPdfLabel(ctx, labelData, canvasWidth, canvasHeight);
+      
+      // Step 4: Add canvas image to PDF
+      const imgData = canvas.toDataURL('image/png');
+      
+      // Add image to fill A4 page
+      pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+      
+      console.log(`PDF label rendered successfully. LabelId: ${labelId}`);
     } catch (error) {
-      console.error('Error generating QR code:', error);
-    }
-    
-    // === HEADER SECTION ===
-    // Header background with gradient effect (dark blue)
-    pdf.setFillColor(30, 58, 138); // Blue-900
-    pdf.rect(0, 0, this.settings.paperWidth, 25, 'F');
-    
-    // Add QR Code in header (top right)
-    if (qrCodeDataUrl) {
-      const qrSize = 22;
-      const qrX = this.settings.paperWidth - qrSize - margin;
-      const qrY = margin - 6;
-      // White background for QR
-      pdf.setFillColor(255, 255, 255);
-      pdf.rect(qrX - 1, qrY - 1, qrSize + 2, qrSize + 2, 'F');
-      pdf.addImage(qrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
-    }
-    
-    // Product Name in header (white text)
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(16);
-    pdf.setFont('helvetica', 'bold');
-    const maxProductWidth = contentWidth - 30; // Leave room for QR
-    const productLines = pdf.splitTextToSize(label.productName, maxProductWidth);
-    const productY = 12 + (productLines.length === 1 ? 0 : -2);
-    pdf.text(productLines, margin, productY);
-    
-    y = 28; // Start content below header
-    pdf.setTextColor(0, 0, 0); // Reset to black for body
-    
-    // === CLASSIFICATION SECTION ===
-    if (label.categoryName || label.subcategoryName) {
-      // Light gray background
-      pdf.setFillColor(243, 244, 246); // Gray-100
-      pdf.rect(margin, y, contentWidth, 14, 'F');
-      
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(75, 85, 99); // Gray-600
-      
-      let classY = y + 6;
-      if (label.categoryName) {
-        pdf.text(`CATEGORY: `, margin + 2, classY);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(0, 0, 0);
-        pdf.text(label.categoryName, margin + 22, classY);
-        classY += 5;
-      }
-      
-      if (label.subcategoryName) {
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(75, 85, 99);
-        pdf.text(`SUBCATEGORY: `, margin + 2, classY);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(0, 0, 0);
-        pdf.text(label.subcategoryName, margin + 28, classY);
-      }
-      
-      y += 17;
-    }
-    
-    // === DATE INFORMATION SECTION ===
-    // Border box
-    pdf.setDrawColor(209, 213, 219); // Gray-300
-    pdf.setLineWidth(0.3);
-    pdf.rect(margin, y, contentWidth, 20, 'S');
-    
-    const dateY = y + 7;
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(75, 85, 99);
-    
-    // Prepared date
-    pdf.text('PREPARED:', margin + 2, dateY);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(0, 0, 0);
-    pdf.text(this.formatDate(label.preparedDate), margin + 2, dateY + 5);
-    
-    // Use by date (highlighted)
-    const useByX = margin + (contentWidth / 2) + 2;
-    pdf.setFont('helvetica', 'normal');
-    pdf.setTextColor(185, 28, 28); // Red-700
-    pdf.text('USE BY:', useByX, dateY);
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(220, 38, 38); // Red-600
-    pdf.text(this.formatDate(label.useByDate), useByX, dateY + 5);
-    
-    y += 23;
-    
-    // === ALLERGEN WARNING (if present) ===
-    if (label.allergens && label.allergens.length > 0) {
-      // Red warning background
-      pdf.setFillColor(254, 226, 226); // Red-100
-      pdf.setDrawColor(239, 68, 68); // Red-500
-      pdf.setLineWidth(0.5);
-      pdf.rect(margin, y, contentWidth, 12, 'FD');
-      
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(185, 28, 28);
-      pdf.text('⚠ ALLERGENS:', margin + 2, y + 5);
-      
-      pdf.setFont('helvetica', 'normal');
-      const allergensText = label.allergens.join(', ');
-      const allergenLines = pdf.splitTextToSize(allergensText, contentWidth - 30);
-      pdf.text(allergenLines, margin + 28, y + 5);
-      
-      y += 15;
-    }
-    
-    // === STORAGE INSTRUCTIONS ===
-    if (label.storageInstructions) {
-      pdf.setFontSize(8);
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(107, 114, 128); // Gray-500
-      const storageLines = pdf.splitTextToSize(label.storageInstructions, contentWidth);
-      pdf.text(storageLines, margin, y);
-      y += storageLines.length * 4;
-    }
-    
-    // === FOOTER - BARCODE ===
-    if (label.barcode) {
-      y += 3;
-      pdf.setFontSize(8);
-      pdf.setFont('courier', 'normal');
-      pdf.text(`Barcode: ${label.barcode}`, margin, y);
+      console.error('Error rendering PDF label:', error);
+      throw error;
     }
   }
 
-  private formatDate(dateString: string): string {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric', 
-        year: 'numeric' 
-      });
-    } catch {
-      return dateString;
+  /**
+   * Convert incoming label data to LabelPrintData format
+   * Fetches missing data from Supabase if needed
+   */
+  private async convertToLabelPrintData(labelData: IncomingLabelData): Promise<LabelPrintData> {
+    // Get current user and organization
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    let organizationId = labelData.organizationId;
+    let preparedBy = labelData.preparedBy;
+    let preparedByName = labelData.preparedByName;
+    
+    // Fetch organization and user info if not provided
+    if (user && (!organizationId || !preparedBy)) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id, display_name')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (profile) {
+        organizationId = organizationId || profile.organization_id;
+        preparedBy = preparedBy || user.id;
+        preparedByName = preparedByName || profile.display_name || 'Unknown';
+      }
     }
+    
+    if (!organizationId) {
+      throw new Error('Organization ID is required for printing');
+    }
+    
+    if (!preparedBy || !preparedByName) {
+      throw new Error('Prepared by information is required for printing');
+    }
+    
+    // Fetch organization details for label footer
+    let organizationDetails;
+    try {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name, address, phone, email, food_safety_registration')
+        .eq('id', organizationId)
+        .single();
+      
+      console.log('🔍 PDFPrinter - Raw org data from DB:', orgData);
+      
+      if (orgData) {
+        organizationDetails = {
+          name: orgData.name,
+          address: orgData.address || undefined, // Address is already a JSON string from DB
+          phone: orgData.phone || undefined,
+          email: orgData.email || undefined,
+          foodSafetyRegistration: orgData.food_safety_registration || undefined,
+        };
+        console.log('🔍 PDFPrinter - Formatted organizationDetails:', organizationDetails);
+      }
+    } catch (error) {
+      console.warn('Could not fetch organization details:', error);
+    }
+    
+    // Parse condition from storage instructions if not provided
+    const condition = labelData.condition || 
+                     labelData.storageInstructions || 
+                     'Refrigerate';
+    
+    // Build LabelPrintData object
+    const printData: LabelPrintData = {
+      productId: labelData.productId || null, // Use null instead of empty string for UUID field
+      productName: labelData.productName,
+      categoryId: labelData.categoryId || null,
+      categoryName: labelData.categoryName || 'General',
+      preparedBy,
+      preparedByName,
+      prepDate: labelData.preparedDate,
+      expiryDate: labelData.useByDate,
+      condition,
+      organizationId,
+      organizationDetails, // Add organization details for professional footer
+      quantity: labelData.quantity,
+      unit: labelData.unit,
+      batchNumber: labelData.barcode || '',
+      allergens: labelData.allergens?.map(name => ({
+        id: '',
+        name: typeof name === 'string' ? name : (name as any).name || '',
+        icon: null,
+        severity: 'low'
+      }))
+    };
+    
+    return printData;
   }
 }

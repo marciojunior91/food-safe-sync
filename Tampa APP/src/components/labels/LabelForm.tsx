@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { TeamMember } from "@/types/teamMembers";
 import { 
   Printer, 
   Save, 
@@ -48,6 +49,7 @@ import { Settings } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 
 export interface LabelData {
+  labelId?: string; // UUID from printed_labels table - for lifecycle tracking
   categoryId: string;
   categoryName: string;
   subcategoryId?: string;
@@ -62,22 +64,26 @@ export interface LabelData {
   quantity: string;
   unit: string;
   batchNumber: string;
+  allergens?: Array<{
+    id: string;
+    name: string;
+    icon: string | null;
+    severity: string;
+  }>;
+  organizationDetails?: {
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    foodSafetyRegistration?: string;
+  };
 }
 
 interface LabelFormProps {
   onSave?: (data: LabelData) => void;
   onPrint?: (data: LabelData) => void;
   onCancel?: () => void;
-  selectedUser?: {
-    id: string;
-    user_id: string;
-    display_name: string | null;
-  };
-  selectedTemplate?: {
-    id: string;
-    name: string;
-    zpl_code?: string | null;
-  };
+  selectedUser?: TeamMember;
 }
 
 interface Category {
@@ -116,7 +122,7 @@ const CONDITIONS = [
   { value: "refrigerated", label: "Refrigerated", days: 7 },
 ];
 
-export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTemplate }: LabelFormProps) {
+export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelFormProps) {
   const { toast } = useToast();
   const { updateProductAllergens } = useAllergens();
   const { user } = useAuth();
@@ -163,11 +169,16 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
   
   // Canvas preview states
   const [showCanvasPreview, setShowCanvasPreview] = useState(false);
-  const [previewFormat, setPreviewFormat] = useState<LabelFormat>('generic');
   const [previewScale, setPreviewScale] = useState<PreviewScale>(1);
   
-  // Template selection state (for React preview)
-  const [selectedPreviewTemplate, setSelectedPreviewTemplate] = useState<'default' | 'recipe' | 'allergen' | 'blank'>('default');
+  // Organization details for label preview
+  const [organizationDetails, setOrganizationDetails] = useState<{
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    foodSafetyRegistration?: string;
+  }>();
   
   // Duplicate detection for new product creation (only active when organizationId is loaded)
   const {
@@ -197,7 +208,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     productId: "",
     productName: "",
     condition: "",
-    preparedBy: selectedUser?.user_id || "",
+    preparedBy: selectedUser?.auth_role_id || user?.id || "", // ✅ Use auth_role_id or fallback to current user
     preparedByName: selectedUser?.display_name || "",
     prepDate: today,
     expiryDate: "",
@@ -222,6 +233,27 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
         
         if (profile?.organization_id) {
           setOrganizationId(profile.organization_id);
+          
+          // Fetch organization details for label preview
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('name, address, phone, email, food_safety_registration')
+            .eq('id', profile.organization_id)
+            .single();
+          
+          if (orgData) {
+            setOrganizationDetails({
+              name: orgData.name,
+              address: typeof orgData.address === 'string' 
+                ? orgData.address 
+                : orgData.address 
+                  ? JSON.stringify(orgData.address) 
+                  : undefined,
+              phone: orgData.phone || undefined,
+              email: orgData.email || undefined,
+              foodSafetyRegistration: orgData.food_safety_registration || undefined,
+            });
+          }
         }
       } catch (error) {
         console.error("Error fetching organization_id:", error);
@@ -237,18 +269,32 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
   }, [user, toast]);
 
   useEffect(() => {
-    if (selectedUser) {
-      setLabelData(prev => ({
-        ...prev,
-        preparedBy: selectedUser.user_id,
-        preparedByName: selectedUser.display_name || ""
-      }));
-    }
-  }, [selectedUser]);
+    const updatePreparedBy = async () => {
+      if (selectedUser) {
+        let userId = selectedUser.auth_role_id;
+        
+        // Fallback: if team member doesn't have auth_role_id, use current logged-in user
+        if (!userId && user?.id) {
+          userId = user.id;
+          console.warn(`Team member ${selectedUser.display_name} (${selectedUser.id}) is not linked to a user account. Using current user as fallback.`);
+        }
+        
+        setLabelData(prev => ({
+          ...prev,
+          preparedBy: userId || "",
+          preparedByName: selectedUser.display_name || ""
+        }));
+      }
+    };
+    
+    updatePreparedBy();
+  }, [selectedUser, user]);
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
+    if (organizationId) {
+      fetchCategories();
+    }
+  }, [organizationId]);
 
   // Fetch subcategories for MAIN FORM when category changes
   useEffect(() => {
@@ -258,12 +304,18 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
         return;
       }
 
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching subcategories");
+        return;
+      }
+
       try {
         setLoadingFormSubcategories(true);
         const { data, error } = await supabase
           .from("label_subcategories")
           .select("id, name")
           .eq("category_id", labelData.categoryId)
+          .eq('organization_id', organizationId)
           .order("name");
 
         if (error) throw error;
@@ -283,7 +335,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     };
 
     fetchFormSubcategories();
-  }, [labelData.categoryId]);
+  }, [labelData.categoryId, organizationId]);
 
   // Fetch subcategories for CREATE PRODUCT DIALOG when category changes
   useEffect(() => {
@@ -293,12 +345,18 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
         return;
       }
 
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching dialog subcategories");
+        return;
+      }
+
       try {
         setLoadingDialogSubcategories(true);
         const { data, error } = await supabase
           .from("label_subcategories")
           .select("id, name")
           .eq("category_id", newProductCategory)
+          .eq('organization_id', organizationId)
           .order("name");
 
         if (error) throw error;
@@ -318,7 +376,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
     };
 
     fetchDialogSubcategories();
-  }, [newProductCategory]);
+  }, [newProductCategory, organizationId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -329,9 +387,16 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
 
   const fetchCategories = async () => {
     try {
+      // Only fetch categories if we have organization_id
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching categories");
+        return;
+      }
+
       const { data, error } = await supabase
         .from("label_categories")
         .select("id, name")
+        .eq('organization_id', organizationId)
         .order("name");
 
       if (error) throw error;
@@ -344,6 +409,12 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
 
   const fetchProducts = async (categoryId?: string, subcategoryId?: string, search?: string) => {
     try {
+      // Don't fetch if we don't have organization_id yet
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching products");
+        return;
+      }
+
       let query = supabase
         .from("products")
         .select(`
@@ -365,6 +436,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
             name
           )
         `)
+        .eq('organization_id', organizationId)
         .order("name")
         .limit(50);
 
@@ -727,6 +799,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
         quantity: labelData.quantity,
         unit: labelData.unit,
         batchNumber: labelData.batchNumber,
+        organizationId: organizationId || "", // Required for RLS
       });
 
       // Print using the new printer system
@@ -1322,80 +1395,13 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
         </Card>
       )}
 
-      {/* Label Preview with QR Code */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="w-5 h-5" />
-              Label Preview
-            </CardTitle>
-            {/* Template Selector */}
-            <Select 
-              value={selectedPreviewTemplate} 
-              onValueChange={(value) => setSelectedPreviewTemplate(value as 'default' | 'recipe' | 'allergen' | 'blank')}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">
-                  <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    <span>Default Template</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="recipe">
-                  <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    <span>Recipe Template</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="allergen">
-                  <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    <span>Allergen Template</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="blank">
-                  <div className="flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    <span>Blank Template</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-sm text-muted-foreground mt-2">
-            Preview how your label will look with different template types
-          </p>
-        </CardHeader>
-        <CardContent>
-          <LabelPreview
-            productName={labelData.productName}
-            categoryName={labelData.categoryName}
-            condition={labelData.condition}
-            preparedByName={labelData.preparedByName}
-            prepDate={labelData.prepDate}
-            expiryDate={labelData.expiryDate}
-            quantity={labelData.quantity}
-            unit={labelData.unit}
-            batchNumber={labelData.batchNumber}
-            productId={labelData.productId}
-            templateType={selectedPreviewTemplate}
-            templateName={selectedPreviewTemplate === 'blank' ? 'Blank' : `${selectedPreviewTemplate.charAt(0).toUpperCase() + selectedPreviewTemplate.slice(1)} Template`}
-            isBlankTemplate={selectedPreviewTemplate === 'blank'}
-          />
-        </CardContent>
-      </Card>
-
       {/* Canvas-Based Preview (Multi-Format) */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               {showCanvasPreview ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-              Multi-Format Label Preview
+              Label Preview
             </CardTitle>
             <Button
               variant="outline"
@@ -1417,7 +1423,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
             </Button>
           </div>
           <p className="text-sm text-muted-foreground mt-2">
-            View your label in different formats: Generic (visual), PDF (paper), or Zebra (thermal printer)
+            Preview shows how your label will look with the current printer: <span className="font-medium text-foreground">{settings?.name || 'No printer selected'}</span>
           </p>
         </CardHeader>
         
@@ -1425,43 +1431,18 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
           <CardContent className="space-y-4">
             {/* Preview Controls */}
             <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/50 rounded-lg">
-              {/* Format Selector */}
+              {/* Current Printer Info */}
               <div className="flex-1 space-y-2">
-                <Label htmlFor="preview-format" className="text-xs font-medium">Format</Label>
-                <Select value={previewFormat} onValueChange={(value) => setPreviewFormat(value as LabelFormat)}>
-                  <SelectTrigger id="preview-format">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="generic">
-                      <div className="flex items-center gap-2">
-                        <Eye className="w-4 h-4" />
-                        <div>
-                          <div className="font-medium">Generic</div>
-                          <div className="text-xs text-muted-foreground">Visual label design</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="pdf">
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4" />
-                        <div>
-                          <div className="font-medium">PDF</div>
-                          <div className="text-xs text-muted-foreground">A4 paper layout</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="zebra">
-                      <div className="flex items-center gap-2">
-                        <Printer className="w-4 h-4" />
-                        <div>
-                          <div className="font-medium">Zebra</div>
-                          <div className="text-xs text-muted-foreground">Thermal printer</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs font-medium">Current Printer</Label>
+                <div className="flex items-center gap-3 p-3 bg-background rounded-md border">
+                  <Printer className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm">{settings?.name || 'No printer selected'}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {settings?.paperWidth}mm × {settings?.paperHeight}mm
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Zoom Control */}
@@ -1525,23 +1506,24 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser, selectedTem
 
             {/* Canvas Preview */}
             <LabelPreviewCanvas
-              labelData={labelData}
-              format={previewFormat}
+              labelData={{
+                ...labelData,
+                organizationDetails, // Add organization details for preview
+              }}
+              format={(settings?.type as LabelFormat) || 'generic'}
               scale={previewScale}
               className="min-h-[400px]"
             />
 
             {/* Format Info */}
             <div className="text-xs text-muted-foreground text-center p-4 bg-muted/30 rounded-lg">
-              {previewFormat === 'generic' && (
-                <p>Generic format shows a visual representation of your label with color and styling.</p>
-              )}
-              {previewFormat === 'pdf' && (
-                <p>PDF format shows how your label will appear on A4 paper (210mm × 297mm).</p>
-              )}
-              {previewFormat === 'zebra' && (
-                <p>Zebra format simulates a thermal printer label in monochrome (black & white).</p>
-              )}
+              <p>
+                All labels use the same professional layout. 
+                {settings?.type === 'pdf' && ' This preview shows how it will appear on A4 paper (210mm × 297mm).'}
+                {settings?.type === 'zebra' && ' This preview shows how it will appear on thermal printer labels (60mm × 60mm).'}
+                {settings?.type === 'generic' && ' This preview shows how it will appear on standard label paper (60mm × 60mm).'}
+                {!settings && ' Select a printer to see the label preview with appropriate dimensions.'}
+              </p>
             </div>
           </CardContent>
         )}

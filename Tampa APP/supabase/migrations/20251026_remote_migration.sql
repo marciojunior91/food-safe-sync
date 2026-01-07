@@ -1,0 +1,2 @@
+-- Migration already applied remotely
+-- This file was created to match the remote migration history

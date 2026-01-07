@@ -1,7 +1,8 @@
 // LabelPreviewCanvas - Canvas-based real-time label preview
+// All formats now use unified Suflex layout (renderPdfLabel)
 import { useEffect, useRef, useState } from 'react';
 import { LabelData } from './LabelForm';
-import { renderGenericLabel, renderPdfLabel, renderZebraLabel } from '@/utils/labelRenderers';
+import { renderPdfLabel } from '@/utils/labelRenderers';
 import { Loader2 } from 'lucide-react';
 
 export type LabelFormat = 'generic' | 'pdf' | 'zebra';
@@ -9,7 +10,7 @@ export type PreviewScale = 0.5 | 0.75 | 1 | 1.25 | 1.5;
 
 interface LabelPreviewCanvasProps {
   labelData: LabelData;
-  format: LabelFormat;
+  format: LabelFormat; // Only used for canvas dimensions, not for layout rendering
   scale: PreviewScale;
   className?: string;
 }
@@ -35,21 +36,21 @@ export function LabelPreviewCanvas({
     setIsRendering(true);
 
     // Set canvas dimensions based on format
-    let baseWidth = 480;  // Default 60mm (~2.36 inches at 203 DPI)
-    let baseHeight = 480; // Default 60mm (square label)
+    // Since all formats now use the unified Suflex layout from pdfRenderer,
+    // we need to ensure the canvas is tall enough to fit the full label
+    let baseWidth = 600;  // Standard width for all formats
+    let baseHeight = 848; // Standard height for all formats (matches PDF A4 proportions)
 
     if (format === 'pdf') {
       // A4 dimensions in pixels at 96 DPI (reduced for preview)
       baseWidth = 600;  // Scaled down from 794
       baseHeight = 848; // Scaled down from 1123
-    } else if (format === 'zebra') {
-      // 60mm x 60mm label at 203 DPI (thermal printer)
-      // 60mm = 2.36 inches, at 203 DPI = ~479 pixels
-      // For preview, scale down proportionally
-      baseWidth = 480;  // ~60mm width
-      baseHeight = 480; // ~60mm height (square label)
+    } else if (format === 'zebra' || format === 'generic') {
+      // Thermal and generic labels use same dimensions as PDF to fit the full layout
+      // The unified layout requires this height to display all content without cutting
+      baseWidth = 600;
+      baseHeight = 848;
     }
-    // Generic format also uses 60mm x 60mm by default
 
     // Apply scale
     canvas.width = baseWidth * scale;
@@ -62,19 +63,11 @@ export function LabelPreviewCanvas({
     ctx.save();
     ctx.scale(scale, scale);
 
-    // Render based on format
+    // Render using unified professional layout (same design for all formats)
+    // Only difference is canvas dimensions based on printer paper size
     try {
-      switch (format) {
-        case 'generic':
-          await renderGenericLabel(ctx, labelData, baseWidth, baseHeight);
-          break;
-        case 'pdf':
-          await renderPdfLabel(ctx, labelData, baseWidth, baseHeight);
-          break;
-        case 'zebra':
-          await renderZebraLabel(ctx, labelData, baseWidth, baseHeight);
-          break;
-      }
+      // All formats now use the same PDF renderer with professional design
+      await renderPdfLabel(ctx, labelData, baseWidth, baseHeight);
     } catch (error) {
       console.error('Error rendering label preview:', error);
       

@@ -30,12 +30,26 @@ export const getExpiryStatus = (expiryDate: string): ExpiryStatus => {
 export const getStatusColor = (status: ExpiryStatus): string => {
   switch (status) {
     case 'expired':
-      return 'text-red-500 bg-red-100'; // Red
+      return '#ef4444'; // Red
     case 'warning':
-      return 'text-yellow-500 bg-yellow-100'; // Yellow
+      return '#f59e0b'; // Orange/Yellow
     case 'safe':
-      return 'text-green-500 bg-green-100'; // Green
+      return '#10b981'; // Green
     default:
-      return 'text-gray-500 bg-gray-100';
+      return '#6b7280'; // Gray
   }
 };
+
+export const getStatusLabel = (status: ExpiryStatus): string => {
+  switch (status) {
+    case 'expired':
+      return 'Expired';
+    case 'warning':
+      return 'Expiring Soon';
+    case 'safe':
+      return 'Safe';
+    default:
+      return 'Unknown';
+  }
+};
+

@@ -3,6 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Printer, 
   Grid3x3, 
@@ -13,7 +21,9 @@ import {
   Loader2,
   Zap,
   AlertTriangle,
-  Plus
+  Plus,
+  Clock,
+  Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PrintMode, NavigationLevel } from "@/constants/quickPrintIcons";
@@ -24,6 +34,8 @@ import { QuickAddToQueueDialog } from "./QuickAddToQueueDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { AllergenBadge } from "./AllergenBadge";
 import { useAuth } from "@/hooks/useAuth";
+import { usePrinter } from "@/hooks/usePrinter";
+import { getExpiryStatus, getStatusColor, getStatusLabel } from "@/utils/trafficLight";
 import type { Allergen } from "@/hooks/useAllergens";
 
 interface Product {
@@ -40,6 +52,11 @@ interface Product {
     name: string;
   };
   allergens?: Allergen[];
+  latestLabel?: {
+    id: string;
+    expiry_date: string;
+    condition: string;
+  } | null;
 }
 
 interface Category {
@@ -66,6 +83,7 @@ interface QuickPrintGridProps {
 
 export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrintGridProps) {
   const { user } = useAuth();
+  const { settings, availablePrinters, changePrinter } = usePrinter();
   
   // View mode state
   const [printMode, setPrintMode] = useState<PrintMode>('categories');
@@ -111,28 +129,60 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
   const fetchCategories = async () => {
     setLoadingCategories(true);
     try {
-      const { data, error } = await supabase
+      // Get user's organization_id
+      if (!user?.id) {
+        setCategories([]);
+        return;
+      }
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!profile?.organization_id) {
+        setCategories([]);
+        return;
+      }
+
+      // First, get categories
+      const { data: categoriesData, error: categoriesError } = await supabase
         .from("label_categories")
-        .select(`
-          id,
-          name,
-          icon,
-          label_subcategories(count),
-          products(count)
-        `)
+        .select("id, name, icon")
+        .eq('organization_id', profile.organization_id)
         .order("name");
 
-      if (error) throw error;
+      if (categoriesError) throw categoriesError;
 
-      const formattedCategories = (data || []).map((cat: any) => ({
-        id: cat.id,
-        name: cat.name,
-        icon: cat.icon,
-        subcategory_count: cat.label_subcategories?.[0]?.count || 0,
-        product_count: cat.products?.[0]?.count || 0,
-      }));
+      // Then, get counts for each category
+      const categoriesWithCounts = await Promise.all(
+        (categoriesData || []).map(async (cat) => {
+          // Count subcategories
+          const { count: subCount } = await supabase
+            .from("label_subcategories")
+            .select("*", { count: "exact", head: true })
+            .eq("category_id", cat.id)
+            .eq('organization_id', profile.organization_id);
 
-      setCategories(formattedCategories);
+          // Count products in this category
+          const { count: prodCount } = await supabase
+            .from("products")
+            .select("*", { count: "exact", head: true })
+            .eq("category_id", cat.id)
+            .eq('organization_id', profile.organization_id);
+
+          return {
+            id: cat.id,
+            name: cat.name,
+            icon: cat.icon,
+            subcategory_count: subCount || 0,
+            product_count: prodCount || 0,
+          };
+        })
+      );
+
+      setCategories(categoriesWithCounts);
     } catch (error) {
       console.error("Error fetching categories:", error);
     } finally {
@@ -143,30 +193,54 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
   const fetchSubcategories = async (categoryId: string) => {
     setLoadingSubcategories(true);
     try {
-      const { data, error } = await supabase
+      // Get user's organization_id
+      if (!user?.id) {
+        setSubcategories([]);
+        return [];
+      }
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!profile?.organization_id) {
+        setSubcategories([]);
+        return [];
+      }
+
+      // Get subcategories
+      const { data: subcategoriesData, error: subcategoriesError } = await supabase
         .from("label_subcategories")
-        .select(`
-          id,
-          name,
-          icon,
-          category_id,
-          products(count)
-        `)
+        .select("id, name, icon, category_id")
         .eq("category_id", categoryId)
+        .eq('organization_id', profile.organization_id)
         .order("display_order");
 
-      if (error) throw error;
+      if (subcategoriesError) throw subcategoriesError;
 
-      const formattedSubcategories = (data || []).map((sub: any) => ({
-        id: sub.id,
-        name: sub.name,
-        icon: sub.icon,
-        category_id: sub.category_id,
-        product_count: sub.products?.[0]?.count || 0,
-      }));
+      // Get product counts for each subcategory
+      const subcategoriesWithCounts = await Promise.all(
+        (subcategoriesData || []).map(async (sub) => {
+          const { count: prodCount } = await supabase
+            .from("products")
+            .select("*", { count: "exact", head: true })
+            .eq("subcategory_id", sub.id)
+            .eq('organization_id', profile.organization_id);
 
-      setSubcategories(formattedSubcategories);
-      return formattedSubcategories;
+          return {
+            id: sub.id,
+            name: sub.name,
+            icon: sub.icon,
+            category_id: sub.category_id,
+            product_count: prodCount || 0,
+          };
+        })
+      );
+
+      setSubcategories(subcategoriesWithCounts);
+      return subcategoriesWithCounts;
     } catch (error) {
       console.error("Error fetching subcategories:", error);
       return [];
@@ -178,6 +252,23 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
   const fetchProductsByCategory = async (categoryId: string, subcategoryId?: string) => {
     setLoadingProducts(true);
     try {
+      // Get user's organization_id
+      if (!user?.id) {
+        setFilteredProducts([]);
+        return;
+      }
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!profile?.organization_id) {
+        setFilteredProducts([]);
+        return;
+      }
+
       let query = supabase
         .from("products")
         .select(`
@@ -205,7 +296,8 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
             )
           )
         `)
-        .eq("category_id", categoryId);
+        .eq("category_id", categoryId)
+        .eq('organization_id', profile.organization_id);
 
       if (subcategoryId) {
         query = query.eq("subcategory_id", subcategoryId);
@@ -220,14 +312,33 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
       if (error) throw error;
       
       // Transform product_allergens into allergens array
-      const transformedProducts = (data || []).map(product => ({
+      const productsWithAllergens = (data || []).map(product => ({
         ...product,
         allergens: product.product_allergens
           ?.map((pa: any) => pa.allergens)
           .filter(Boolean) || []
       }));
       
-      setFilteredProducts(transformedProducts);
+      // Fetch latest printed label for each product
+      const productsWithLabels = await Promise.all(
+        productsWithAllergens.map(async (product) => {
+          const { data: latestLabel } = await supabase
+            .from('printed_labels')
+            .select('id, expiry_date, condition')
+            .eq('product_id', product.id)
+            .eq('organization_id', profile.organization_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          return {
+            ...product,
+            latestLabel
+          };
+        })
+      );
+      
+      setFilteredProducts(productsWithLabels);
     } catch (error) {
       console.error("Error fetching products:", error);
       setFilteredProducts([]);
@@ -349,6 +460,38 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
     <>
     <Card className={cn("w-full", className)}>
       <CardHeader className="pb-3">
+        {/* Printer Selector */}
+        <div className="mb-4 p-3 border rounded-lg bg-muted/20">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Settings className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <Label className="text-xs font-medium">Printer Output</Label>
+                <p className="text-xs text-muted-foreground truncate">
+                  {settings?.name || 'No printer'} • {settings?.paperWidth}×{settings?.paperHeight}mm
+                </p>
+              </div>
+            </div>
+            <Select value={settings?.type || 'generic'} onValueChange={changePrinter}>
+              <SelectTrigger className="w-[160px] h-8 text-xs flex-shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePrinters.map(p => (
+                  <SelectItem key={p.type} value={p.type}>
+                    <div className="flex items-center gap-2">
+                      <Printer className="h-3 w-3 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium">{p.name}</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
         {/* Mode Toggle */}
         <QuickPrintModeToggle 
           mode={printMode} 
@@ -454,12 +597,17 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
               <>
                 {/* Grid View - TOUCH-FRIENDLY with larger buttons */}
                 {viewMode === "grid" && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
                     {filteredProducts.map((product) => {
                       const isLoading = printingProductId === product.id;
                       const isSuccess = successProductId === product.id;
                       const hasCriticalAllergens = product.allergens?.some(a => a.severity === 'critical');
                       const criticalCount = product.allergens?.filter(a => a.severity === 'critical').length || 0;
+                      
+                      // Get expiry status from latest printed label
+                      const expiryStatus = product.latestLabel ? getExpiryStatus(product.latestLabel.expiry_date) : null;
+                      const statusColor = expiryStatus ? getStatusColor(expiryStatus) : null;
+                      const showExpiryWarning = expiryStatus === 'warning' || expiryStatus === 'expired';
                       
                       return (
                         <div key={product.id} className="relative">
@@ -467,65 +615,83 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             variant="outline"
                             disabled={isLoading}
                             className={cn(
-                              "h-36 sm:h-40 w-full flex flex-col items-center justify-center p-4 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md",
+                              "min-h-[10rem] sm:min-h-[11rem] w-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                               isSuccess 
                                 ? "bg-green-500 text-white border-green-600 hover:bg-green-600" 
                                 : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
                             )}
                             onClick={() => handleQuickPrint(product)}
                           >
-                            {isLoading ? (
-                              <div className={cn(
-                                "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-2 transition-colors",
-                                "bg-primary/10 group-hover:bg-primary-foreground/20"
-                              )}>
-                                <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 animate-spin" />
-                              </div>
-                            ) : isSuccess ? (
-                              <div className={cn(
-                                "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-2 transition-colors",
-                                "bg-green-600"
-                              )}>
-                                <Check className="w-7 h-7 sm:w-8 sm:h-8" />
-                              </div>
-                            ) : (
-                              <div className="text-4xl sm:text-5xl mb-2">
-                                📦
-                              </div>
-                            )}
-                            <span className="text-sm sm:text-base font-medium text-center line-clamp-2 px-1 mb-1">
-                              {product.name}
-                            </span>
+                            {/* Top Row - Badges with proper spacing */}
+                            <div className="absolute top-2 left-2 right-2 flex items-start justify-between z-20 pointer-events-none gap-2">
+                              {/* Expiry Badge (Top-Left) */}
+                              {product.latestLabel && expiryStatus ? (
+                                <Badge 
+                                  variant="secondary"
+                                  className="h-5 sm:h-6 px-2 text-[10px] sm:text-xs font-bold shadow-sm pointer-events-auto shrink-0"
+                                  style={{ 
+                                    backgroundColor: statusColor ? `${statusColor}20` : 'rgba(0,0,0,0.1)', 
+                                    color: statusColor || '#000',
+                                    borderColor: statusColor || 'transparent'
+                                  }}
+                                >
+                                  {getStatusLabel(expiryStatus)}
+                                </Badge>
+                              ) : (
+                                <span className="shrink-0"></span>
+                              )}
+                              
+                              {/* Quick Add Button (Top-Right) */}
+                              {!isLoading && !isSuccess && (
+                                <Button
+                                  size="icon"
+                                  variant="secondary"
+                                  className="h-8 w-8 rounded-full shadow-md hover:scale-110 bg-primary text-primary-foreground hover:bg-primary/90 pointer-events-auto transition-transform shrink-0"
+                                  onClick={(e) => handleQuickAdd(e, product)}
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                             
-                            {/* Allergen Warning Indicator */}
-                            {hasCriticalAllergens && (
-                              <div className="flex items-center gap-1 mt-1">
-                                <AlertTriangle className="w-3 h-3 text-red-600" />
-                                <span className="text-xs text-red-600 font-semibold">
-                                  {criticalCount} Critical
-                                </span>
-                              </div>
-                            )}
+                            {/* Center Content - Well spaced */}
+                            <div className="flex-1 flex flex-col items-center justify-center gap-2 mt-8 mb-6">
+                              {isLoading ? (
+                                <div className={cn(
+                                  "w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-colors",
+                                  "bg-primary/10 group-hover:bg-primary-foreground/20"
+                                )}>
+                                  <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 animate-spin" />
+                                </div>
+                              ) : isSuccess ? (
+                                <div className={cn(
+                                  "w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-colors",
+                                  "bg-green-600"
+                                )}>
+                                  <Check className="w-8 h-8 sm:w-10 sm:h-10" />
+                                </div>
+                              ) : (
+                                <div className="text-5xl sm:text-6xl leading-none">
+                                  📦
+                                </div>
+                              )}
+                              
+                              <span className="text-sm sm:text-base font-medium text-center line-clamp-2 px-2 w-full">
+                                {product.name}
+                              </span>
+                            </div>
+                            
+                            {/* Bottom Info - Empty space for consistency */}
+                            <div className="w-full flex flex-col items-center gap-1 min-h-[1.5rem]">
+                            </div>
                           </Button>
                           
-                          {/* Quick Add "+" Button (Top-Right Corner) */}
-                          {!isLoading && !isSuccess && (
-                            <Button
-                              size="icon"
-                              variant="secondary"
-                              className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg hover:scale-110 z-10 bg-primary text-primary-foreground hover:bg-primary/90"
-                              onClick={(e) => handleQuickAdd(e, product)}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
-                          )}
-                          
-                          {/* Allergen Count Badge (Top-Left Corner) */}
+                          {/* Allergen Count Badge (Bottom-Right) - Outside button */}
                           {product.allergens && product.allergens.length > 0 && (
                             <Badge 
                               variant="secondary"
                               className={cn(
-                                "absolute top-2 left-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold shadow-md",
+                                "absolute bottom-2 right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold shadow-sm z-10",
                                 hasCriticalAllergens 
                                   ? "bg-red-500 text-white border-red-600" 
                                   : "bg-yellow-500 text-white border-yellow-600"
@@ -546,7 +712,12 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                     {filteredProducts.map((product) => {
                       const isLoading = printingProductId === product.id;
                       const isSuccess = successProductId === product.id;
-                      const criticalAllergens = product.allergens?.filter(a => a.severity === 'critical') || [];
+                      const hasCriticalAllergens = product.allergens?.some(a => a.severity === 'critical');
+                      
+                      // Get expiry status from latest printed label
+                      const expiryStatus = product.latestLabel ? getExpiryStatus(product.latestLabel.expiry_date) : null;
+                      const statusColor = expiryStatus ? getStatusColor(expiryStatus) : null;
+                      const showExpiryWarning = expiryStatus === 'warning' || expiryStatus === 'expired';
                       
                       return (
                         <Button
@@ -583,28 +754,43 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             )}
                             
                             <div className="flex-1 text-left">
-                              <span className="text-base font-medium block mb-1">
-                                {product.name}
-                              </span>
-                              
-                              {/* Allergen Badges */}
-                              {product.allergens && product.allergens.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {criticalAllergens.slice(0, 3).map(allergen => (
-                                    <AllergenBadge 
-                                      key={allergen.id}
-                                      allergen={allergen}
-                                      size="sm"
-                                      showIcon={false}
-                                    />
-                                  ))}
-                                  {product.allergens.length > 3 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      +{product.allergens.length - 3} more
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-base font-medium">
+                                  {product.name}
+                                </span>
+                                
+                                {/* Expiry Status Badge - Show if product has a latest label */}
+                                {!isLoading && !isSuccess && product.latestLabel && expiryStatus && (
+                                  <Badge 
+                                    variant="secondary"
+                                    className="h-5 px-2 text-xs font-bold"
+                                    style={{ 
+                                      backgroundColor: statusColor ? `${statusColor}20` : 'rgba(0,0,0,0.1)', 
+                                      color: statusColor || '#000',
+                                      borderColor: statusColor || 'transparent'
+                                    }}
+                                  >
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    {expiryStatus && getStatusLabel(expiryStatus)}
+                                  </Badge>
+                                )}
+                                
+                                {/* Allergen Badge - Show if has allergens */}
+                                {!isLoading && !isSuccess && product.allergens && product.allergens.length > 0 && (
+                                  <Badge 
+                                    variant="secondary"
+                                    className={cn(
+                                      "h-5 px-2 text-xs font-bold",
+                                      hasCriticalAllergens 
+                                        ? "bg-red-500 text-white border-red-600" 
+                                        : "bg-yellow-500 text-white border-yellow-600"
+                                    )}
+                                  >
+                                    <AlertTriangle className="w-3 h-3 mr-1" />
+                                    {product.allergens.length} Allergen{product.allergens.length > 1 ? 's' : ''}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <Zap className="w-5 h-5 opacity-60 shrink-0" />

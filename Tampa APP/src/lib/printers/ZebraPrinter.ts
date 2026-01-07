@@ -1,5 +1,8 @@
 // ZebraPrinter - Generate ZPL commands for Zebra thermal printers
+// Updated to use unified BOPP design with labelId tracking
 import { PrinterDriver, PrinterCapabilities, PrinterSettings, PrinterStatus } from '@/types/printer';
+import { printLabel as printWithZebra, saveLabelToDatabase, type LabelPrintData } from '@/utils/zebraPrinter';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LabelData {
   productName: string;
@@ -10,6 +13,14 @@ interface LabelData {
   allergens?: string[];
   storageInstructions?: string;
   barcode?: string;
+  preparedBy?: string;
+  preparedByName?: string;
+  productId?: string;
+  categoryId?: string;
+  quantity?: string;
+  unit?: string;
+  condition?: string;
+  organizationId?: string;
 }
 
 export class ZebraPrinter implements PrinterDriver {
@@ -63,17 +74,20 @@ export class ZebraPrinter implements PrinterDriver {
 
   async print(labelData: any): Promise<boolean> {
     try {
-      const zpl = this.generateZPL(labelData);
+      // Convert label data to LabelPrintData format
+      const printData = await this.convertToLabelPrintData(labelData);
       
-      if (this.connected && this.settings.ipAddress) {
-        // In a real implementation, send ZPL to printer via IP
-        // For now, we'll download the ZPL file
-        this.downloadZPL(zpl, `label_${labelData.productName.replace(/\s+/g, '_')}.zpl`);
-      } else {
-        // Download ZPL file for manual printing
-        this.downloadZPL(zpl, `label_${labelData.productName.replace(/\s+/g, '_')}.zpl`);
+      // Use updated zebraPrinter.ts which includes:
+      // 1. Save to database (get labelId)
+      // 2. Generate ZPL with BOPP design
+      // 3. Include labelId in QR code
+      const result = await printWithZebra(printData);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Print failed');
       }
       
+      console.log(`Label printed successfully. LabelId: ${result.labelId}`);
       return true;
     } catch (error) {
       console.error('ZPL generation error:', error);
@@ -83,16 +97,13 @@ export class ZebraPrinter implements PrinterDriver {
 
   async printBatch(labels: any[]): Promise<boolean> {
     try {
-      const zplCommands = labels.map(label => this.generateZPL(label)).join('\n');
+      // Print each label individually to ensure each gets its own labelId
+      const results = await Promise.all(
+        labels.map(label => this.print(label))
+      );
       
-      if (this.connected && this.settings.ipAddress) {
-        // In a real implementation, send batch to printer
-        this.downloadZPL(zplCommands, `labels_batch_${labels.length}items.zpl`);
-      } else {
-        this.downloadZPL(zplCommands, `labels_batch_${labels.length}items.zpl`);
-      }
-      
-      return true;
+      // Return true if all succeeded
+      return results.every(result => result === true);
     } catch (error) {
       console.error('ZPL batch generation error:', error);
       return false;
@@ -116,117 +127,93 @@ export class ZebraPrinter implements PrinterDriver {
     };
   }
 
-  private generateZPL(label: LabelData): string {
-    const dpmm = 8; // 203 DPI = 8 dots per mm
-    const width = Math.floor(this.settings.paperWidth * dpmm);
-    const height = Math.floor(this.settings.paperHeight * dpmm);
+  /**
+   * Convert incoming label data to LabelPrintData format
+   * Fetches missing data from Supabase if needed
+   */
+  private async convertToLabelPrintData(labelData: LabelData): Promise<LabelPrintData> {
+    // Get current user and organization
+    const { data: { user } } = await supabase.auth.getUser();
     
-    let zpl = '^XA\n'; // Start format
+    let organizationId = labelData.organizationId;
+    let preparedBy = labelData.preparedBy;
+    let preparedByName = labelData.preparedByName;
     
-    // Set label home position
-    zpl += '^LH0,0\n';
-    
-    // Set print speed and darkness
-    zpl += `^PR${this.settings.speed || 4}\n`;
-    zpl += `^MD${this.settings.darkness || 20}\n`;
-    
-    // Set label dimensions
-    zpl += `^PW${width}\n`;
-    zpl += `^LL${height}\n`;
-    
-    let y = 30;
-    
-    // Product Name (Large, Bold)
-    zpl += `^FO50,${y}^A0N,60,60^FD${this.escapeZPL(label.productName)}^FS\n`;
-    y += 80;
-    
-    // Category
-    if (label.categoryName) {
-      zpl += `^FO50,${y}^A0N,25,25^FDCategory: ${this.escapeZPL(label.categoryName)}^FS\n`;
-      y += 35;
-    }
-    
-    // Subcategory
-    if (label.subcategoryName) {
-      zpl += `^FO50,${y}^A0N,25,25^FDSubcategory: ${this.escapeZPL(label.subcategoryName)}^FS\n`;
-      y += 35;
-    }
-    
-    y += 10;
-    
-    // Prepared Date
-    zpl += `^FO50,${y}^A0N,30,30^FDPrepared: ${label.preparedDate}^FS\n`;
-    y += 50;
-    
-    // Use By Date (Larger, Boxed)
-    zpl += `^FO40,${y}^GB${width - 80},60,3^FS\n`; // Box
-    zpl += `^FO50,${y + 10}^A0N,40,40^FDUse By: ${label.useByDate}^FS\n`;
-    y += 80;
-    
-    // Allergens
-    if (label.allergens && label.allergens.length > 0) {
-      zpl += `^FO50,${y}^A0N,25,25^FD** Allergens: ${this.escapeZPL(label.allergens.join(', '))}^FS\n`;
-      y += 35;
-    }
-    
-    // Storage Instructions (smaller text, wrapped)
-    if (label.storageInstructions) {
-      const wrapped = this.wrapText(label.storageInstructions, 50);
-      wrapped.forEach(line => {
-        zpl += `^FO50,${y}^A0N,20,20^FD${this.escapeZPL(line)}^FS\n`;
-        y += 25;
-      });
-    }
-    
-    // Barcode (Code 128)
-    if (label.barcode) {
-      y += 10;
-      zpl += `^FO50,${y}^BCN,80,Y,N,N^FD${label.barcode}^FS\n`;
-      y += 100;
-      zpl += `^FO50,${y}^A0N,20,20^FD${label.barcode}^FS\n`;
-    }
-    
-    zpl += '^XZ\n'; // End format
-    
-    return zpl;
-  }
-
-  private escapeZPL(text: string): string {
-    // Escape special ZPL characters
-    return text
-      .replace(/\^/g, '\\^')
-      .replace(/~/g, '\\~')
-      .replace(/\\/g, '\\\\');
-  }
-
-  private wrapText(text: string, maxLength: number): string[] {
-    const words = text.split(' ');
-    const lines: string[] = [];
-    let currentLine = '';
-    
-    words.forEach(word => {
-      if ((currentLine + word).length <= maxLength) {
-        currentLine += (currentLine ? ' ' : '') + word;
-      } else {
-        if (currentLine) lines.push(currentLine);
-        currentLine = word;
+    // Fetch organization and user info if not provided
+    if (user && (!organizationId || !preparedBy)) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id, display_name')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (profile) {
+        organizationId = organizationId || profile.organization_id;
+        preparedBy = preparedBy || user.id;
+        preparedByName = preparedByName || profile.display_name || 'Unknown';
       }
-    });
+    }
     
-    if (currentLine) lines.push(currentLine);
+    if (!organizationId) {
+      throw new Error('Organization ID is required for printing');
+    }
     
-    return lines;
-  }
-
-  private downloadZPL(zpl: string, filename: string): void {
-    const blob = new Blob([zpl], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    if (!preparedBy || !preparedByName) {
+      throw new Error('Prepared by information is required for printing');
+    }
+    
+    // Fetch organization details for label footer
+    let organizationDetails;
+    try {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name, address, phone, email, food_safety_registration')
+        .eq('id', organizationId)
+        .single();
+      
+      if (orgData) {
+        organizationDetails = {
+          name: orgData.name,
+          address: orgData.address || undefined, // Address is already a JSON string from DB
+          phone: orgData.phone || undefined,
+          email: orgData.email || undefined,
+          foodSafetyRegistration: orgData.food_safety_registration || undefined,
+        };
+      }
+    } catch (error) {
+      console.warn('Could not fetch organization details:', error);
+    }
+    
+    // Parse condition from storage instructions if not provided
+    const condition = labelData.condition || 
+                     labelData.storageInstructions || 
+                     'Refrigerate';
+    
+    // Build LabelPrintData object
+    const printData: LabelPrintData = {
+      productId: labelData.productId || null, // Use null instead of empty string for UUID field
+      productName: labelData.productName,
+      categoryId: labelData.categoryId || null,
+      categoryName: labelData.categoryName || 'General',
+      preparedBy,
+      preparedByName,
+      prepDate: labelData.preparedDate,
+      expiryDate: labelData.useByDate,
+      condition,
+      organizationId,
+      organizationDetails, // Add organization details for professional footer
+      quantity: labelData.quantity,
+      unit: labelData.unit,
+      batchNumber: labelData.barcode || '',
+      allergens: labelData.allergens?.map(name => ({
+        id: '',
+        name: typeof name === 'string' ? name : (name as any).name || '',
+        icon: null,
+        severity: 'low'
+      }))
+    };
+    
+    return printData;
   }
 }
+

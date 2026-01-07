@@ -5,6 +5,7 @@ import { usePrinter } from './usePrinter';
 import { useToast } from './use-toast';
 import { usePrintQueueContext } from '@/contexts/PrintQueueContext';
 import { saveLabelToDatabase } from '@/utils/zebraPrinter';
+import { useOrganizationId } from './useUserContext';
 
 const MAX_QUEUE_SIZE = 50;
 
@@ -44,6 +45,7 @@ export function usePrintQueue() {
   const { toast } = useToast();
   const { printBatch, isLoading: isPrinterBusy } = usePrinter();
   const { isOpen, items, setItems, openQueue, closeQueue, toggleQueue } = usePrintQueueContext();
+  const { organizationId } = useOrganizationId();
   
   const [isPrinting, setIsPrinting] = useState(false);
   const [printProgress, setPrintProgress] = useState<PrintProgress | null>(null);
@@ -179,7 +181,7 @@ export function usePrintQueue() {
   }, [items, toast]);
 
   // Print all items in queue
-  const printAll = useCallback(async (): Promise<PrintResult> => {
+  const printAll = useCallback(async (overridePreparedBy?: string, overridePreparedByName?: string): Promise<PrintResult> => {
     if (items.length === 0) {
       toast({
         title: 'Empty Queue',
@@ -193,6 +195,15 @@ export function usePrintQueue() {
       toast({
         title: 'Printer Busy',
         description: 'Please wait for current print job to finish.',
+        variant: 'destructive'
+      });
+      return { success: false, totalPrinted: 0, totalFailed: 0, errors: [] };
+    }
+
+    if (!organizationId) {
+      toast({
+        title: 'Organization Not Found',
+        description: 'Unable to determine organization. Please refresh the page.',
         variant: 'destructive'
       });
       return { success: false, totalPrinted: 0, totalFailed: 0, errors: [] };
@@ -231,6 +242,10 @@ export function usePrintQueue() {
         });
 
         try {
+          // Use override values if provided, otherwise use item's values
+          const preparedBy = overridePreparedBy || item.labelData.preparedBy || "";
+          const preparedByName = overridePreparedByName || item.labelData.preparedByName;
+
           // Save to database first (for each quantity)
           for (let j = 0; j < item.quantity; j++) {
             await saveLabelToDatabase({
@@ -240,11 +255,12 @@ export function usePrintQueue() {
                 ? item.labelData.categoryId 
                 : null,
               categoryName: item.labelData.categoryName,
-              preparedBy: item.labelData.preparedBy || "",
-              preparedByName: item.labelData.preparedByName,
+              preparedBy: preparedBy,
+              preparedByName: preparedByName,
               prepDate: item.labelData.prepDate,
               expiryDate: item.labelData.expiryDate,
               condition: item.labelData.condition,
+              organizationId: organizationId, // Required for RLS
               quantity: "1", // Each record is for 1 label
               unit: item.labelData.unit,
               batchNumber: item.labelData.batchNumber || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -338,7 +354,7 @@ export function usePrintQueue() {
       setIsPrinting(false);
       setPrintProgress(null);
     }
-  }, [items, totalLabels, isPrinterBusy, printBatch, toast]);
+  }, [items, totalLabels, isPrinterBusy, printBatch, toast, organizationId]);
 
   // Retry failed items
   const retryFailed = useCallback(async (errorIds: string[]): Promise<PrintResult> => {

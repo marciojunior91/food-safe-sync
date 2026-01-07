@@ -1,12 +1,21 @@
 import { useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
-import { BarChart3, ClipboardList, Package, Tags, Settings, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, Lightbulb, FileText } from "lucide-react";
+import { Outlet, useLocation, Link } from "react-router-dom";
+import { BarChart3, ClipboardList, Package, Tags, Settings, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, Lightbulb, FileText, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
+import { useUserContext } from "@/hooks/useUserContext";
 import { TampaIcon } from "@/components/TampaIcon";
 const navigation = [{
   name: "Dashboard",
@@ -29,8 +38,8 @@ const navigation = [{
   href: "/inventory",
   icon: Package
 }, {
-  name: "Daily Routines",
-  href: "/routines",
+  name: "Routine Tasks",
+  href: "/routine-tasks",
   icon: Calendar
 }, {
   name: "Training",
@@ -41,8 +50,8 @@ const navigation = [{
   href: "/people",
   icon: Users
 }, {
-  name: "Notifications",
-  href: "/notifications",
+  name: "Feed",
+  href: "/feed",
   icon: Bell
 }, {
   name: "Product Traffic Light",
@@ -68,9 +77,14 @@ export function Layout() {
     toast
   } = useToast();
   const {
-    highestRole,
+    role,
     loading: roleLoading
   } = useUserRole();
+  const {
+    organization,
+    department,
+    loading: contextLoading
+  } = useUserContext();
   const handleSignOut = async () => {
     await signOut();
     toast({
@@ -133,29 +147,70 @@ export function Layout() {
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1 items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Organization:</span>
-                  <span className="font-medium">Demo Restaurant Group</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Location:</span>
-                  <span className="font-medium">Main Kitchen</span>
-                </div>
+                {!contextLoading && (
+                  <>
+                    {organization && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Organization:</span>
+                        <span className="font-medium">{organization.name}</span>
+                      </div>
+                    )}
+                    {department && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Department:</span>
+                        <span className="font-medium">{department.name}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                {contextLoading && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Loading...</span>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 mr-2">
-                  {!roleLoading && highestRole && <div className="px-2 py-1 rounded-md bg-primary/10 text-primary text-xs font-medium capitalize">
-                      {highestRole.replace('_', ' ')}
-                    </div>}
-                  <span className="text-sm text-muted-foreground hidden sm:block">
-                    {user?.email}
-                  </span>
-                </div>
                 <ThemeToggle />
-                <Button variant="outline" size="sm" onClick={handleSignOut} className="flex items-center gap-2">
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:block">Sign Out</span>
-                </Button>
+                
+                {/* User Menu Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      <span className="hidden sm:inline">{user?.email?.split('@')[0] || 'User'}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">{user?.email}</p>
+                        {!roleLoading && role && (
+                          <p className="text-xs leading-none text-muted-foreground capitalize">
+                            {role.replace('_', ' ')}
+                          </p>
+                        )}
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/people" className="flex items-center cursor-pointer">
+                        <Users className="w-4 h-4 mr-2" />
+                        Team Members
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings" className="flex items-center cursor-pointer">
+                        <Settings className="w-4 h-4 mr-2" />
+                        Settings
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut} className="text-red-600 focus:text-red-600 cursor-pointer">
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>

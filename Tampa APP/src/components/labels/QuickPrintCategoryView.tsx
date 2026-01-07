@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Loader2, Check, Printer, Package, Plus } from "lucide-react";
+import { Loader2, Check, Printer, Package, Plus, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -9,6 +9,8 @@ import {
 import { QuickAddToQueueDialog } from "./QuickAddToQueueDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { getExpiryStatus, getStatusColor, getStatusLabel } from "@/utils/trafficLight";
+import type { Allergen } from "@/hooks/useAllergens";
 
 interface Category {
   id: string;
@@ -38,6 +40,12 @@ interface Product {
     id: string;
     name: string;
   };
+  allergens?: Allergen[];
+  latestLabel?: {
+    id: string;
+    expiry_date: string;
+    condition: string;
+  } | null;
 }
 
 interface QuickPrintCategoryViewProps {
@@ -156,22 +164,22 @@ export function QuickPrintCategoryView({
         <p className="text-sm text-muted-foreground">
           Select a subcategory to view products
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {subcategories.map((subcategory) => (
             <Button
               key={subcategory.id}
               variant="outline"
-              className="h-36 sm:h-40 flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
+              className="min-h-[10rem] sm:min-h-[11rem] flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
               onClick={() => onSubcategorySelect(subcategory)}
             >
-              <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">
+              <div className="text-5xl sm:text-6xl group-hover:scale-110 transition-transform leading-none">
                 {subcategory.icon || '📂'}
               </div>
-              <span className="text-sm font-medium text-center line-clamp-2 leading-tight">
+              <span className="text-sm sm:text-base font-medium text-center line-clamp-2 leading-tight px-2">
                 {subcategory.name}
               </span>
               {subcategory.product_count !== undefined && (
-                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
+                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-1">
                   {subcategory.product_count} {subcategory.product_count === 1 ? 'product' : 'products'}
                 </span>
               )}
@@ -207,10 +215,19 @@ export function QuickPrintCategoryView({
         <p className="text-sm text-muted-foreground">
           Tap to print instantly • Long-press + icon to add to queue
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {products.map((product) => {
             const isLoading = printingProductId === product.id;
             const isSuccess = successProductId === product.id;
+            
+            // Get expiry status from latest printed label
+            const expiryStatus = product.latestLabel ? getExpiryStatus(product.latestLabel.expiry_date) : null;
+            const statusColor = expiryStatus ? getStatusColor(expiryStatus) : null;
+            const showExpiryWarning = expiryStatus === 'warning' || expiryStatus === 'expired';
+            
+            // Allergen warnings
+            const hasCriticalAllergens = product.allergens?.some(a => a.severity === 'critical');
+            const criticalCount = product.allergens?.filter(a => a.severity === 'critical').length || 0;
 
             return (
               <div key={product.id} className="relative">
@@ -218,49 +235,96 @@ export function QuickPrintCategoryView({
                   variant="outline"
                   disabled={isLoading}
                   className={cn(
-                    "w-full h-36 sm:h-40 flex flex-col items-center justify-center p-4 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md",
+                    "w-full min-h-[10rem] sm:min-h-[11rem] flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                     isSuccess
                       ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
                       : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
                   )}
                   onClick={() => onProductSelect(product)}
                 >
-                  <div
-                    className={cn(
-                      "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mb-3 transition-colors",
-                      isSuccess
-                        ? "bg-green-600"
-                        : "bg-primary/10 group-hover:bg-primary-foreground/20"
-                    )}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-7 h-7 sm:w-8 sm:h-8 animate-spin" />
-                    ) : isSuccess ? (
-                      <Check className="w-7 h-7 sm:w-8 sm:h-8 animate-in zoom-in duration-300" />
+                  {/* Top Row - Badges with proper spacing */}
+                  <div className="absolute top-2 left-2 right-2 flex items-start justify-between z-20 pointer-events-none gap-2">
+                    {/* Expiry Badge (Top-Left) */}
+                    {product.latestLabel && expiryStatus ? (
+                      <Badge 
+                        variant="secondary"
+                        className="h-5 sm:h-6 px-2 text-[10px] sm:text-xs font-bold shadow-sm pointer-events-auto shrink-0"
+                        style={{ 
+                          backgroundColor: statusColor ? `${statusColor}20` : 'rgba(0,0,0,0.1)', 
+                          color: statusColor || '#000',
+                          borderColor: statusColor || 'transparent'
+                        }}
+                      >
+                        {getStatusLabel(expiryStatus)}
+                      </Badge>
                     ) : (
-                      <span className="text-3xl">{getProductIcon()}</span>
+                      <span className="shrink-0"></span>
+                    )}
+                    
+                    {/* Quick Add Button (Top-Right) */}
+                    {!isLoading && !isSuccess && (
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8 rounded-full shadow-md hover:scale-110 transition-transform bg-primary text-primary-foreground hover:bg-primary/90 pointer-events-auto shrink-0"
+                        onClick={(e) => handleQuickAdd(e, product)}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
                     )}
                   </div>
-                  <span className="text-sm font-medium text-center line-clamp-2 leading-tight px-1">
-                    {isLoading ? "Printing..." : isSuccess ? "Sent!" : product.name}
-                  </span>
-                  {!isLoading && !isSuccess && product.measuring_units && (
-                    <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
-                      {product.measuring_units.abbreviation}
+                  
+                  {/* Center Content - Well spaced */}
+                  <div className="flex-1 flex flex-col items-center justify-center gap-2 mt-8 mb-6">
+                    {isLoading ? (
+                      <div className={cn(
+                        "w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-colors",
+                        "bg-primary/10 group-hover:bg-primary-foreground/20"
+                      )}>
+                        <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 animate-spin" />
+                      </div>
+                    ) : isSuccess ? (
+                      <div className={cn(
+                        "w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-colors",
+                        "bg-green-600"
+                      )}>
+                        <Check className="w-8 h-8 sm:w-10 sm:h-10 animate-in zoom-in duration-300" />
+                      </div>
+                    ) : (
+                      <div className="text-5xl sm:text-6xl leading-none">
+                        {getProductIcon()}
+                      </div>
+                    )}
+                    
+                    <span className="text-sm sm:text-base font-medium text-center line-clamp-2 px-2 w-full">
+                      {isLoading ? "Printing..." : isSuccess ? "Sent!" : product.name}
                     </span>
-                  )}
+                  </div>
+                  
+                  {/* Bottom Info - Unit Display */}
+                  <div className="w-full flex flex-col items-center gap-1 min-h-[1.5rem]">
+                    {/* Unit display */}
+                    {!isLoading && !isSuccess && product.measuring_units && (
+                      <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80">
+                        {product.measuring_units.abbreviation}
+                      </span>
+                    )}
+                  </div>
                 </Button>
                 
-                {/* Quick Add to Queue button */}
-                {!isLoading && !isSuccess && (
-                  <Button
-                    size="icon"
+                {/* Allergen Count Badge (Bottom-Right) - Outside button */}
+                {product.allergens && product.allergens.length > 0 && (
+                  <Badge 
                     variant="secondary"
-                    className="absolute top-2 right-2 h-8 w-8 rounded-full shadow-lg hover:scale-110 transition-transform z-10"
-                    onClick={(e) => handleQuickAdd(e, product)}
+                    className={cn(
+                      "absolute bottom-2 right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold shadow-sm z-10",
+                      hasCriticalAllergens 
+                        ? "bg-red-500 text-white border-red-600" 
+                        : "bg-yellow-500 text-white border-yellow-600"
+                    )}
                   >
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                    {product.allergens.length}
+                  </Badge>
                 )}
               </div>
             );

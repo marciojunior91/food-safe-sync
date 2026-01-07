@@ -1,4 +1,5 @@
-// PDF Label Renderer - A4 paper layout for PDF printing
+// PDF Label Renderer - A4 paper layout with professional design
+// Professional restaurant label design with company footer
 import { LabelData } from '@/components/labels/LabelForm';
 import QRCode from 'qrcode';
 
@@ -8,6 +9,10 @@ export async function renderPdfLabel(
   width: number,
   height: number
 ): Promise<void> {
+  // Debug: Check if organization details are being received
+  console.log('🔍 PDF Renderer - Received data.organizationDetails:', data.organizationDetails);
+  console.log('🔍 PDF Renderer - Full data object keys:', Object.keys(data));
+  
   // Clear canvas
   ctx.clearRect(0, 0, width, height);
 
@@ -18,7 +23,7 @@ export async function renderPdfLabel(
   // Page margins (A4 standard)
   const margin = 40;
   const labelWidth = width - (margin * 2);
-  const labelHeight = 250;
+  const labelHeight = 680; // Increased to fit all content including QR and Label ID
   const labelY = margin + 50;
 
   // Paper border
@@ -26,119 +31,238 @@ export async function renderPdfLabel(
   ctx.lineWidth = 1;
   ctx.strokeRect(0, 0, width, height);
 
-  // Label border
+  // Label outer border
   ctx.strokeStyle = '#212529';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   ctx.strokeRect(margin, labelY, labelWidth, labelHeight);
 
   // Label content area
   const padding = 20;
-  let yPos = labelY + padding + 20;
+  let yPos = labelY + padding;
   const xPos = margin + padding;
+  const contentWidth = labelWidth - (padding * 2);
 
-  // Title
+  // ============================================================================
+  // PRODUCT NAME + QUANTITY HEADER - Professional style
+  // ============================================================================
+  ctx.strokeStyle = '#212529';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(xPos, yPos, contentWidth, 60);
+  
   ctx.fillStyle = '#212529';
-  ctx.font = 'bold 24px Arial';
+  ctx.font = 'bold 28px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText('FOOD LABEL', xPos, yPos);
-  yPos += 40;
-
-  // Product name
-  ctx.font = 'bold 20px Arial';
-  ctx.fillText(data.productName || 'Product Name', xPos, yPos);
-  yPos += 30;
-
-  // Category
-  if (data.categoryName) {
-    ctx.fillStyle = '#6c757d';
-    ctx.font = '16px Arial';
-    ctx.fillText(data.categoryName, xPos, yPos);
-    yPos += 25;
+  
+  // Product name on left, quantity on right
+  const productText = data.productName || 'Product Name';
+  ctx.fillText(productText, xPos + 10, yPos + 40);
+  
+  if (data.quantity && data.unit) {
+    ctx.font = 'bold 24px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${data.quantity} ${data.unit}`, xPos + contentWidth - 10, yPos + 40);
+    ctx.textAlign = 'left';
   }
+  yPos += 65;
 
-  // Divider
-  ctx.strokeStyle = '#dee2e6';
+  // Separator line
+  ctx.strokeStyle = '#212529';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(xPos, yPos);
-  ctx.lineTo(margin + labelWidth - padding, yPos);
+  ctx.lineTo(xPos + contentWidth, yPos);
+  ctx.stroke();
+  yPos += 25;
+
+  // ============================================================================
+  // CONDITION - Prominent display
+  // ============================================================================
+  ctx.fillStyle = '#212529';
+  ctx.font = 'bold 22px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+  ctx.fillText(data.condition?.toUpperCase() || 'N/A', xPos, yPos);
+  yPos += 35;
+
+  // Separator line
+  ctx.strokeStyle = '#212529';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(xPos, yPos);
+  ctx.lineTo(xPos + contentWidth, yPos);
+  ctx.stroke();
+  yPos += 25;
+
+  // ============================================================================
+  // DATES SECTION - English labels with more spacing
+  // ============================================================================
+  ctx.fillStyle = '#212529';
+  ctx.font = '18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+  ctx.fillText('Manufacturing Date:', xPos, yPos);
+  ctx.font = 'bold 18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+  ctx.fillText(data.prepDate || 'N/A', xPos + 210, yPos);
+  yPos += 30;
+
+  ctx.font = '18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+  ctx.fillText('Expiry Date:', xPos, yPos);
+  ctx.font = 'bold 18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+  ctx.fillText(data.expiryDate || 'N/A', xPos + 210, yPos);
+  yPos += 30;
+
+  // Batch number (if present)
+  if (data.batchNumber && data.batchNumber.trim() !== '') {
+    ctx.font = '18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText('Batch:', xPos, yPos);
+    ctx.font = 'bold 18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText(data.batchNumber, xPos + 210, yPos);
+    yPos += 30;
+  }
+
+  // Category (if not Quick Print)
+  if (data.categoryName && data.categoryName !== 'Quick Print') {
+    ctx.font = '18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText('Category:', xPos, yPos);
+    ctx.font = 'bold 18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText(data.categoryName, xPos + 210, yPos);
+    yPos += 30;
+  }
+
+  // Food Safety Registration (if present)
+  if (data.organizationDetails?.foodSafetyRegistration) {
+    ctx.font = '18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText('Food Safety Reg:', xPos, yPos);
+    ctx.font = 'bold 18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText(data.organizationDetails.foodSafetyRegistration, xPos + 210, yPos);
+    yPos += 30;
+  }
+
+  // Separator line
+  ctx.strokeStyle = '#212529';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(xPos, yPos);
+  ctx.lineTo(xPos + contentWidth, yPos);
   ctx.stroke();
   yPos += 20;
 
-  // Info columns
-  const col1X = xPos;
-  const col2X = xPos + 250;
-  let col1Y = yPos;
-  let col2Y = yPos;
+  // ============================================================================
+  // ALLERGENS SECTION (if applicable)
+  // ============================================================================
+  if (data.allergens && data.allergens.length > 0) {
+    const allergenText = data.allergens.map(a => a.name).join(', ');
 
-  // Column 1
-  ctx.fillStyle = '#495057';
-  ctx.font = '11px Arial';
-  ctx.fillText('PREPARED BY:', col1X, col1Y);
-  col1Y += 16;
+    ctx.fillStyle = '#212529';
+    ctx.font = 'bold 16px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText('Allergens:', xPos, yPos);
+    yPos += 25;
+
+    ctx.font = '14px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    // Wrap text if too long (reserve space for QR code)
+    const maxWidth = contentWidth - 150;
+    const words = allergenText.split(' ');
+    let line = '';
+    
+    for (let i = 0; i < words.length; i++) {
+      const testLine = line + words[i] + ' ';
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxWidth && i > 0) {
+        ctx.fillText(line, xPos, yPos);
+        line = words[i] + ' ';
+        yPos += 22;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, xPos, yPos);
+    yPos += 30;
+
+    // Separator line
+    ctx.strokeStyle = '#212529';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(xPos, yPos);
+    ctx.lineTo(xPos + contentWidth, yPos);
+    ctx.stroke();
+    yPos += 20;
+  }
+
+  // ============================================================================
+  // PREPARED BY - Professional style (uppercase)
+  // ============================================================================
   ctx.fillStyle = '#212529';
-  ctx.font = 'bold 14px Arial';
-  ctx.fillText(data.preparedByName || 'Unknown', col1X, col1Y);
-  col1Y += 25;
+  ctx.font = 'bold 18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+  ctx.fillText(`Prepared By: ${(data.preparedByName || 'Unknown').toUpperCase()}`, xPos, yPos);
+  yPos += 35;
 
-  ctx.fillStyle = '#495057';
-  ctx.font = '11px Arial';
-  ctx.fillText('PREP DATE:', col1X, col1Y);
-  col1Y += 16;
-  ctx.fillStyle = '#212529';
-  ctx.font = 'bold 14px Arial';
-  ctx.fillText(data.prepDate || 'N/A', col1X, col1Y);
-  col1Y += 25;
+  // Separator line
+  ctx.strokeStyle = '#212529';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(xPos, yPos);
+  ctx.lineTo(xPos + contentWidth, yPos);
+  ctx.stroke();
+  yPos += 20;
 
-  ctx.fillStyle = '#495057';
-  ctx.font = '11px Arial';
-  ctx.fillText('CONDITION:', col1X, col1Y);
-  col1Y += 16;
-  ctx.fillStyle = '#212529';
-  ctx.font = 'bold 14px Arial';
-  ctx.fillText(data.condition || 'N/A', col1X, col1Y);
+  // ============================================================================
+  // COMPANY FOOTER - Professional style with spacing
+  // ============================================================================
+  if (data.organizationDetails) {
+    ctx.fillStyle = '#212529';
+    ctx.font = 'bold 16px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+    ctx.fillText(data.organizationDetails.name.toUpperCase(), xPos, yPos);
+    yPos += 24;
 
-  // Column 2
-  ctx.fillStyle = '#495057';
-  ctx.font = '11px Arial';
-  ctx.fillText('USE BY:', col2X, col2Y);
-  col2Y += 16;
-  ctx.fillStyle = '#dc3545';
-  ctx.font = 'bold 16px Arial';
-  ctx.fillText(data.expiryDate || 'N/A', col2X, col2Y);
-  col2Y += 25;
+    if (data.organizationDetails.phone) {
+      ctx.font = '13px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+      ctx.fillText(`Tel: ${data.organizationDetails.phone}`, xPos, yPos);
+      yPos += 20;
+    }
 
-  ctx.fillStyle = '#495057';
-  ctx.font = '11px Arial';
-  ctx.fillText('QUANTITY:', col2X, col2Y);
-  col2Y += 16;
-  ctx.fillStyle = '#212529';
-  ctx.font = 'bold 14px Arial';
-  ctx.fillText(`${data.quantity || '0'} ${data.unit || ''}`, col2X, col2Y);
-  col2Y += 25;
+    if (data.organizationDetails.address) {
+      // Parse address JSON
+      let addressLines: string[] = [];
+      try {
+        const addr = typeof data.organizationDetails.address === 'string' 
+          ? JSON.parse(data.organizationDetails.address)
+          : data.organizationDetails.address;
+        
+        const line1 = `${addr.street || ''}, ${addr.number || ''}`.trim();
+        const line2 = `${addr.city || ''} - ${addr.state || ''}, ${addr.postalCode || ''}`.trim();
+        addressLines = [line1, line2].filter(l => l.length > 3);
+      } catch {
+        addressLines = [String(data.organizationDetails.address)];
+      }
 
-  ctx.fillStyle = '#495057';
-  ctx.font = '11px Arial';
-  ctx.fillText('BATCH #:', col2X, col2Y);
-  col2Y += 16;
-  ctx.fillStyle = '#212529';
-  ctx.font = 'bold 12px monospace';
-  ctx.fillText(data.batchNumber || 'N/A', col2X, col2Y);
+      ctx.font = '12px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+      addressLines.forEach(line => {
+        ctx.fillText(line, xPos, yPos);
+        yPos += 18;
+      });
+    }
 
-  // QR code (right side) - Real QR code
-  const qrSize = 120;
+    // Food Safety Registration - Professional style
+    if (data.organizationDetails.foodSafetyRegistration) {
+      ctx.font = '13px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+      ctx.fillText(`Food Safety Reg: ${data.organizationDetails.foodSafetyRegistration}`, xPos, yPos);
+      yPos += 20;
+    }
+  }
+
+  // ============================================================================
+  // QR CODE - Bottom right corner (closer to content, reduced spacing)
+  // ============================================================================
+  const qrSize = 110;
   const qrX = margin + labelWidth - padding - qrSize;
-  const qrY = labelY + padding + 40;
+  const qrY = labelY + labelHeight - padding - qrSize - 10; // Moved up 10px closer to content
   
   try {
-    // Generate QR code data
+    // Generate QR code data - includes labelId for product lifecycle tracking
     const qrData = JSON.stringify({
-      productId: data.productId || "",
-      productName: data.productName,
-      prepDate: data.prepDate,
-      expiryDate: data.expiryDate,
-      batchNumber: data.batchNumber,
-      timestamp: new Date().toISOString(),
+      labelId: data.labelId || null,
+      product: data.productName,
+      prep: data.prepDate,
+      exp: data.expiryDate,
+      batch: data.batchNumber,
+      by: data.preparedByName,
     });
     
     // Generate QR code as data URL
@@ -162,23 +286,33 @@ export async function renderPdfLabel(
         resolve();
       };
       qrImage.onerror = () => {
-        // Fallback to placeholder
         drawQRPlaceholderPDF(ctx, qrX, qrY, qrSize);
         resolve();
       };
     });
   } catch (error) {
-    // Fallback to placeholder
     drawQRPlaceholderPDF(ctx, qrX, qrY, qrSize);
   }
 
-  // Page footer
+  // ============================================================================
+  // LABEL ID - Bottom left corner
+  // ============================================================================
+  if (data.labelId) {
+    const labelIdY = labelY + labelHeight - padding - 5; // Bottom left position
+    ctx.fillStyle = '#495057';
+    ctx.font = 'bold 11px "Courier New", monospace';
+    ctx.textAlign = 'left';
+    const shortId = data.labelId.substring(0, 8).toUpperCase();
+    ctx.fillText(`#${shortId}`, xPos, labelIdY);
+  }
+
+  // ============================================================================
+  // PAGE FOOTER
+  // ============================================================================
   ctx.fillStyle = '#adb5bd';
-  ctx.font = '10px Arial';
+  ctx.font = '10px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Generated by Food Safe Sync - A4 Label Format', width / 2, height - 20);
-  
-  // Page number
+  ctx.fillText('Generated by Food Safe Sync - Suflex Label Design (A4 Format)', width / 2, height - 20);
   ctx.fillText('Page 1 of 1', width / 2, height - 10);
   ctx.textAlign = 'left';
 }

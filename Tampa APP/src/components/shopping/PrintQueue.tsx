@@ -27,6 +27,10 @@ import {
 import { usePrintQueue } from '@/hooks/usePrintQueue';
 import { usePrinter } from '@/hooks/usePrinter';
 import { cn } from '@/lib/utils';
+import { UserSelectionDialog } from '@/components/labels/UserSelectionDialog';
+import { TeamMember } from '@/types/teamMembers';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 export function PrintQueue() {
   const {
@@ -44,8 +48,10 @@ export function PrintQueue() {
   } = usePrintQueue();
 
   const { settings, availablePrinters, changePrinter } = usePrinter();
+  const { toast } = useToast();
 
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
 
   // Calculate estimated print time (3 seconds per label)
   const estimatedMinutes = Math.ceil((totalLabels * 3) / 60);
@@ -73,9 +79,35 @@ export function PrintQueue() {
     }
   };
 
-  // Handle print all
+  // Handle print all - show user selection dialog first
   const handlePrintAll = async () => {
-    await printAll();
+    // Open user selection dialog
+    setUserDialogOpen(true);
+  };
+
+  // Handle user selection for print all
+  const handleUserSelected = async (selectedUserData: TeamMember) => {
+    // Get user_id - either from team_member.auth_role_id or fallback to current logged-in user
+    let userId: string;
+    if (selectedUserData.auth_role_id) {
+      userId = selectedUserData.auth_role_id;
+    } else {
+      // Fallback: use current logged-in user (maintains backward compatibility)
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        toast({
+          title: "Authentication Error",
+          description: "Unable to determine user. Please refresh the page.",
+          variant: "destructive"
+        });
+        return;
+      }
+      userId = currentUser.id;
+      console.warn('Team member not linked to user account. Using current logged-in user as fallback.');
+    }
+
+    // Call printAll with the selected user
+    await printAll(userId, selectedUserData.display_name || 'Unknown');
   };
 
   // Handle clear confirmation
@@ -369,6 +401,13 @@ export function PrintQueue() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* User selection dialog */}
+      <UserSelectionDialog
+        open={userDialogOpen}
+        onOpenChange={setUserDialogOpen}
+        onSelectUser={handleUserSelected}
+      />
     </>
   );
 }

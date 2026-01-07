@@ -1,7 +1,16 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export interface OrganizationDetails {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  foodSafetyRegistration?: string; // SIF in Brazil, Food Business Registration in Australia
+}
+
 export interface LabelPrintData {
-  productId: string;
+  labelId?: string; // UUID from printed_labels table - for lifecycle tracking
+  productId: string | null; // UUID or null for quick print without product
   productName: string;
   categoryId: string | null;
   categoryName: string;
@@ -10,6 +19,8 @@ export interface LabelPrintData {
   prepDate: string;
   expiryDate: string;
   condition: string;
+  organizationId: string; // Required for RLS
+  organizationDetails?: OrganizationDetails; // Company/restaurant information for label
   quantity?: string;
   unit?: string;
   qrCodeData?: string;
@@ -24,51 +35,141 @@ export interface LabelPrintData {
 
 /**
  * Generate ZPL code from label data
+ * Designed for BOPP (Biaxially Oriented Polypropylene) labels
+ * Following Suflex label layout pattern
  */
 const generateZPL = (data: LabelPrintData): string => {
-  const { productName, categoryName, condition, prepDate, expiryDate, preparedByName, quantity, unit, allergens } = data;
+  const { 
+    labelId, 
+    productName, 
+    categoryName, 
+    condition, 
+    prepDate, 
+    expiryDate, 
+    preparedByName, 
+    quantity, 
+    unit, 
+    allergens,
+    organizationDetails 
+  } = data;
   
-  // Generate QR Code data (can be a URL or product identifier)
-  const qrData = `PRODUCT:${productName}|PREP:${prepDate}|EXP:${expiryDate}`;
+  // Generate QR Code data - includes labelId for product lifecycle tracking
+  const qrData = JSON.stringify({
+    labelId: labelId || null,
+    product: productName,
+    prep: prepDate,
+    exp: expiryDate,
+    batch: data.batchNumber,
+    by: preparedByName,
+  });
   
-  // Check for critical allergens
-  const hasCriticalAllergens = allergens?.some(a => a.severity === 'critical');
-  const criticalAllergens = allergens?.filter(a => a.severity === 'critical') || [];
-  
-  // Format allergen text for printing
+  // Format allergen text
   const allergenText = allergens && allergens.length > 0
-    ? allergens.map(a => `${a.icon || ''} ${a.name}`).join(', ')
+    ? allergens.map(a => a.name).join(', ')
     : '';
   
-  // Calculate Y position for allergen section (below quantity or last standard field)
-  const allergenYStart = quantity ? 290 : 255;
+  // Format address - handle JSON format
+  let addressText = '';
+  if (organizationDetails?.address) {
+    try {
+      const addr = typeof organizationDetails.address === 'string' 
+        ? JSON.parse(organizationDetails.address)
+        : organizationDetails.address;
+      addressText = `${addr.street || ''}, ${addr.number || ''}\n${addr.city || ''} - ${addr.state || ''}, ${addr.postalCode || ''}`;
+    } catch {
+      addressText = String(organizationDetails.address);
+    }
+  }
   
-  // ZPL Command to generate the label
-  // ^XA - Start Format
-  // ^FO - Field Origin (x, y coordinates)
-  // ^A0N - Font (0=default, N=normal, size, size)
-  // ^FD - Field Data
-  // ^FS - Field Separator
-  // ^BQ - QR Code
-  // ^GB - Graphic Box (for warning borders)
-  // ^XZ - End Format
-  
+  // Professional ZPL layout
   const zpl = `
 ^XA
-^FO50,30^A0N,40,40^FD${productName}^FS
-^FO50,80^A0N,25,25^FDCategory: ${categoryName}^FS
-^FO50,115^A0N,25,25^FDCondition: ${condition}^FS
-^FO50,150^A0N,25,25^FDPrep: ${prepDate}^FS
-^FO50,185^A0N,25,25^FDExpiry: ${expiryDate}^FS
-^FO50,220^A0N,25,25^FDBy: ${preparedByName}^FS
-${quantity ? `^FO50,255^A0N,25,25^FDQty: ${quantity} ${unit || ''}^FS` : ''}
-${allergens && allergens.length > 0 ? `
-^FO30,${allergenYStart}^GB540,${hasCriticalAllergens ? '90' : '70'},3^FS
-^FO40,${allergenYStart + 10}^A0N,30,30^FD${hasCriticalAllergens ? '!!! ALLERGEN WARNING !!!' : 'ALLERGENS:'}^FS
-^FO40,${allergenYStart + 45}^A0N,20,20^FD${allergenText.substring(0, 50)}^FS
-${allergenText.length > 50 ? `^FO40,${allergenYStart + 70}^A0N,20,20^FD${allergenText.substring(50, 100)}^FS` : ''}
+^CF0,30
+~TA000
+~JSN
+^LT0
+^MNW
+^MTT
+^PON
+^PMN
+^LH0,0
+^JMA
+^PR4,4
+~SD15
+^JUS
+^LRN
+^CI27
+^PA0,1,1,0
+^XZ
+
+^XA
+^MMT
+^PW600
+^LL600
+^LS0
+
+^FO20,20^GB560,60,3^FS
+^FO30,30^A0N,45,45^FD${productName}^FS
+
+^FO20,90^GB560,1,1^FS
+
+^FO30,100^A0N,24,24^FD${condition.toUpperCase()}${quantity ? ` / ${quantity} ${unit || ''}` : ''}^FS
+
+^FO20,130^GB560,1,1^FS
+
+^FO30,140^A0N,20,20^FDManufacturing Date:^FS
+^FO230,140^A0N,20,20^FD${prepDate}^FS
+
+^FO30,165^A0N,20,20^FDExpiry Date:^FS
+^FO230,165^A0N,20,20^FD${expiryDate}^FS
+
+${data.batchNumber ? `
+^FO30,190^A0N,20,20^FDBatch:^FS
+^FO150,190^A0N,20,20^FD${data.batchNumber}^FS
 ` : ''}
-^FO450,50^BQN,2,6^FDQA,${qrData}^FS
+
+${categoryName && categoryName !== 'Quick Print' ? `
+^FO30,215^A0N,20,20^FDCategory:^FS
+^FO150,215^A0N,20,20^FD${categoryName}^FS
+` : ''}
+
+${organizationDetails?.foodSafetyRegistration ? `
+^FO30,240^A0N,20,20^FDFood Safety Reg:^FS
+^FO200,240^A0N,20,20^FD${organizationDetails.foodSafetyRegistration}^FS
+` : ''}
+
+^FO20,270^GB560,1,1^FS
+
+${allergens && allergens.length > 0 ? `
+^FO30,280^A0N,18,18^FDAllergens:^FS
+^FO30,300^A0N,16,16^FD${allergenText.length > 50 ? allergenText.substring(0, 50) + '...' : allergenText}^FS
+^FO20,325^GB560,1,1^FS
+` : ''}
+
+^FO30,${allergens && allergens.length > 0 ? '335' : '280'}^A0N,20,20^FDPrepared By: ${preparedByName.toUpperCase()}^FS
+
+^FO20,${allergens && allergens.length > 0 ? '365' : '310'}^GB560,1,1^FS
+
+${organizationDetails ? `
+^FO30,${allergens && allergens.length > 0 ? '375' : '320'}^A0N,18,18^FD${organizationDetails.name.toUpperCase()}^FS
+${organizationDetails.phone ? `^FO30,${allergens && allergens.length > 0 ? '395' : '340'}^A0N,14,14^FDTel: ${organizationDetails.phone}^FS` : ''}
+${addressText ? `
+^FO30,${allergens && allergens.length > 0 ? '415' : '360'}^A0N,12,12^FD${addressText.split('\n')[0]}^FS
+^FO30,${allergens && allergens.length > 0 ? '430' : '375'}^A0N,12,12^FD${addressText.split('\n')[1] || ''}^FS
+` : ''}
+${organizationDetails.foodSafetyRegistration ? `^FO30,${allergens && allergens.length > 0 ? '445' : '390'}^A0N,13,13^FDFood Safety Reg: ${organizationDetails.foodSafetyRegistration}^FS` : ''}
+` : ''}
+
+${labelId ? `^FO30,${
+  organizationDetails?.foodSafetyRegistration ? 
+    (allergens && allergens.length > 0 ? '465' : '410') : 
+    (organizationDetails ? 
+      (allergens && allergens.length > 0 ? '445' : '390') : 
+      (allergens && allergens.length > 0 ? '390' : '335'))
+}^A0N,11,11^FD#${labelId.substring(0, 8).toUpperCase()}^FS` : ''}
+
+^FO480,${allergens && allergens.length > 0 ? '380' : '320'}^BQN,2,4^FDQA,${qrData}^FS
+
 ^XZ
 `;
 
@@ -80,15 +181,33 @@ ${allergenText.length > 50 ? `^FO40,${allergenYStart + 70}^A0N,20,20^FD${allerge
  */
 export const saveLabelToDatabase = async (data: LabelPrintData): Promise<string | null> => {
   try {
+    // CRITICAL VALIDATION: prepared_by is REQUIRED for food safety compliance
+    if (!data.preparedBy || data.preparedBy.trim() === '') {
+      const error = new Error('VALIDATION ERROR: prepared_by is a required field. Every label must identify who prepared it for food safety compliance and audit trail.');
+      console.error(error.message, data);
+      throw error;
+    }
+
+    // CRITICAL VALIDATION: organization_id is REQUIRED for RLS
+    if (!data.organizationId || data.organizationId.trim() === '') {
+      const error = new Error('VALIDATION ERROR: organizationId is required for Row Level Security.');
+      console.error(error.message, data);
+      throw error;
+    }
+
     // Format allergens as array of names for storage
     const allergenNames = data.allergens?.map(a => a.name) || [];
+    
+    // Handle product_id - convert empty string to null for UUID field
+    const productId = data.productId && data.productId.trim() !== '' ? data.productId : null;
+    const categoryId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : null;
     
     const { data: insertedData, error } = await supabase
       .from("printed_labels")
       .insert({
-        product_id: data.productId,
+        product_id: productId,
         product_name: data.productName,
-        category_id: data.categoryId,
+        category_id: categoryId,
         category_name: data.categoryName,
         prepared_by: data.preparedBy,
         prepared_by_name: data.preparedByName,
@@ -97,6 +216,7 @@ export const saveLabelToDatabase = async (data: LabelPrintData): Promise<string 
         condition: data.condition,
         quantity: data.quantity || null,
         unit: data.unit || null,
+        organization_id: data.organizationId, // Required for RLS
         allergens: allergenNames.length > 0 ? allergenNames : null,
       })
       .select()
@@ -166,15 +286,16 @@ const sendToPrinter = async (zpl: string, quantity: number = 1): Promise<void> =
 
 /**
  * Main function to print a label
- * Saves to database first, then sends to printer
+ * Saves to database first, then sends to printer with labelId in QR code
  */
 export const printLabel = async (data: LabelPrintData): Promise<{ success: boolean; labelId?: string; error?: string }> => {
   try {
-    // 1. Save to database first
+    // 1. Save to database first to get the labelId
     const labelId = await saveLabelToDatabase(data);
 
-    // 2. Generate ZPL
-    const zpl = generateZPL(data);
+    // 2. Generate ZPL with labelId included in QR code
+    const dataWithLabelId = { ...data, labelId: labelId || undefined };
+    const zpl = generateZPL(dataWithLabelId);
 
     // 3. Send to printer
     const printQuantity = data.quantity ? parseInt(data.quantity) : 1;
