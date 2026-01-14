@@ -56,7 +56,8 @@ export interface RoutineTask {
   task_type: TaskType;
   priority: TaskPriority;
   status: TaskStatus;
-  assigned_to?: string;
+  assigned_to?: string; // LEGACY: auth user_id
+  team_member_id?: string; // NEW: team member ID - preferred
   scheduled_date: string;
   scheduled_time?: string;
   completed_at?: string;
@@ -108,7 +109,8 @@ export interface CreateTaskInput {
   description?: string;
   task_type: TaskType;
   priority?: TaskPriority;
-  assigned_to?: string;
+  assigned_to?: string; // LEGACY: auth user_id - kept for backward compatibility
+  team_member_id?: string; // NEW: team member ID - preferred
   scheduled_date: string;
   scheduled_time?: string;
   estimated_minutes?: number;
@@ -121,7 +123,8 @@ export interface UpdateTaskInput {
   description?: string;
   priority?: TaskPriority;
   status?: TaskStatus;
-  assigned_to?: string;
+  assigned_to?: string; // LEGACY: auth user_id - kept for backward compatibility
+  team_member_id?: string; // NEW: team member ID - preferred
   scheduled_date?: string;
   scheduled_time?: string;
   notes?: string;

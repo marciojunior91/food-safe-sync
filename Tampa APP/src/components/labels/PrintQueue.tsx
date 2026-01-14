@@ -49,7 +49,9 @@ import {
   RefreshCw
 } from "lucide-react";
 import { format } from "date-fns";
-import { printLabel } from "@/utils/zebraPrinter";
+import { usePrinter } from "@/hooks/usePrinter";
+import { UserSelectionDialog } from "./UserSelectionDialog";
+import type { TeamMember } from "@/types/teamMembers";
 
 interface PrintQueueItem {
   id: string;
@@ -167,7 +169,10 @@ export function PrintQueue() {
   const [queueItems, setQueueItems] = useState<PrintQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
   const { toast } = useToast();
+  const { print } = usePrinter();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -272,7 +277,11 @@ export function PrintQueue() {
     }
   };
 
-  const handlePrintSingle = async (id: string) => {
+  const handlePrintSingle = async (
+    id: string,
+    overridePreparedBy?: string,
+    overridePreparedByName?: string
+  ) => {
     const item = queueItems.find((i) => i.id === id);
     if (!item) return;
 
@@ -283,21 +292,29 @@ export function PrintQueue() {
         .update({ status: "printing" })
         .eq("id", id);
 
-      // Print the label
-      await printLabel({
+      // Use override values if provided, otherwise use item values
+      const preparedBy = overridePreparedBy || item.user_id;
+      const preparedByName = overridePreparedByName || item.prepared_by_name;
+
+      // Print the label using the unified printer system
+      const success = await print({
         productId: item.product_id || "",
         productName: item.product?.name || "Unknown Product",
         categoryId: item.category_id || "",
         categoryName: item.product?.category?.name || "",
-        prepDate: item.prep_date,
-        expiryDate: item.expiry_date,
-        preparedBy: item.user_id,
-        preparedByName: item.prepared_by_name,
-        condition: item.condition as any,
+        preparedDate: item.prep_date,
+        useByDate: item.expiry_date,
+        preparedBy,
+        preparedByName,
+        condition: item.condition,
         quantity: item.quantity || "",
         unit: item.unit || "",
         batchNumber: item.batch_number,
       });
+
+      if (!success) {
+        throw new Error('Print failed');
+      }
 
       // Update status to completed
       await supabase
@@ -341,13 +358,28 @@ export function PrintQueue() {
       return;
     }
 
+    // ✅ FIXED: Open team member selection dialog before printing
+    // This makes the workflow consistent with Quick Print and Full Form workflows
+    setUserDialogOpen(true);
+  };
+
+  const handleUserSelected = (user: TeamMember) => {
+    setSelectedUser(user);
+    setUserDialogOpen(false);
+    // Start printing after user is selected
+    printAllWithUser(user);
+  };
+
+  const printAllWithUser = async (user: TeamMember) => {
+    const pendingItems = queueItems.filter((item) => item.status === "pending");
+
     toast({
       title: "Printing Queue",
-      description: `Printing ${pendingItems.length} labels...`,
+      description: `Printing ${pendingItems.length} labels as ${user.display_name}...`,
     });
 
     for (const item of pendingItems) {
-      await handlePrintSingle(item.id);
+      await handlePrintSingle(item.id, user.auth_role_id || "", user.display_name);
       // Small delay between prints
       await new Promise(resolve => setTimeout(resolve, 500));
     }
@@ -526,6 +558,13 @@ export function PrintQueue() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* User Selection Dialog for Batch Printing */}
+      <UserSelectionDialog
+        open={userDialogOpen}
+        onOpenChange={setUserDialogOpen}
+        onUserSelected={handleUserSelected}
+      />
     </div>
   );
 }

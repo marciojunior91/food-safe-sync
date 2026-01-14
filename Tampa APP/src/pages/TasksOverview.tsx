@@ -1,15 +1,16 @@
-import { useState, useMemo } from "react";
-import { Plus, Filter, Calendar, AlertCircle, Search, X, List, Clock } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Card,
@@ -43,6 +44,7 @@ import { TaskDetailView } from "@/components/routine-tasks/TaskDetailView";
 import { TaskTimeline } from "@/components/routine-tasks/TaskTimeline";
 import { useRoutineTasks } from "@/hooks/useRoutineTasks";
 import { usePeople } from "@/hooks/usePeople";
+import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useUserContext } from "@/hooks/useUserContext";
 import {
   RoutineTask,
@@ -79,8 +81,18 @@ export default function TasksOverview() {
   const [filterPriority, setFilterPriority] = useState<TaskPriority | "all">("all");
   const [filterAssignedUser, setFilterAssignedUser] = useState<string | "all">("all");
 
-  // Fetch users from the organization
+  // Fetch users from the organization (auth users - kept for backward compatibility)
   const { users, loading: usersLoading } = usePeople(context?.organization_id);
+  
+  // Fetch team members from the organization
+  const { teamMembers, loading: teamMembersLoading, fetchTeamMembers } = useTeamMembers();
+  
+  // Fetch team members when organization context is available
+  useEffect(() => {
+    if (context?.organization_id) {
+      fetchTeamMembers({ organization_id: context.organization_id, is_active: true });
+    }
+  }, [context?.organization_id]);
 
   // Use the routine tasks hook
   const {
@@ -154,22 +166,13 @@ export default function TasksOverview() {
   const inProgressTasks = filteredTasks.filter((task) => task.status === "in_progress");
   const completedTasks = filteredTasks.filter((task) => task.status === "completed");
 
-  // Get unique assigned users for filter
+  // Get team members for the filter dropdown (instead of auth users)
   const uniqueUsers = useMemo(() => {
-    const users = tasks
-      .filter((task) => task.assigned_user)
-      .map((task) => ({
-        id: task.assigned_to!,
-        name: task.assigned_user!.display_name,
-      }));
-
-    // Remove duplicates
-    const unique = Array.from(
-      new Map(users.map((user) => [user.id, user])).values()
-    );
-
-    return unique;
-  }, [tasks]);
+    return teamMembers.map((member) => ({
+      id: member.id,
+      name: member.display_name,
+    }));
+  }, [teamMembers]);
 
   // Check if any filters are active
   const hasActiveFilters =
@@ -319,7 +322,7 @@ export default function TasksOverview() {
       title: data.title,
       description: data.description,
       priority: data.priority,
-      assigned_to: data.assigned_to,
+      team_member_id: data.team_member_id, // Use team_member_id instead of assigned_to
       scheduled_date: data.scheduled_date,
       scheduled_time: data.scheduled_time,
     });
@@ -434,33 +437,32 @@ export default function TasksOverview() {
           </ToggleGroup>
 
           {/* Create Task Button */}
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                size="lg" 
-                className="gap-2 w-full sm:w-auto"
-                onClick={() => console.log('Button clicked, dialog should open')}
-              >
-                <Plus className="w-5 h-5" />
-                <span>New Task</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Task</DialogTitle>
-                <DialogDescription>
-                  Add a new routine task to your schedule
-                </DialogDescription>
-              </DialogHeader>
-              {isCreateDialogOpen && (
+          {isCreateDialogOpen && (
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Task</DialogTitle>
+                  <DialogDescription>
+                    Add a new routine task to your schedule
+                  </DialogDescription>
+                </DialogHeader>
                 <TaskForm
                   onSubmit={handleCreateTask}
-                  users={users.map(u => ({ user_id: u.user_id, display_name: u.display_name }))}
-                  isLoading={usersLoading}
+                  users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name }))}
+                  isLoading={teamMembersLoading}
                 />
-              )}
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+          )}
+          
+          <Button 
+            size="lg" 
+            className="gap-2 w-full sm:w-auto"
+            onClick={() => setIsCreateDialogOpen(true)}
+          >
+            <Plus className="w-5 h-5" />
+            <span>New Task</span>
+          </Button>
         </div>
       </div>
 
@@ -487,15 +489,9 @@ export default function TasksOverview() {
                 >
                   Today
                 </Button>
-                <div className="text-center">
-                  <div className="font-semibold">
-                    {selectedDate.toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </div>
+                
+                <div className="text-center font-semibold">
+                  {format(selectedDate, "PPP")}
                 </div>
               </div>
               
@@ -750,7 +746,7 @@ export default function TasksOverview() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Tasks</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{todayTasks.length}</div>
@@ -835,7 +831,7 @@ export default function TasksOverview() {
           {todayTasks.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
+                <CalendarIcon className="w-12 h-12 text-muted-foreground mb-4" />
                 <p className="text-lg font-medium">No tasks scheduled for today</p>
                 <p className="text-sm text-muted-foreground">
                   Create a new task to get started
@@ -964,7 +960,7 @@ export default function TasksOverview() {
       )}
 
       {/* Edit Task Dialog */}
-      {taskToEdit && (
+      {isEditDialogOpen && taskToEdit && (
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
@@ -973,35 +969,25 @@ export default function TasksOverview() {
                 Update the task details below
               </DialogDescription>
             </DialogHeader>
-            {taskToEdit && (
-              <>
-                {console.log('📋 Passing to TaskForm:', {
-                  isEditing: true,
-                  taskId: taskToEdit.id,
-                  userRole: context?.user_role,
-                  fullContext: context
-                })}
-                <TaskForm
-                  onSubmit={handleEditTask}
-                  users={users.map(u => ({ user_id: u.user_id, display_name: u.display_name }))}
-                  isLoading={usersLoading}
-                  isEditing={true}
-                  taskId={taskToEdit.id}
-                  userRole={context?.user_role}
-                  defaultValues={{
-                    title: taskToEdit.title,
-                    description: taskToEdit.description || "",
-                    task_type: taskToEdit.task_type,
-                    priority: taskToEdit.priority,
-                    assigned_to: taskToEdit.assigned_to || "",
-                    scheduled_date: new Date(taskToEdit.scheduled_date),
-                    scheduled_time: taskToEdit.scheduled_time || "",
-                    estimated_minutes: taskToEdit.estimated_minutes || 30,
-                    requires_approval: taskToEdit.requires_approval,
-                  }}
-                />
-              </>
-            )}
+            <TaskForm
+              onSubmit={handleEditTask}
+              users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name }))}
+              isLoading={teamMembersLoading}
+              isEditing={true}
+              taskId={taskToEdit.id}
+              userRole={context?.user_role}
+              defaultValues={{
+                title: taskToEdit.title,
+                description: taskToEdit.description || "",
+                task_type: taskToEdit.task_type,
+                priority: taskToEdit.priority,
+                assigned_to: taskToEdit.team_member_id || taskToEdit.assigned_to || "",
+                scheduled_date: new Date(taskToEdit.scheduled_date),
+                scheduled_time: taskToEdit.scheduled_time || "",
+                estimated_minutes: taskToEdit.estimated_minutes || 30,
+                requires_approval: taskToEdit.requires_approval,
+              }}
+            />
           </DialogContent>
         </Dialog>
       )}

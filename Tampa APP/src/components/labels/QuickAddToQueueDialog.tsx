@@ -34,16 +34,12 @@ interface QuickAddToQueueDialogProps {
   product: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  preparedBy?: string;
-  preparedByName?: string;
 }
 
 export function QuickAddToQueueDialog({ 
   product, 
   open, 
-  onOpenChange,
-  preparedBy = "",
-  preparedByName = "Unknown User"
+  onOpenChange
 }: QuickAddToQueueDialogProps) {
   const { addToQueue } = usePrintQueue();
   const [quantity, setQuantity] = useState(1);
@@ -51,7 +47,10 @@ export function QuickAddToQueueDialog({
   const handleAdd = () => {
     if (!product) return;
 
-    // Create default label data
+    // ✅ FIXED: Team member will be selected at print time, not at add time
+    // This makes the workflow consistent with Quick Print and Full Form workflows
+    
+    // Create default label data WITHOUT team member info
     const today = new Date().toISOString().split('T')[0];
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -65,8 +64,8 @@ export function QuickAddToQueueDialog({
       productId: product.id,
       productName: product.name,
       condition: "Fresh",
-      preparedBy,
-      preparedByName,
+      preparedBy: "", // ✅ Empty - will be filled when printing
+      preparedByName: "", // ✅ Empty - will be filled when printing
       prepDate: today,
       expiryDate,
       quantity: quantity.toString(),

@@ -16,6 +16,7 @@ import { StatsCard } from "@/components/StatsCard";
 import { LabelForm, LabelData } from "@/components/labels/LabelForm";
 import { UserSelectionDialog } from "@/components/labels/UserSelectionDialog";
 import { QuickPrintDetailsDialog } from "@/components/labels/QuickPrintDetailsDialog";
+import { RecipePrintDialog } from "@/components/recipes/RecipePrintDialog";
 import { QuickPrintGrid } from "@/components/labels/QuickPrintGrid";
 import { MergeProductsAdmin } from "@/components/admin/MergeProductsAdmin";
 import { PrintQueue } from "@/components/shopping/PrintQueue";
@@ -35,6 +36,7 @@ export default function Labeling() {
   const [currentView, setCurrentView] = useState<'overview' | 'form' | 'admin'>('overview');
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [quickPrintDetailsOpen, setQuickPrintDetailsOpen] = useState(false);
+  const [recipePrintDialogOpen, setRecipePrintDialogOpen] = useState(false);
   const [pendingQuickPrint, setPendingQuickPrint] = useState<any | null>(null);
   const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
   const { toast } = useToast();
@@ -236,8 +238,14 @@ export default function Labeling() {
     setSelectedUser(selectedUserData);
     
     if (pendingQuickPrint) {
-      // Open quick print details dialog before printing
-      setQuickPrintDetailsOpen(true);
+      // Check if it's a recipe (has shelf_life_days property from recipes table)
+      if (pendingQuickPrint.shelf_life_days !== undefined) {
+        // It's a recipe - open recipe print dialog
+        setRecipePrintDialogOpen(true);
+      } else {
+        // It's a regular product - open quick print details dialog
+        setQuickPrintDetailsOpen(true);
+      }
     } else {
       // Open form for new label creation
       setCurrentView('form');
@@ -734,6 +742,30 @@ export default function Labeling() {
       {/* Print Queue Components */}
       <PrintQueue />
       <PrintQueueBadge />
+
+      {/* Recipe Print Dialog */}
+      {pendingQuickPrint && selectedUser && (
+        <RecipePrintDialog
+          open={recipePrintDialogOpen}
+          onOpenChange={(open) => {
+            setRecipePrintDialogOpen(open);
+            if (!open) {
+              setPendingQuickPrint(null);
+              setSelectedUser(null);
+            }
+          }}
+          recipe={{
+            id: pendingQuickPrint.id,
+            name: pendingQuickPrint.name,
+            shelf_life_days: pendingQuickPrint.shelf_life_days,
+            allergens: pendingQuickPrint.allergens
+          }}
+          initialUser={selectedUser ? {
+            id: selectedUser.id,
+            display_name: selectedUser.display_name
+          } : null}
+        />
+      )}
     </>
   );
 }

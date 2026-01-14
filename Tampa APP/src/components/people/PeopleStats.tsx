@@ -25,7 +25,8 @@ export default function PeopleStats({ users }: PeopleStatsProps) {
   const admins = users.filter((u) => u.role === "admin").length;
   const managers = users.filter((u) => u.role === "manager").length;
   const leaderChefs = users.filter((u) => u.role === "leader_chef").length;
-  const staff = users.filter((u) => u.role === "staff").length;
+  const cooks = users.filter((u) => u.role === "cook").length;
+  const baristas = users.filter((u) => u.role === "barista").length;
 
   // Calculate compliance
   const now = new Date();
@@ -108,23 +109,30 @@ export default function PeopleStats({ users }: PeopleStatsProps) {
                 )}
                 {managers > 0 && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span>🟡</span>
+                    <span>‍💼</span>
                     <span className="font-medium">{managers}</span>
                     <span className="text-muted-foreground">Manager</span>
                   </div>
                 )}
                 {leaderChefs > 0 && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span>🟠</span>
+                    <span>👨‍🍳</span>
                     <span className="font-medium">{leaderChefs}</span>
                     <span className="text-muted-foreground">Leader Chef</span>
                   </div>
                 )}
-                {staff > 0 && (
+                {cooks > 0 && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span>🔵</span>
-                    <span className="font-medium">{staff}</span>
-                    <span className="text-muted-foreground">Staff</span>
+                    <span>🍳</span>
+                    <span className="font-medium">{cooks}</span>
+                    <span className="text-muted-foreground">Cook</span>
+                  </div>
+                )}
+                {baristas > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span>☕</span>
+                    <span className="font-medium">{baristas}</span>
+                    <span className="text-muted-foreground">Barista</span>
                   </div>
                 )}
               </div>

@@ -264,3 +264,9 @@ export const VERIFICATION_STATUS_COLORS: Record<CertificateVerificationStatus, s
   pending: 'bg-yellow-100 text-yellow-800 border-yellow-200',
   rejected: 'bg-red-100 text-red-800 border-red-200'
 };
+
+// ============================================================================
+// TEAM MEMBER DOCUMENTS (Alias for compatibility)
+// ============================================================================
+
+export type TeamMemberDocument = TeamMemberCertificate;

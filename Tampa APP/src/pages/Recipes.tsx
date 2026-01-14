@@ -11,6 +11,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import { CreateRecipeDialog } from "@/components/recipes/CreateRecipeDialog";
 import { PrepareRecipeDialog } from "@/components/recipes/PrepareRecipeDialog";
+import { RecipePrintButton } from "@/components/recipes/RecipePrintButton";
 import { format } from "date-fns";
 import {
   AlertDialog,
@@ -63,23 +64,23 @@ export default function Recipes() {
   const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const { hasRole, roles, loading: rolesLoading } = useUserRole();
+  const { role, isAdmin, isLeaderChef, loading: rolesLoading } = useUserRole();
   const { toast } = useToast();
   
   // Check if user can manage recipes (admin or leader_chef)
-  const canManageRecipes = hasRole('admin') || hasRole('leader_chef');
+  const canManageRecipes = isAdmin || isLeaderChef;
 
   // Debug logging
   useEffect(() => {
     console.log('🔍 Recipe Permissions Debug:', {
       userId: user?.id,
-      roles: roles,
+      role: role,
       rolesLoading: rolesLoading,
-      hasAdminRole: hasRole('admin'),
-      hasLeaderChefRole: hasRole('leader_chef'),
+      isAdmin: isAdmin,
+      isLeaderChef: isLeaderChef,
       canManageRecipes: canManageRecipes
     });
-  }, [user, roles, rolesLoading, canManageRecipes]);
+  }, [user, role, rolesLoading, isAdmin, isLeaderChef, canManageRecipes]);
 
   useEffect(() => {
     fetchRecipes();
@@ -221,7 +222,9 @@ export default function Recipes() {
         <CardContent className="pt-4">
           <p className="text-sm font-mono">
             <strong>Debug Info:</strong> User ID: {user?.id?.slice(0, 8)}... | 
-            Roles: [{roles.join(', ') || 'none'}] | 
+            Role: {role || 'none'} | 
+            Is Admin: {isAdmin ? '✅' : '❌'} | 
+            Is Leader Chef: {isLeaderChef ? '✅' : '❌'} | 
             Can Manage: {canManageRecipes ? '✅ YES' : '❌ NO'} | 
             Loading: {rolesLoading ? 'Yes' : 'No'}
           </p>
@@ -409,6 +412,22 @@ export default function Recipes() {
                     <ChefHat className="w-4 h-4 mr-2" />
                     Prepare Recipe
                   </Button>
+                  
+                  {/* Print Label Button */}
+                  <RecipePrintButton
+                    recipe={{
+                      id: recipe.id,
+                      name: recipe.name,
+                      shelf_life_days: recipe.hold_time_days,
+                      allergens: recipe.allergens?.map((name, index) => ({ 
+                        id: `allergen-${index}`, 
+                        name 
+                      }))
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  />
                   
                   <div className="flex gap-2">
                     {/* Comments button - available to all users */}

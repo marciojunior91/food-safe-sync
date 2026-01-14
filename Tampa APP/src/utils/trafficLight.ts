@@ -47,9 +47,14 @@ export const getStatusLabel = (status: ExpiryStatus): string => {
     case 'warning':
       return 'Expiring Soon';
     case 'safe':
-      return 'Safe';
+      return ''; // Don't show "Safe" badge - only show warnings/expired
     default:
       return 'Unknown';
   }
+};
+
+// Helper to check if status should display a badge
+export const shouldShowStatusBadge = (status: ExpiryStatus): boolean => {
+  return status === 'expired' || status === 'warning';
 };
 

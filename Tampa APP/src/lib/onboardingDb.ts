@@ -21,7 +21,7 @@ async function hashPIN(pin: string): Promise<string> {
   return hashHex;
 }
 
-// Step 1: Register User and Create Profile
+// Step 1: Register User (Profile will be created after organization in Step 2)
 export async function registerUser(data: RegistrationData) {
   try {
     // Sign up user with Supabase Auth
@@ -32,6 +32,7 @@ export async function registerUser(data: RegistrationData) {
         data: {
           first_name: data.firstName,
           last_name: data.lastName,
+          display_name: `${data.firstName} ${data.lastName}`,
         },
         emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
@@ -40,16 +41,8 @@ export async function registerUser(data: RegistrationData) {
     if (authError) throw authError;
     if (!authData.user) throw new Error('User creation failed');
 
-    // Create profile
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .insert({
-        user_id: authData.user.id,
-        display_name: `${data.firstName} ${data.lastName}`,
-        email: data.email,
-      });
-
-    if (profileError) throw profileError;
+    // Note: Profile creation will be handled in createOrganization step
+    // because profiles table requires organization_id (NOT NULL)
 
     return {
       success: true,
@@ -65,9 +58,16 @@ export async function registerUser(data: RegistrationData) {
   }
 }
 
-// Step 2: Create Organization
+// Step 2: Create Organization and Profile
 export async function createOrganization(data: CompanyData, userId: string) {
   try {
+    // Get user data for display name
+    const { data: { user } } = await supabase.auth.getUser();
+    const displayName = user?.user_metadata?.display_name || 
+                       `${user?.user_metadata?.first_name || ''} ${user?.user_metadata?.last_name || ''}`.trim() ||
+                       user?.email?.split('@')[0] || 
+                       'User';
+
     // Create organization
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
@@ -91,15 +91,29 @@ export async function createOrganization(data: CompanyData, userId: string) {
     if (orgError) throw orgError;
     if (!orgData) throw new Error('Organization creation failed');
 
-    // Update user profile with organization_id
-    const { error: updateError } = await supabase
+    // Create profile with organization_id (required field)
+    const { error: profileError } = await supabase
       .from('profiles')
-      .update({
+      .insert({
+        user_id: userId,
         organization_id: orgData.id,
-      })
-      .eq('user_id', userId);
+        display_name: displayName,
+        email: user?.email || null,
+        onboarding_completed: false,
+      });
 
-    if (updateError) throw updateError;
+    if (profileError) {
+      // Profile might already exist from trigger, try updating instead
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          organization_id: orgData.id,
+          display_name: displayName,
+        })
+        .eq('user_id', userId);
+      
+      if (updateError) throw updateError;
+    }
 
     // Assign owner role to user
     const { error: roleError } = await supabase

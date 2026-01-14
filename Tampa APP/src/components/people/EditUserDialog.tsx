@@ -51,7 +51,7 @@ export default function EditUserDialog({
     email: user.email || "",
     phone: user.phone || "",
     position: user.position || "",
-    role: user.role || "staff",
+    role: user.role || "cook", // Default to cook instead of non-existent staff
     hire_date: user.hire_date || "", // Note: Using hire_date, not admission_date
   });
 
@@ -62,19 +62,17 @@ export default function EditUserDialog({
       email: user.email || "",
       phone: user.phone || "",
       position: user.position || "",
-      role: user.role || "staff",
+      role: user.role || "cook",
       hire_date: user.hire_date || "",
     });
   }, [user, open]);
 
-  // Check permissions - admin, owner, or leader_chef can edit everything
-  const isAdmin = 
-    context?.user_role === "admin" || 
-    context?.user_role === "owner" || 
-    context?.user_role === "leader_chef";
+  // Check permissions - admin can edit everything, manager can edit most things
+  const isAdmin = context?.user_role === "admin";
+  const isManager = context?.user_role === "manager";
   const isOwnProfile = context?.user_id === user.user_id;
-  const canEdit = isAdmin || isOwnProfile;
-  const canEditRole = isAdmin; // Only admins can edit roles
+  const canEdit = isAdmin || isManager || isOwnProfile;
+  const canEditRole = isAdmin || isManager; // Admins and managers can edit roles
 
   // Handle form field changes
   const handleChange = (field: string, value: string) => {
@@ -185,7 +183,7 @@ export default function EditUserDialog({
             {isOwnProfile
               ? "Update your profile information."
               : `Update information for ${user.display_name}.`}
-            {!isAdmin && " You can only edit contact information."}
+            {!isAdmin && !isManager && " You can only edit contact information."}
           </DialogDescription>
         </DialogHeader>
 
@@ -271,14 +269,16 @@ export default function EditUserDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">🔴 Admin</SelectItem>
-                    <SelectItem value="manager">🟡 Manager</SelectItem>
-                    <SelectItem value="leader_chef">🟠 Leader Chef</SelectItem>
-                    <SelectItem value="staff">🔵 Staff</SelectItem>
+                    <SelectItem value="manager">👨‍💼 Manager</SelectItem>
+                    <SelectItem value="leader_chef">👨‍🍳 Leader Chef</SelectItem>
+                    <SelectItem value="cook">🍳 Cook</SelectItem>
+                    <SelectItem value="barista">☕ Barista</SelectItem>
+                    <SelectItem value="staff">👤 Staff</SelectItem>
                   </SelectContent>
                 </Select>
                 {!canEditRole && (
                   <p className="text-xs text-muted-foreground">
-                    Admin only field
+                    Admin/Manager only field
                   </p>
                 )}
               </div>
@@ -291,11 +291,11 @@ export default function EditUserDialog({
                   type="date"
                   value={formData.hire_date}
                   onChange={(e) => handleChange("hire_date", e.target.value)}
-                  disabled={!isAdmin}
+                  disabled={!isAdmin && !isManager}
                 />
-                {!isAdmin && (
+                {!isAdmin && !isManager && (
                   <p className="text-xs text-muted-foreground">
-                    Admin only field
+                    Admin/Manager only field
                   </p>
                 )}
               </div>

@@ -19,6 +19,8 @@ import PeopleStats from "@/components/people/PeopleStats";
 import PeopleFilters from "@/components/people/PeopleFilters";
 import EditUserDialog from "@/components/people/EditUserDialog";
 import { TeamMemberEditDialog } from "@/components/people/TeamMemberEditDialog";
+import CreateUserDialog from "@/components/people/CreateUserDialog";
+import CreateTeamMemberDialog from "@/components/people/CreateTeamMemberDialog";
 import { Plus, RefreshCw, Users, Briefcase } from "lucide-react";
 
 export default function People() {
@@ -30,6 +32,8 @@ export default function People() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editingTeamMember, setEditingTeamMember] = useState<TeamMember | null>(null);
   const [activeTab, setActiveTab] = useState<"users" | "team">("team");
+  const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
+  const [createTeamMemberDialogOpen, setCreateTeamMemberDialogOpen] = useState(false);
   
   const {
     users,
@@ -115,6 +119,31 @@ export default function People() {
     });
   };
 
+  // Handle create user success
+  const handleCreateUserSuccess = () => {
+    // Refresh both lists since edge function creates auth user + team member
+    if (context?.organization_id) {
+      fetchUsers(filters);
+      fetchTeamMembers({ organization_id: context.organization_id });
+    }
+    toast({
+      title: "Success",
+      description: "User created successfully. They can now log in.",
+    });
+  };
+
+  // Handle create team member success
+  const handleCreateTeamMemberSuccess = () => {
+    // Refresh team members list
+    if (context?.organization_id) {
+      fetchTeamMembers({ organization_id: context.organization_id });
+    }
+    toast({
+      title: "Success",
+      description: "Team member created successfully.",
+    });
+  };
+
   if (contextLoading) {
     return (
       <div className="container mx-auto p-4 sm:p-6 space-y-6">
@@ -171,13 +200,13 @@ export default function People() {
           {canManageTeamMembers && (
             <>
               {activeTab === "users" && (
-                <Button onClick={() => toast({ title: "Coming soon!", description: "Add auth user functionality will be added." })}>
+                <Button onClick={() => setCreateUserDialogOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add User
                 </Button>
               )}
               {activeTab === "team" && (
-                <Button onClick={() => toast({ title: "Coming soon!", description: "Add team member functionality will be added." })}>
+                <Button onClick={() => setCreateTeamMemberDialogOpen(true)}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Team Member
                 </Button>
@@ -244,7 +273,7 @@ export default function People() {
                       <p className="text-muted-foreground">No team members found</p>
                       {canManageTeamMembers && (
                         <Button
-                          onClick={() => toast({ title: "Coming soon!", description: "Add team member functionality will be added." })}
+                          onClick={() => setCreateTeamMemberDialogOpen(true)}
                           className="mt-4"
                         >
                           <Plus className="w-4 h-4 mr-2" />
@@ -359,6 +388,20 @@ export default function People() {
           onSuccess={handleTeamMemberEditSuccess}
         />
       )}
+
+      {/* Create User with Credentials Dialog */}
+      <CreateUserDialog
+        open={createUserDialogOpen}
+        onOpenChange={setCreateUserDialogOpen}
+        onSuccess={handleCreateUserSuccess}
+      />
+
+      {/* Create Team Member Dialog */}
+      <CreateTeamMemberDialog
+        open={createTeamMemberDialogOpen}
+        onOpenChange={setCreateTeamMemberDialogOpen}
+        onSuccess={handleCreateTeamMemberSuccess}
+      />
     </div>
   );
 }

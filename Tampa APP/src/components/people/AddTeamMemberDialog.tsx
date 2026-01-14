@@ -25,6 +25,19 @@ import type { CreateTeamMemberInput, TeamMemberRole } from '@/types/teamMembers'
 import { TEAM_MEMBER_ROLE_LABELS } from '@/types/teamMembers';
 import { User, Briefcase, Phone, Shield, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatPhoneNumber, getRawPhoneNumber, isValidPhoneNumber, formatTFN, getRawTFN } from '@/utils/phoneFormat';
+import { DocumentUpload } from './DocumentUpload';
+
+// Local Document interface for upload component
+interface Document {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url?: string;
+  file?: File;
+  preview?: string;
+}
 
 interface AddTeamMemberDialogProps {
   open: boolean;
@@ -41,7 +54,7 @@ export function AddTeamMemberDialog({
   const { context } = useUserContext();
   const { createTeamMember, loading } = useTeamMembers();
   
-  const [activeTab, setActiveTab] = useState<'personal' | 'employment' | 'emergency' | 'security'>('personal');
+  const [activeTab, setActiveTab] = useState<'personal' | 'employment' | 'emergency' | 'security' | 'documents'>('personal');
   const [formData, setFormData] = useState<CreateTeamMemberInput>({
     display_name: '',
     role_type: 'cook',
@@ -50,6 +63,7 @@ export function AddTeamMemberDialog({
   
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Reset form when dialog opens
@@ -62,6 +76,7 @@ export function AddTeamMemberDialog({
       });
       setPin('');
       setPinConfirm('');
+      setDocuments([]);
       setErrors({});
       setActiveTab('personal');
     }
@@ -84,7 +99,7 @@ export function AddTeamMemberDialog({
 
     if (!formData.phone?.trim()) {
       newErrors.phone = 'Phone is required';
-    } else if (!/^\+?[0-9]{10,15}$/.test(formData.phone.replace(/[\s-]/g, ''))) {
+    } else if (!isValidPhoneNumber(formData.phone)) {
       newErrors.phone = 'Invalid phone format (10-15 digits)';
     }
 
@@ -115,7 +130,7 @@ export function AddTeamMemberDialog({
       }
     }
 
-    if (formData.emergency_contact_phone && !/^\+?[0-9]{10,15}$/.test(formData.emergency_contact_phone.replace(/[\s-]/g, ''))) {
+    if (formData.emergency_contact_phone && !isValidPhoneNumber(formData.emergency_contact_phone)) {
       newErrors.emergency_contact_phone = 'Invalid phone format';
     }
 
@@ -135,6 +150,9 @@ export function AddTeamMemberDialog({
 
     const success = await createTeamMember({
       ...formData,
+      phone: formData.phone ? getRawPhoneNumber(formData.phone) : undefined,
+      emergency_contact_phone: formData.emergency_contact_phone ? getRawPhoneNumber(formData.emergency_contact_phone) : undefined,
+      tfn_number: formData.tfn_number ? getRawTFN(formData.tfn_number) : undefined,
       pin, // Will be hashed by the hook
     });
 
@@ -157,7 +175,16 @@ export function AddTeamMemberDialog({
   };
 
   const handleFieldChange = (field: keyof CreateTeamMemberInput, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    // Format phone fields as user types
+    if (field === 'phone' || field === 'emergency_contact_phone') {
+      setFormData(prev => ({ ...prev, [field]: formatPhoneNumber(value) }));
+    } else if (field === 'tfn_number') {
+      // Format TFN as user types
+      setFormData(prev => ({ ...prev, [field]: formatTFN(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, [field]: value }));
+    }
+    
     // Clear error for this field
     if (errors[field]) {
       setErrors(prev => {
@@ -183,7 +210,7 @@ export function AddTeamMemberDialog({
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="personal" className="flex items-center gap-1">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Personal</span>
@@ -195,6 +222,10 @@ export function AddTeamMemberDialog({
               <TabsTrigger value="emergency" className="flex items-center gap-1">
                 <Phone className="w-4 h-4" />
                 <span className="hidden sm:inline">Emergency</span>
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="flex items-center gap-1">
+                <Shield className="w-4 h-4" />
+                <span className="hidden sm:inline">Documents</span>
               </TabsTrigger>
               <TabsTrigger value="security" className="flex items-center gap-1">
                 <Shield className="w-4 h-4" />
@@ -310,16 +341,17 @@ export function AddTeamMemberDialog({
                   {/* TFN */}
                   <div className="space-y-2">
                     <Label htmlFor="tfn_number">
-                      TFN / Tax File Number <span className="text-muted-foreground">(Recommended)</span>
+                      TFN (Tax File Number) <span className="text-muted-foreground">(Recommended)</span>
                     </Label>
                     <Input
                       id="tfn_number"
-                      placeholder="123456789"
+                      placeholder="123 456 789"
                       value={formData.tfn_number || ''}
                       onChange={(e) => handleFieldChange('tfn_number', e.target.value)}
+                      maxLength={11}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Carteira de Trabalho or Tax File Number for employment records
+                      Format: nnn nnn nnn (8 or 9 digits)
                     </p>
                   </div>
                 </CardContent>
@@ -461,6 +493,30 @@ export function AddTeamMemberDialog({
                       </SelectContent>
                     </Select>
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* DOCUMENTS TAB */}
+            <TabsContent value="documents" className="space-y-4 mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Certificates & Documents
+                  </CardTitle>
+                  <CardDescription>
+                    Upload certificates, TFN, and other important documents (PDF, JPG, PNG, WEBP)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <DocumentUpload
+                    teamMemberId={undefined}
+                    documents={documents}
+                    onDocumentsChange={setDocuments}
+                    maxFiles={10}
+                    maxSizeInMB={10}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

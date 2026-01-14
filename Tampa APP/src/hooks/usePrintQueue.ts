@@ -6,6 +6,7 @@ import { useToast } from './use-toast';
 import { usePrintQueueContext } from '@/contexts/PrintQueueContext';
 import { saveLabelToDatabase } from '@/utils/zebraPrinter';
 import { useOrganizationId } from './useUserContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const MAX_QUEUE_SIZE = 50;
 
@@ -246,10 +247,26 @@ export function usePrintQueue() {
           const preparedBy = overridePreparedBy || item.labelData.preparedBy || "";
           const preparedByName = overridePreparedByName || item.labelData.preparedByName;
 
+          // Check if productId is valid (exists in products table)
+          // For recipes, productId is recipe ID which doesn't exist in products - set to null
+          let validProductId = item.labelData.productId || "";
+          if (validProductId) {
+            const { data: productCheck } = await supabase
+              .from('products')
+              .select('id')
+              .eq('id', validProductId)
+              .maybeSingle();
+            
+            // If not found in products table, it's a recipe - set to empty string (will become null)
+            if (!productCheck) {
+              validProductId = "";
+            }
+          }
+
           // Save to database first (for each quantity)
           for (let j = 0; j < item.quantity; j++) {
             await saveLabelToDatabase({
-              productId: item.labelData.productId || "",
+              productId: validProductId,
               productName: item.labelData.productName,
               categoryId: (item.labelData.categoryId && item.labelData.categoryId !== "all" && item.labelData.categoryId !== "") 
                 ? item.labelData.categoryId 
@@ -268,15 +285,24 @@ export function usePrintQueue() {
           }
           
           // Transform LabelData to printer format
+          const labelData = item.labelData as LabelData;
           const printerData = {
-            productName: item.labelData.productName,
-            categoryName: item.labelData.categoryName,
-            subcategoryName: item.labelData.subcategoryName,
-            preparedDate: item.labelData.prepDate,
-            useByDate: item.labelData.expiryDate,
-            allergens: [], // Allergens will be fetched if needed
-            storageInstructions: `Condition: ${item.labelData.condition}`,
-            barcode: item.labelData.batchNumber,
+            productId: validProductId, // Use validated product ID
+            productName: labelData.productName,
+            categoryId: labelData.categoryId,
+            categoryName: labelData.categoryName,
+            subcategoryName: labelData.subcategoryName,
+            preparedDate: labelData.prepDate,
+            useByDate: labelData.expiryDate,
+            preparedBy: preparedBy, // Use overridden value
+            preparedByName: preparedByName, // Use overridden value
+            condition: labelData.condition,
+            quantity: labelData.quantity || "1",
+            unit: labelData.unit || "",
+            batchNumber: labelData.batchNumber,
+            allergens: (labelData.allergens || []).map((a) => a.name),
+            storageInstructions: `Condition: ${labelData.condition}`,
+            organizationId: organizationId,
           };
           
           // Create array of label data (one per quantity)

@@ -9,7 +9,7 @@ import {
 import { QuickAddToQueueDialog } from "./QuickAddToQueueDialog";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { getExpiryStatus, getStatusColor, getStatusLabel } from "@/utils/trafficLight";
+import { getExpiryStatus, getStatusColor, getStatusLabel, shouldShowStatusBadge } from "@/utils/trafficLight";
 import type { Allergen } from "@/hooks/useAllergens";
 
 interface Category {
@@ -244,8 +244,8 @@ export function QuickPrintCategoryView({
                 >
                   {/* Top Row - Badges with proper spacing */}
                   <div className="absolute top-2 left-2 right-2 flex items-start justify-between z-20 pointer-events-none gap-2">
-                    {/* Expiry Badge (Top-Left) */}
-                    {product.latestLabel && expiryStatus ? (
+                    {/* Expiry Badge (Top-Left) - Only show for warnings and expired */}
+                    {product.latestLabel && expiryStatus && shouldShowStatusBadge(expiryStatus) ? (
                       <Badge 
                         variant="secondary"
                         className="h-5 sm:h-6 px-2 text-[10px] sm:text-xs font-bold shadow-sm pointer-events-auto shrink-0"
@@ -336,8 +336,6 @@ export function QuickPrintCategoryView({
           product={quickAddProduct}
           open={quickAddDialogOpen}
           onOpenChange={setQuickAddDialogOpen}
-          preparedBy={user?.id || ""}
-          preparedByName={user?.email || "Unknown User"}
         />
       </div>
     );

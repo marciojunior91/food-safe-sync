@@ -35,7 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AllergenBadge } from "./AllergenBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { usePrinter } from "@/hooks/usePrinter";
-import { getExpiryStatus, getStatusColor, getStatusLabel } from "@/utils/trafficLight";
+import { getExpiryStatus, getStatusColor, getStatusLabel, shouldShowStatusBadge } from "@/utils/trafficLight";
 import type { Allergen } from "@/hooks/useAllergens";
 
 interface Product {
@@ -269,6 +269,48 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
         return;
       }
 
+      // Check if this is the "Recipes" subcategory
+      let isRecipesSubcategory = false;
+      if (subcategoryId) {
+        const { data: subcategory } = await supabase
+          .from('label_subcategories')
+          .select('name')
+          .eq('id', subcategoryId)
+          .single();
+        
+        isRecipesSubcategory = subcategory?.name === 'Recipes';
+      }
+
+      // If Recipes subcategory, fetch from recipes table
+      if (isRecipesSubcategory) {
+        const { data: recipes, error: recipesError } = await supabase
+          .from('recipes')
+          .select('id, name, hold_time_days, allergens')
+          .eq('organization_id', profile.organization_id)
+          .order('name');
+
+        if (recipesError) throw recipesError;
+
+        // Transform recipes to look like products
+        const recipesAsProducts = (recipes || []).map(recipe => ({
+          id: recipe.id,
+          name: recipe.name,
+          category_id: categoryId,
+          subcategory_id: subcategoryId,
+          measuring_unit_id: null,
+          measuring_units: null,
+          label_categories: null,
+          allergens: [], // Recipe allergens stored as array in recipes table
+          latestLabel: null, // Recipes don't have pre-printed labels
+          shelf_life_days: recipe.hold_time_days // Map hold_time_days to shelf_life_days for consistency
+        }));
+
+        setFilteredProducts(recipesAsProducts);
+        setLoadingProducts(false);
+        return;
+      }
+
+      // Regular products query
       let query = supabase
         .from("products")
         .select(`
@@ -624,8 +666,8 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                           >
                             {/* Top Row - Badges with proper spacing */}
                             <div className="absolute top-2 left-2 right-2 flex items-start justify-between z-20 pointer-events-none gap-2">
-                              {/* Expiry Badge (Top-Left) */}
-                              {product.latestLabel && expiryStatus ? (
+                              {/* Expiry Badge (Top-Left) - Only show for warnings and expired */}
+                              {product.latestLabel && expiryStatus && shouldShowStatusBadge(expiryStatus) ? (
                                 <Badge 
                                   variant="secondary"
                                   className="h-5 sm:h-6 px-2 text-[10px] sm:text-xs font-bold shadow-sm pointer-events-auto shrink-0"
@@ -759,8 +801,8 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                                   {product.name}
                                 </span>
                                 
-                                {/* Expiry Status Badge - Show if product has a latest label */}
-                                {!isLoading && !isSuccess && product.latestLabel && expiryStatus && (
+                                {/* Expiry Status Badge - Only show for warnings and expired */}
+                                {!isLoading && !isSuccess && product.latestLabel && expiryStatus && shouldShowStatusBadge(expiryStatus) && (
                                   <Badge 
                                     variant="secondary"
                                     className="h-5 px-2 text-xs font-bold"
@@ -811,8 +853,6 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
       product={quickAddProduct}
       open={quickAddDialogOpen}
       onOpenChange={setQuickAddDialogOpen}
-      preparedBy={user?.id || ""}
-      preparedByName={user?.email || "Unknown User"}
     />
     </>
   );

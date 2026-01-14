@@ -1,6 +1,8 @@
+// @ts-nocheck
 // Supabase Edge Function: Send User Invitation
 // Iteration 13 - MVP Sprint
 // Sends email invitations to new auth users via Supabase Admin API
+// This is a Deno runtime file - TypeScript checking handled by Deno, not Node.js
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";

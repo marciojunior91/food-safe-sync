@@ -162,27 +162,8 @@ export class ZebraPrinter implements PrinterDriver {
       throw new Error('Prepared by information is required for printing');
     }
     
-    // Fetch organization details for label footer
-    let organizationDetails;
-    try {
-      const { data: orgData } = await supabase
-        .from('organizations')
-        .select('name, address, phone, email, food_safety_registration')
-        .eq('id', organizationId)
-        .single();
-      
-      if (orgData) {
-        organizationDetails = {
-          name: orgData.name,
-          address: orgData.address || undefined, // Address is already a JSON string from DB
-          phone: orgData.phone || undefined,
-          email: orgData.email || undefined,
-          foodSafetyRegistration: orgData.food_safety_registration || undefined,
-        };
-      }
-    } catch (error) {
-      console.warn('Could not fetch organization details:', error);
-    }
+    // ❌ REMOVED: Organization details fetch - No org data on labels per requirements
+    // Labels should only contain product, preparer, and safety information
     
     // Parse condition from storage instructions if not provided
     const condition = labelData.condition || 
@@ -201,7 +182,7 @@ export class ZebraPrinter implements PrinterDriver {
       expiryDate: labelData.useByDate,
       condition,
       organizationId,
-      organizationDetails, // Add organization details for professional footer
+      // ❌ REMOVED: organizationDetails - No org data on labels
       quantity: labelData.quantity,
       unit: labelData.unit,
       batchNumber: labelData.barcode || '',

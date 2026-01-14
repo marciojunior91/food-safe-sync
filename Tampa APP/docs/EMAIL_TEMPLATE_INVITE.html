@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Tampa APP</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0a0a0a; color: #ffffff;">
+    
+    <!-- Main Container -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #0a0a0a;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                
+                <!-- Email Card -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);">
+                    
+                    <!-- Header with Orange Accent -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%); padding: 0; height: 8px;"></td>
+                    </tr>
+                    
+                    <!-- Logo/Brand Section -->
+                    <tr>
+                        <td style="padding: 48px 40px 32px 40px; text-align: center;">
+                            <div style="display: inline-block; background-color: #ff6b35; width: 64px; height: 64px; border-radius: 16px; line-height: 64px; font-size: 32px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);">
+                                🍴
+                            </div>
+                            <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">
+                                Tampa APP
+                            </h1>
+                            <p style="margin: 8px 0 0 0; font-size: 14px; color: #ff6b35; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                                Food Safety Sync
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Main Content -->
+                    <tr>
+                        <td style="padding: 0 40px 40px 40px;">
+                            
+                            <!-- Welcome Message -->
+                            <div style="background-color: rgba(255, 107, 53, 0.1); border-left: 4px solid #ff6b35; padding: 20px 24px; border-radius: 8px; margin-bottom: 32px;">
+                                <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #ffffff;">
+                                    🎉 You've Been Invited!
+                                </h2>
+                                <p style="margin: 0; font-size: 15px; color: #b3b3b3; line-height: 1.6;">
+                                    You have been invited to join Tampa APP, our food safety management platform.
+                                </p>
+                            </div>
+                            
+                            <!-- Instructions -->
+                            <p style="margin: 0 0 24px 0; font-size: 16px; color: #e0e0e0; line-height: 1.7;">
+                                Welcome to the team! Click the button below to set your password and access your account:
+                            </p>
+                            
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 32px 0;">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <a href="{{ .ConfirmationURL }}" 
+                                           style="display: inline-block; background: linear-gradient(135deg, #ff6b35 0%, #ff8c42 100%); color: #ffffff; text-decoration: none; padding: 16px 48px; border-radius: 8px; font-weight: 700; font-size: 16px; letter-spacing: 0.5px; box-shadow: 0 4px 12px rgba(255, 107, 53, 0.4); transition: all 0.3s ease;">
+                                            ✨ Accept Invitation & Set Password
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Alternative Link -->
+                            <div style="background-color: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; margin-top: 32px;">
+                                <p style="margin: 0 0 12px 0; font-size: 13px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                                    Button not working?
+                                </p>
+                                <p style="margin: 0; font-size: 14px; color: #b3b3b3; word-break: break-all; line-height: 1.6;">
+                                    Copy and paste this link into your browser:
+                                    <br>
+                                    <a href="{{ .ConfirmationURL }}" style="color: #ff6b35; text-decoration: underline;">{{ .ConfirmationURL }}</a>
+                                </p>
+                            </div>
+                            
+                            <!-- Info Box -->
+                            <div style="margin-top: 32px; padding: 20px; background: rgba(255, 107, 53, 0.08); border-radius: 8px; border: 1px solid rgba(255, 107, 53, 0.2);">
+                                <p style="margin: 0 0 8px 0; font-size: 13px; color: #ff6b35; font-weight: 700;">
+                                    ℹ️ IMPORTANT INFORMATION
+                                </p>
+                                <ul style="margin: 0; padding-left: 20px; font-size: 14px; color: #b3b3b3; line-height: 1.7;">
+                                    <li style="margin-bottom: 8px;">This invitation link expires in <strong style="color: #ffffff;">24 hours</strong></li>
+                                    <li style="margin-bottom: 8px;">After setting your password, you can login at: <a href="{{ .SiteURL }}" style="color: #ff6b35; text-decoration: none; font-weight: 600;">{{ .SiteURL }}</a></li>
+                                    <li>If you didn't expect this invitation, you can safely ignore this email</li>
+                                </ul>
+                            </div>
+                            
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 32px 40px; background-color: rgba(0, 0, 0, 0.3); border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <p style="margin: 0 0 8px 0; font-size: 14px; color: #666666;">
+                                            Tampa APP - Food Safety Management System
+                                        </p>
+                                        <p style="margin: 0; font-size: 12px; color: #4d4d4d;">
+                                            © 2026 Tampa APP. All rights reserved.
+                                        </p>
+                                        <div style="margin-top: 16px;">
+                                            <a href="{{ .SiteURL }}/help" style="color: #ff6b35; text-decoration: none; font-size: 12px; margin: 0 12px;">Help Center</a>
+                                            <a href="{{ .SiteURL }}/privacy" style="color: #ff6b35; text-decoration: none; font-size: 12px; margin: 0 12px;">Privacy Policy</a>
+                                            <a href="{{ .SiteURL }}/terms" style="color: #ff6b35; text-decoration: none; font-size: 12px; margin: 0 12px;">Terms of Service</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                </table>
+                
+            </td>
+        </tr>
+    </table>
+    
+</body>
+</html>

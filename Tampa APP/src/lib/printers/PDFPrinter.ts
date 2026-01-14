@@ -37,8 +37,8 @@ export class PDFPrinter implements PrinterDriver {
     this.settings = {
       type: 'pdf',
       name,
-      paperWidth: 102,
-      paperHeight: 152,
+      paperWidth: 50,  // 5cm = 50mm (standard label size)
+      paperHeight: 50, // 5cm = 50mm (standard label size)
       defaultQuantity: 1,
       ...settings
     };
@@ -146,7 +146,7 @@ export class PDFPrinter implements PrinterDriver {
         unit: printData.unit || '',
         batchNumber: printData.batchNumber,
         allergens: printData.allergens,
-        organizationDetails: printData.organizationDetails // ✅ Pass organization details to renderer
+        // ❌ REMOVED: organizationDetails - No org data on labels
       };
       
       // Step 3: Create canvas and render with BOPP design
@@ -215,30 +215,7 @@ export class PDFPrinter implements PrinterDriver {
       throw new Error('Prepared by information is required for printing');
     }
     
-    // Fetch organization details for label footer
-    let organizationDetails;
-    try {
-      const { data: orgData } = await supabase
-        .from('organizations')
-        .select('name, address, phone, email, food_safety_registration')
-        .eq('id', organizationId)
-        .single();
-      
-      console.log('🔍 PDFPrinter - Raw org data from DB:', orgData);
-      
-      if (orgData) {
-        organizationDetails = {
-          name: orgData.name,
-          address: orgData.address || undefined, // Address is already a JSON string from DB
-          phone: orgData.phone || undefined,
-          email: orgData.email || undefined,
-          foodSafetyRegistration: orgData.food_safety_registration || undefined,
-        };
-        console.log('🔍 PDFPrinter - Formatted organizationDetails:', organizationDetails);
-      }
-    } catch (error) {
-      console.warn('Could not fetch organization details:', error);
-    }
+    // ❌ REMOVED: Organization details fetch - No org data on labels per requirements
     
     // Parse condition from storage instructions if not provided
     const condition = labelData.condition || 
@@ -257,7 +234,7 @@ export class PDFPrinter implements PrinterDriver {
       expiryDate: labelData.useByDate,
       condition,
       organizationId,
-      organizationDetails, // Add organization details for professional footer
+      // ❌ REMOVED: organizationDetails - No org data on labels
       quantity: labelData.quantity,
       unit: labelData.unit,
       batchNumber: labelData.barcode || '',

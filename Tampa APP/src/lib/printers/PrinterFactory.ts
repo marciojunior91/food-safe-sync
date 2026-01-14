@@ -46,7 +46,7 @@ export class PrinterFactory {
       type,
       name: '',
       paperWidth: 102,
-      paperHeight: 152,
+      paperHeight: 180, // Increased from 152 to 180mm to accommodate full label content
       defaultQuantity: 1
     };
 

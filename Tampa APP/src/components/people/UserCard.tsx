@@ -15,6 +15,7 @@ import {
   Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatPhoneNumber } from "@/utils/phoneFormat";
 
 interface UserCardProps {
   user: UserProfile;
@@ -41,14 +42,26 @@ export default function UserCard({
       case "manager":
         return {
           color: "bg-yellow-100 text-yellow-800 border-yellow-200",
-          icon: "�",
+          icon: "👨‍💼",
           label: "Manager",
         };
       case "leader_chef":
         return {
           color: "bg-orange-100 text-orange-800 border-orange-200",
-          icon: "🟠",
+          icon: "👨‍🍳",
           label: "Leader Chef",
+        };
+      case "cook":
+        return {
+          color: "bg-purple-100 text-purple-800 border-purple-200",
+          icon: "🍳",
+          label: "Cook",
+        };
+      case "barista":
+        return {
+          color: "bg-amber-100 text-amber-800 border-amber-200",
+          icon: "☕",
+          label: "Barista",
         };
       case "staff":
         return {
@@ -60,7 +73,7 @@ export default function UserCard({
         return {
           color: "bg-gray-100 text-gray-800 border-gray-200",
           icon: "⚪",
-          label: "Staff",
+          label: "Unknown",
         };
     }
   };
@@ -200,7 +213,7 @@ export default function UserCard({
             {user.phone && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center">
                 <Phone className="w-3 h-3" />
-                <span>{user.phone}</span>
+                <span>{formatPhoneNumber(user.phone)}</span>
               </div>
             )}
           </div>

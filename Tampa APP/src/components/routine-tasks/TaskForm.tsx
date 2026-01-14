@@ -161,7 +161,7 @@ export function TaskForm({
         description: data.description,
         task_type: data.task_type,
         priority: data.priority,
-        assigned_to: data.assigned_to, // Now required, will always have a value
+        team_member_id: data.assigned_to, // Send as team_member_id (new field)
         scheduled_date: format(data.scheduled_date, "yyyy-MM-dd"),
         scheduled_time: data.scheduled_time || undefined,
         estimated_minutes: data.estimated_minutes,
@@ -170,11 +170,7 @@ export function TaskForm({
 
       await onSubmit(taskInput);
 
-      toast({
-        title: "Success!",
-        description: "Task created successfully",
-      });
-
+      // Don't show toast here - let the parent component handle it
       form.reset();
     } catch (error) {
       console.error("Error submitting task:", error);
@@ -402,18 +398,15 @@ export function TaskForm({
             control={form.control}
             name="scheduled_time"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="flex flex-col">
                 <FormLabel>Scheduled Time</FormLabel>
                 <FormControl>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      type="time"
-                      className="pl-10"
-                      placeholder="09:00"
-                      {...field}
-                    />
-                  </div>
+                  <Input
+                    type="time"
+                    className="w-full h-10 [color-scheme:light] dark:[color-scheme:dark]"
+                    placeholder="09:00"
+                    {...field}
+                  />
                 </FormControl>
                 <FormDescription>Optional specific time</FormDescription>
                 <FormMessage />

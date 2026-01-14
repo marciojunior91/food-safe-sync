@@ -104,71 +104,67 @@ const generateZPL = (data: LabelPrintData): string => {
 
 ^XA
 ^MMT
-^PW600
-^LL600
+^PW394  // 5cm = 394 dots at 203 DPI
+^LL394  // 5cm = 394 dots at 203 DPI
 ^LS0
 
-^FO20,20^GB560,60,3^FS
-^FO30,30^A0N,45,45^FD${productName}^FS
+// Product Name Header (scaled from 560x60 to 354x40)
+^FO15,15^GB364,40,2^FS
+^FO20,18^A0N,30,30^FD${productName}^FS
 
-^FO20,90^GB560,1,1^FS
+^FO15,60^GB364,1,1^FS
 
-^FO30,100^A0N,24,24^FD${condition.toUpperCase()}${quantity ? ` / ${quantity} ${unit || ''}` : ''}^FS
+// Condition & Quantity (scaled font from 24 to 18)
+^FO20,65^A0N,18,18^FD${condition.toUpperCase()}${quantity ? ` / ${quantity} ${unit || ''}` : ''}^FS
 
-^FO20,130^GB560,1,1^FS
+^FO15,88^GB364,1,1^FS
 
-^FO30,140^A0N,20,20^FDManufacturing Date:^FS
-^FO230,140^A0N,20,20^FD${prepDate}^FS
+// Manufacturing & Expiry Dates (scaled font from 20 to 15)
+^FO20,93^A0N,15,15^FDMfg Date:^FS
+^FO150,93^A0N,15,15^FD${prepDate}^FS
 
-^FO30,165^A0N,20,20^FDExpiry Date:^FS
-^FO230,165^A0N,20,20^FD${expiryDate}^FS
+^FO20,110^A0N,15,15^FDExpiry:^FS
+^FO150,110^A0N,15,15^FD${expiryDate}^FS
 
 ${data.batchNumber ? `
-^FO30,190^A0N,20,20^FDBatch:^FS
-^FO150,190^A0N,20,20^FD${data.batchNumber}^FS
+^FO20,127^A0N,14,14^FDBatch:^FS
+^FO100,127^A0N,14,14^FD${data.batchNumber}^FS
 ` : ''}
 
 ${categoryName && categoryName !== 'Quick Print' ? `
-^FO30,215^A0N,20,20^FDCategory:^FS
-^FO150,215^A0N,20,20^FD${categoryName}^FS
+^FO20,${data.batchNumber ? '144' : '127'}^A0N,14,14^FDCategory:^FS
+^FO100,${data.batchNumber ? '144' : '127'}^A0N,14,14^FD${categoryName}^FS
 ` : ''}
 
-${organizationDetails?.foodSafetyRegistration ? `
-^FO30,240^A0N,20,20^FDFood Safety Reg:^FS
-^FO200,240^A0N,20,20^FD${organizationDetails.foodSafetyRegistration}^FS
-` : ''}
-
-^FO20,270^GB560,1,1^FS
+^FO15,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '162' : '145') : (data.batchNumber ? '145' : '127')}^GB364,1,1^FS
 
 ${allergens && allergens.length > 0 ? `
-^FO30,280^A0N,18,18^FDAllergens:^FS
-^FO30,300^A0N,16,16^FD${allergenText.length > 50 ? allergenText.substring(0, 50) + '...' : allergenText}^FS
-^FO20,325^GB560,1,1^FS
+^FO20,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '167' : '150') : (data.batchNumber ? '150' : '132')}^A0N,13,13^FDAllergens:^FS
+^FO20,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '182' : '165') : (data.batchNumber ? '165' : '147')}^A0N,12,12^FD${allergenText.length > 35 ? allergenText.substring(0, 35) + '...' : allergenText}^FS
+^FO15,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '198' : '181') : (data.batchNumber ? '181' : '163')}^GB364,1,1^FS
 ` : ''}
 
-^FO30,${allergens && allergens.length > 0 ? '335' : '280'}^A0N,20,20^FDPrepared By: ${preparedByName.toUpperCase()}^FS
+// Prepared By (scaled font from 20 to 15)
+^FO20,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '203' : '186') : (data.batchNumber ? '186' : '168')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '167' : '150') : (data.batchNumber ? '150' : '132'))
+}^A0N,15,15^FDPrepared By: ${preparedByName.toUpperCase()}^FS
 
-^FO20,${allergens && allergens.length > 0 ? '365' : '310'}^GB560,1,1^FS
+^FO15,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '220' : '203') : (data.batchNumber ? '203' : '185')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '184' : '167') : (data.batchNumber ? '167' : '149'))
+}^GB364,1,1^FS
 
-${organizationDetails ? `
-^FO30,${allergens && allergens.length > 0 ? '375' : '320'}^A0N,18,18^FD${organizationDetails.name.toUpperCase()}^FS
-${organizationDetails.phone ? `^FO30,${allergens && allergens.length > 0 ? '395' : '340'}^A0N,14,14^FDTel: ${organizationDetails.phone}^FS` : ''}
-${addressText ? `
-^FO30,${allergens && allergens.length > 0 ? '415' : '360'}^A0N,12,12^FD${addressText.split('\n')[0]}^FS
-^FO30,${allergens && allergens.length > 0 ? '430' : '375'}^A0N,12,12^FD${addressText.split('\n')[1] || ''}^FS
-` : ''}
-${organizationDetails.foodSafetyRegistration ? `^FO30,${allergens && allergens.length > 0 ? '445' : '390'}^A0N,13,13^FDFood Safety Reg: ${organizationDetails.foodSafetyRegistration}^FS` : ''}
-` : ''}
+${labelId ? `^FO20,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '225' : '208') : (data.batchNumber ? '208' : '190')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '189' : '172') : (data.batchNumber ? '172' : '154'))
+}^A0N,10,10^FD#${labelId.substring(0, 8).toUpperCase()}^FS` : ''}
 
-${labelId ? `^FO30,${
-  organizationDetails?.foodSafetyRegistration ? 
-    (allergens && allergens.length > 0 ? '465' : '410') : 
-    (organizationDetails ? 
-      (allergens && allergens.length > 0 ? '445' : '390') : 
-      (allergens && allergens.length > 0 ? '390' : '335'))
-}^A0N,11,11^FD#${labelId.substring(0, 8).toUpperCase()}^FS` : ''}
-
-^FO480,${allergens && allergens.length > 0 ? '380' : '320'}^BQN,2,4^FDQA,${qrData}^FS
+// QR Code (scaled from size 4 to size 3, moved to bottom right)
+^FO300,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '250' : '233') : (data.batchNumber ? '233' : '215')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '214' : '197') : (data.batchNumber ? '197' : '179'))
+}^BQN,2,3^FDQA,${qrData}^FS
 
 ^XZ
 `;

@@ -36,8 +36,8 @@ export class GenericPrinter implements PrinterDriver {
     this.settings = {
       type: 'generic',
       name,
-      paperWidth: 102,
-      paperHeight: 152,
+      paperWidth: 50,  // 5cm = 50mm (standard label size)
+      paperHeight: 50, // 5cm = 50mm (square label format)
       defaultQuantity: 1,
       ...settings
     };
@@ -169,7 +169,7 @@ export class GenericPrinter implements PrinterDriver {
         unit: printData.unit || '',
         batchNumber: printData.batchNumber,
         allergens: printData.allergens,
-        organizationDetails: printData.organizationDetails // ✅ Pass organization details to renderer
+        // ❌ REMOVED: organizationDetails - No org data on labels per requirements
       };
       
       // Step 3: Create canvas and render with BOPP design
@@ -181,8 +181,9 @@ export class GenericPrinter implements PrinterDriver {
       }
       
       // Label dimensions - A4 proportions for PDF output (matches pdfRenderer)
+      // Increased height to 1000px to ensure all content (680px label + margins + footer) fits without cutting
       const canvasWidth = 600;
-      const canvasHeight = 848;
+      const canvasHeight = 1000;
       
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
@@ -203,7 +204,17 @@ export class GenericPrinter implements PrinterDriver {
             <style>
               @page { size: ${paperWidth}mm ${paperHeight}mm; margin: 0; }
               body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
-              img { width: 100%; height: 100%; object-fit: contain; }
+              img { 
+                width: 100%; 
+                height: auto; 
+                display: block;
+                max-width: 100%;
+              }
+              .label-container {
+                width: ${paperWidth}mm;
+                min-height: ${paperHeight}mm;
+                page-break-after: always;
+              }
             </style>
           </head>
           <body>
@@ -218,7 +229,7 @@ export class GenericPrinter implements PrinterDriver {
       
       return `
         ${wrapper}
-        <div style="width: ${paperWidth}mm; height: ${paperHeight}mm; display: flex; align-items: center; justify-content: center;">
+        <div class="label-container">
           <img src="${imgData}" alt="Label: ${labelData.productName}" />
         </div>
         ${closeWrapper}
@@ -264,27 +275,8 @@ export class GenericPrinter implements PrinterDriver {
       throw new Error('Prepared by information is required for printing');
     }
     
-    // Fetch organization details for label footer
-    let organizationDetails;
-    try {
-      const { data: orgData } = await supabase
-        .from('organizations')
-        .select('name, address, phone, email, food_safety_registration')
-        .eq('id', organizationId)
-        .single();
-      
-      if (orgData) {
-        organizationDetails = {
-          name: orgData.name,
-          address: orgData.address || undefined, // Address is already a JSON string from DB
-          phone: orgData.phone || undefined,
-          email: orgData.email || undefined,
-          foodSafetyRegistration: orgData.food_safety_registration || undefined,
-        };
-      }
-    } catch (error) {
-      console.warn('Could not fetch organization details:', error);
-    }
+    // ❌ REMOVED: Organization details fetch - No org data on labels per requirements
+    // Labels should only contain product, preparer, and safety information
     
     // Parse condition from storage instructions if not provided
     const condition = labelData.condition || 
@@ -303,7 +295,7 @@ export class GenericPrinter implements PrinterDriver {
       expiryDate: labelData.useByDate,
       condition,
       organizationId,
-      organizationDetails, // Add organization details for professional footer
+      // ❌ REMOVED: organizationDetails - No org data on labels
       quantity: labelData.quantity,
       unit: labelData.unit,
       batchNumber: labelData.barcode || '',

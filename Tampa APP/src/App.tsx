@@ -23,7 +23,10 @@ import People from "./pages/People";
 import Feed from "./pages/Feed";
 import ProductTrafficLight from "./pages/ProductTrafficLight";
 import DraftManagement from "./pages/DraftManagement";
+import LabelCategories from "./pages/LabelCategories";
 import UserProfile from "./components/people/UserProfile";
+import PricingPage from "./pages/PricingPage";
+import BillingPage from "./pages/BillingPage";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +58,11 @@ const App = () => (
               <Route path="analytics" element={<Analytics />} />
               <Route path="traffic-light" element={<ProductTrafficLight />} />
               <Route path="drafts" element={<DraftManagement />} />
+              <Route path="label-categories" element={<LabelCategories />} />
+              
+              {/* Billing & Pricing */}
+              <Route path="pricing" element={<PricingPage />} />
+              <Route path="settings/billing" element={<BillingPage />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
