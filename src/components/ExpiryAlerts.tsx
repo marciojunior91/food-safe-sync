@@ -187,7 +187,7 @@ export default function ExpiryAlerts() {
             ) : (
               filteredItems.map(item => {
                 const expiryStatus = getExpiryStatus(item.expires_at);
-                const recipe = item.recipes as any;
+                const recipe = item.recipes;
                 
                 return (
                   <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border">
