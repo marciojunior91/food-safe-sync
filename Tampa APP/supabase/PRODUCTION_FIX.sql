@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS public.production_metrics (
   id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   organization_id uuid,
   recipe_id uuid REFERENCES public.recipes(id) ON DELETE CASCADE,
-  prep_session_id uuid REFERENCES public.prep_sessions(id) ON DELETE SET NULL,
+  prep_session_id uuid, -- Foreign key removed - prep_sessions table may not exist
   actual_time_minutes integer NOT NULL,
   planned_time_minutes integer,
   quantity_produced numeric NOT NULL,
