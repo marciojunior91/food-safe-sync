@@ -387,6 +387,32 @@ export async function completeOnboarding(
     const organizationId = orgResult.organizationId;
     const organizationName = companyData.businessName || 'Your Organization';
 
+    // Step 2.5: Link subscription to organization (if user came from Stripe checkout)
+    // This happens when user: Login → Pricing → Checkout → Onboarding
+    // The subscription is already created and linked to user, now we link it to the org
+    try {
+      const { data: linkResult, error: linkError } = await supabase.rpc(
+        'link_subscription_to_organization' as any,
+        {
+          p_user_id: userId,
+          p_organization_id: organizationId,
+        }
+      );
+
+      if (linkError) {
+        console.warn('Failed to link subscription to organization:', linkError);
+        // Don't fail onboarding if subscription linking fails
+        // User can still use free plan
+      } else if (linkResult === true) {
+        console.log('✅ Subscription successfully linked to organization');
+      } else {
+        console.log('ℹ️ No subscription found to link (user is on free plan)');
+      }
+    } catch (error) {
+      console.warn('Error linking subscription:', error);
+      // Continue with onboarding
+    }
+
     // Step 3: Import Products (optional)
     const productsResult = await importProducts(productsData, organizationId, userId);
     

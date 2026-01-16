@@ -2,11 +2,11 @@
 // Iteration 13 - MVP Sprint
 // Multi-step onboarding flow for new customers
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Loader2, CheckCircle2 } from "lucide-react";
 import OnboardingSteps from "@/components/onboarding/OnboardingSteps";
 import RegistrationStep from "@/components/onboarding/steps/RegistrationStep";
 import CompanyInfoStep from "@/components/onboarding/steps/CompanyInfoStep";
@@ -26,6 +26,7 @@ import {
 export default function Onboarding() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     loading,
     error,
@@ -38,6 +39,19 @@ export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('registration');
   const [completedSteps, setCompletedSteps] = useState<OnboardingStep[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState(false);
+  
+  // Check if user came from Stripe checkout
+  useEffect(() => {
+    const subscriptionParam = searchParams.get('subscription');
+    if (subscriptionParam === 'success') {
+      setHasSubscription(true);
+      toast({
+        title: "🎉 Payment Successful!",
+        description: "Your subscription is active. Complete setup to link it to your organization.",
+      });
+    }
+  }, [searchParams, toast]);
   
   // Form data state
   const [registrationData, setRegistrationData] = useState<Partial<RegistrationData>>({});
@@ -183,6 +197,16 @@ export default function Onboarding() {
           <p className="text-muted-foreground">
             Let's get your kitchen management system set up in just a few minutes
           </p>
+          
+          {/* Subscription Badge */}
+          {hasSubscription && (
+            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-green-700">
+                Premium Plan Active
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Progress Steps */}

@@ -131,20 +131,32 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
     try {
       // Get user's organization_id
       if (!user?.id) {
+        console.error('❌ QuickPrintGrid: No user ID available');
         setCategories([]);
         return;
       }
       
-      const { data: profile } = await supabase
+      console.log('🔍 QuickPrintGrid: Fetching profile for user:', user.id);
+      
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('organization_id')
         .eq('user_id', user.id)
         .single();
       
-      if (!profile?.organization_id) {
+      if (profileError) {
+        console.error('❌ QuickPrintGrid: Error fetching profile:', profileError);
         setCategories([]);
         return;
       }
+      
+      if (!profile?.organization_id) {
+        console.warn('⚠️ QuickPrintGrid: User has no organization_id. Profile:', profile);
+        setCategories([]);
+        return;
+      }
+
+      console.log('✅ QuickPrintGrid: Organization ID:', profile.organization_id);
 
       // First, get categories
       const { data: categoriesData, error: categoriesError } = await supabase
@@ -153,7 +165,12 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
         .eq('organization_id', profile.organization_id)
         .order("name");
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesError) {
+        console.error('❌ QuickPrintGrid: Error fetching categories:', categoriesError);
+        throw categoriesError;
+      }
+      
+      console.log(`✅ QuickPrintGrid: Found ${categoriesData?.length || 0} categories`);
 
       // Then, get counts for each category
       const categoriesWithCounts = await Promise.all(
@@ -223,18 +240,30 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
       // Get product counts for each subcategory
       const subcategoriesWithCounts = await Promise.all(
         (subcategoriesData || []).map(async (sub) => {
-          const { count: prodCount } = await supabase
-            .from("products")
-            .select("*", { count: "exact", head: true })
-            .eq("subcategory_id", sub.id)
-            .eq('organization_id', profile.organization_id);
+          // For "Recipes" subcategory, count from recipes table
+          let prodCount = 0;
+          if (sub.name === 'Recipes') {
+            const { count } = await supabase
+              .from("recipes")
+              .select("*", { count: "exact", head: true })
+              .eq('organization_id', profile.organization_id);
+            prodCount = count || 0;
+          } else {
+            // For other subcategories, count from products table
+            const { count } = await supabase
+              .from("products")
+              .select("*", { count: "exact", head: true })
+              .eq("subcategory_id", sub.id)
+              .eq('organization_id', profile.organization_id);
+            prodCount = count || 0;
+          }
 
           return {
             id: sub.id,
             name: sub.name,
             icon: sub.icon,
             category_id: sub.category_id,
-            product_count: prodCount || 0,
+            product_count: prodCount,
           };
         })
       );

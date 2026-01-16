@@ -54,41 +54,37 @@ import { Skeleton } from '@/components/ui/skeleton';
 export function BillingDashboard() {
   const {
     subscription,
-    billingHistory,
     loading,
     error,
-    cancelSubscription,
-    reactivateSubscription,
-    manageBilling,
-    refresh,
+    refetch,
   } = useSubscription();
 
   const [canceling, setCanceling] = useState(false);
   const [reactivating, setReactivating] = useState(false);
 
-  // Handle subscription cancellation
-  const handleCancel = async () => {
-    try {
-      setCanceling(true);
-      await cancelSubscription();
-    } catch (err) {
-      // Error already toasted in hook
-    } finally {
-      setCanceling(false);
-    }
-  };
+  // TODO: Implement subscription cancellation in useSubscription hook
+  // const handleCancel = async () => {
+  //   try {
+  //     setCanceling(true);
+  //     await cancelSubscription();
+  //   } catch (err) {
+  //     // Error already toasted in hook
+  //   } finally {
+  //     setCanceling(false);
+  //   }
+  // };
 
-  // Handle subscription reactivation
-  const handleReactivate = async () => {
-    try {
-      setReactivating(true);
-      await reactivateSubscription();
-    } catch (err) {
-      // Error already toasted in hook
-    } finally {
-      setReactivating(false);
-    }
-  };
+  // TODO: Implement subscription reactivation in useSubscription hook
+  // const handleReactivate = async () => {
+  //   try {
+  //     setReactivating(true);
+  //     await reactivateSubscription();
+  //   } catch (err) {
+  //     // Error already toasted in hook
+  //   } finally {
+  //     setReactivating(false);
+  //   }
+  // };
 
   if (loading) {
     return <BillingDashboardSkeleton />;
@@ -130,9 +126,13 @@ export function BillingDashboard() {
   }
 
   const plan = getPlan(subscription.planType);
-  const isActive = isSubscriptionActive(subscription);
-  const isTrialing = isSubscriptionTrialing(subscription);
-  const trialDays = getTrialDaysRemaining(subscription);
+  // TODO: These helper functions expect Subscription type but we have SubscriptionData
+  // For now, use the properties directly from the hook
+  const isActive = subscription.status === 'active';
+  const isTrialing = subscription.status === 'trialing';
+  const trialDays = subscription.trialEnd 
+    ? Math.max(0, Math.ceil((new Date(subscription.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -144,7 +144,7 @@ export function BillingDashboard() {
             Manage your subscription and billing details
           </p>
         </div>
-        <Button onClick={refresh} variant="outline" size="sm">
+        <Button onClick={refetch} variant="outline" size="sm">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -163,9 +163,10 @@ export function BillingDashboard() {
                   Update your payment method to continue.
                 </p>
               </div>
-              <Button onClick={manageBilling} size="sm" className="ml-auto">
+              {/* TODO: Implement manageBilling in useSubscription hook */}
+              {/* <Button onClick={manageBilling} size="sm" className="ml-auto">
                 Add Payment Method
-              </Button>
+              </Button> */}
             </div>
           </CardContent>
         </Card>
@@ -236,23 +237,26 @@ export function BillingDashboard() {
                   {isActive ? 'Active' : 'Inactive'}
                 </p>
               </div>
-              {subscription.cancelAtPeriodEnd && (
+              {/* TODO: Add cancelAtPeriodEnd property to SubscriptionData type */}
+              {/* {subscription.cancelAtPeriodEnd && (
                 <p className="text-sm text-destructive mt-1">
                   Cancels on{' '}
                   {format(new Date(subscription.currentPeriodEnd), 'MMM d')}
                 </p>
-              )}
+              )} */}
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-4 pt-4 border-t">
-            <Button onClick={manageBilling} variant="default">
+            {/* TODO: Implement manageBilling in useSubscription hook */}
+            {/* <Button onClick={manageBilling} variant="default">
               <CreditCard className="h-4 w-4 mr-2" />
               Manage Billing
-            </Button>
+            </Button> */}
 
-            {subscription.cancelAtPeriodEnd ? (
+            {/* TODO: Implement cancel/reactivate subscription features */}
+            {/* {subscription.cancelAtPeriodEnd ? (
               <Button
                 onClick={handleReactivate}
                 disabled={reactivating}
@@ -294,13 +298,14 @@ export function BillingDashboard() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-            )}
+            )} */}
           </div>
         </CardContent>
       </Card>
 
       {/* Billing History */}
-      <Card>
+      {/* TODO: Implement billingHistory in useSubscription hook */}
+      {/* <Card>
         <CardHeader>
           <CardTitle>Billing History</CardTitle>
           <CardDescription>
@@ -378,7 +383,7 @@ export function BillingDashboard() {
             </Table>
           )}
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 }

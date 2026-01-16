@@ -46,6 +46,7 @@ import {
   TASK_PRIORITY_LABELS,
 } from "@/types/routineTasks";
 import { ImageUpload } from "./ImageUpload";
+import { TaskActivityTimeline } from "./TaskActivityTimeline";
 
 interface TaskDetailViewProps {
   task: RoutineTask;
@@ -452,21 +453,14 @@ export function TaskDetailView({
             )}
           </div>
 
-          {/* Activity History Placeholder */}
+          {/* Activity History */}
           <Separator />
           <div>
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-              <History className="w-4 h-4" />
-              Activity History
-            </h3>
-            <Card className="border-dashed">
-              <CardContent className="flex flex-col items-center justify-center py-8">
-                <History className="w-8 h-8 text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Activity tracking coming soon
-                </p>
-              </CardContent>
-            </Card>
+            <TaskActivityTimeline 
+              taskId={task.id} 
+              limit={20}
+              showTitle={true}
+            />
           </div>
         </div>
 

@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { format, parseISO, startOfDay, addHours } from "date-fns";
+import { useMemo, useEffect, useRef, Fragment } from "react";
+import { format, parseISO, startOfDay, addHours, startOfWeek, endOfWeek } from "date-fns";
 import { Clock } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TimelineGrid } from "./TimelineGrid";
 import { TaskBlock } from "./TaskBlock";
 import { RoutineTask } from "@/types/routineTasks";
+import { expandAllRecurringTasks } from "@/utils/recurringTasks";
 
 interface TaskTimelineProps {
   tasks: RoutineTask[];
@@ -25,15 +26,22 @@ export function TaskTimeline({
   const now = new Date();
   const isToday = format(selectedDate, "yyyy-MM-dd") === format(now, "yyyy-MM-dd");
 
+  // Expand recurring tasks for the week view
+  const expandedTasks = useMemo(() => {
+    const weekStart = startOfWeek(selectedDate);
+    const weekEnd = endOfWeek(selectedDate);
+    return expandAllRecurringTasks(tasks, weekStart, weekEnd);
+  }, [tasks, selectedDate]);
+
   // Filter tasks for the selected date
   const dayTasks = useMemo(() => {
     const dateStr = format(selectedDate, "yyyy-MM-dd");
-    return tasks.filter((task) => {
+    return expandedTasks.filter((task) => {
       if (!task.scheduled_date) return false;
       const taskDateStr = format(parseISO(task.scheduled_date), "yyyy-MM-dd");
       return taskDateStr === dateStr;
     });
-  }, [tasks, selectedDate]);
+  }, [expandedTasks, selectedDate]);
 
   // Sort tasks by scheduled time
   const sortedTasks = useMemo(() => {
@@ -70,6 +78,15 @@ export function TaskTimeline({
     return groups;
   }, [sortedTasks]);
 
+  // Debug: Check container height
+  const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (containerRef.current) {
+      const height = containerRef.current.offsetHeight;
+      console.log('📏 Timeline container height:', height, 'px (expected: 1440px)');
+    }
+  }, []);
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -85,7 +102,7 @@ export function TaskTimeline({
       </CardHeader>
       <CardContent className="p-0">
         <ScrollArea className="w-full">
-          <div className="relative min-w-[800px]">
+          <div ref={containerRef} className="relative min-w-[800px] h-[1440px]">
             {/* Timeline Grid */}
             <TimelineGrid />
 
@@ -105,7 +122,7 @@ export function TaskTimeline({
             {/* Task Blocks */}
             <div className="absolute inset-0 z-10">
               {Array.from(tasksByHour.entries()).map(([hour, hourTasks]) => (
-                <div key={hour} className="relative">
+                <Fragment key={hour}>
                   {hourTasks.map((task, index) => {
                     const time = task.scheduled_time || "00:00";
                     const [hours, minutes] = time.split(":").map(Number);
@@ -118,10 +135,34 @@ export function TaskTimeline({
                     
                     // Offset multiple tasks at same hour horizontally
                     const leftOffset = index * 5;
+                    
+                    // Debug ONLY for task "aaaaaaa"
+                    if (task.title === "aaaaaaa") {
+                      console.log('🐛 DEBUG Task "aaaaaaa":', {
+                        scheduled_time: task.scheduled_time,
+                        time_parsed: time,
+                        hours_extracted: hours,
+                        minutes_extracted: minutes,
+                        totalMinutes: totalMinutes,
+                        topPosition: topPosition,
+                        topPosition_string: `${topPosition}%`,
+                        expected_pixels: `${(topPosition / 100) * 1440}px of 1440px`
+                      });
+                      console.log('🎨 Style being applied:', {
+                        position: "absolute",
+                        top: `${topPosition}%`,
+                        left: `${80 + leftOffset}px`,
+                        right: "16px",
+                        minHeight: `${Math.max(heightPercent, 2)}%`,
+                      });
+                    }
+
+                    // Generate unique key for React (task ID + scheduled date for recurring instances)
+                    const taskKey = `${task.id}_${task.scheduled_date}`;
 
                     return (
                       <TaskBlock
-                        key={task.id}
+                        key={taskKey}
                         task={task}
                         style={{
                           position: "absolute",
@@ -135,7 +176,7 @@ export function TaskTimeline({
                       />
                     );
                   })}
-                </div>
+                </Fragment>
               ))}
             </div>
 

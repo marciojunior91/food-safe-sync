@@ -9,9 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanEnforcement } from "@/hooks/usePlanEnforcement";
 import { CreateRecipeDialog } from "@/components/recipes/CreateRecipeDialog";
 import { PrepareRecipeDialog } from "@/components/recipes/PrepareRecipeDialog";
 import { RecipePrintButton } from "@/components/recipes/RecipePrintButton";
+import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { format } from "date-fns";
 import {
   AlertDialog,
@@ -65,6 +67,7 @@ export default function Recipes() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { role, isAdmin, isLeaderChef, loading: rolesLoading } = useUserRole();
+  const { checkRecipeLimit, upgradeModalProps } = usePlanEnforcement();
   const { toast } = useToast();
   
   // Check if user can manage recipes (admin or leader_chef)
@@ -81,6 +84,16 @@ export default function Recipes() {
       canManageRecipes: canManageRecipes
     });
   }, [user, role, rolesLoading, isAdmin, isLeaderChef, canManageRecipes]);
+
+  // Handle create recipe button click with limit check
+  const handleCreateRecipeClick = () => {
+    const currentCount = recipes.length;
+    if (!checkRecipeLimit(currentCount)) {
+      return; // Modal will show automatically
+    }
+    setRecipeToEdit(null);
+    setIsCreateDialogOpen(true);
+  };
 
   useEffect(() => {
     fetchRecipes();
@@ -239,10 +252,7 @@ export default function Recipes() {
           </p>
         </div>
         {canManageRecipes && (
-          <Button onClick={() => {
-            setRecipeToEdit(null);
-            setIsCreateDialogOpen(true);
-          }}>
+          <Button onClick={handleCreateRecipeClick}>
             <Plus className="w-4 h-4 mr-2" />
             Create Recipe
           </Button>
@@ -516,6 +526,9 @@ export default function Recipes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Upgrade Modal for Plan Limits */}
+      <UpgradeModal {...upgradeModalProps} />
     </div>
   );
 }

@@ -2,167 +2,210 @@
  * USE SUBSCRIPTION HOOK
  * 
  * React hook for managing subscription state
- * Fetches subscription data, billing history, and provides actions
+ * Uses SQL functions from user-first subscription model
+ * Provides plan limits, feature checks, and subscription management
  * 
- * Created: January 14, 2026
+ * Updated: January 14, 2026 - User-First Subscription Model
  */
 
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  getSubscription,
-  getBillingHistory,
-  cancelSubscription as cancelSubscriptionAPI,
-  reactivateSubscription as reactivateSubscriptionAPI,
-  openCustomerPortal,
-  type Subscription,
-  type BillingHistoryItem,
-} from '@/lib/stripe';
 import { toast } from 'sonner';
+
+// RPC Response Types
+interface SubscriptionRPCResponse {
+  id: string;
+  plan_type: 'starter' | 'professional' | 'enterprise' | 'free';
+  status: 'active' | 'trialing' | 'canceled' | 'past_due';
+  trial_end: string | null;
+  current_period_end: string | null;
+  organization_id: string | null;
+  has_organization: boolean;
+}
+
+interface PlanLimitsRPCResponse {
+  plan_type: string;
+  max_team_members: number;
+  max_recipes: number;
+  max_products: number;
+  max_suppliers: number;
+  has_allergen_management: boolean;
+  has_nutritional_calculator: boolean;
+  has_cost_control: boolean;
+  has_api_access: boolean;
+  has_priority_support: boolean;
+}
+
+export interface SubscriptionData {
+  id: string;
+  planType: 'starter' | 'professional' | 'enterprise' | 'free';
+  status: 'active' | 'trialing' | 'canceled' | 'past_due';
+  trialEnd: string | null;
+  currentPeriodEnd: string | null;
+  organizationId: string | null;
+  hasOrganization: boolean;
+}
+
+export interface PlanLimits {
+  planType: string;
+  maxTeamMembers: number;
+  maxRecipes: number;
+  maxProducts: number;
+  maxSuppliers: number;
+  hasAllergenManagement: boolean;
+  hasNutritionalCalculator: boolean;
+  hasCostControl: boolean;
+  hasApiAccess: boolean;
+  hasPrioritySupport: boolean;
+}
 
 export function useSubscription() {
   const { user } = useAuth();
-  const [organizationId, setOrganizationId] = useState<string | null>(null);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [billingHistory, setBillingHistory] = useState<BillingHistoryItem[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Get organization ID from user profile
-  useEffect(() => {
-    async function fetchOrganizationId() {
-      if (!user?.id) {
-        setOrganizationId(null);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('organization_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (error) throw error;
-        setOrganizationId(data?.organization_id || null);
-      } catch (err) {
-        console.error('Error fetching organization ID:', err);
-        setOrganizationId(null);
-      }
+  const fetchSubscription = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
     }
 
-    fetchOrganizationId();
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch user's subscription using SQL function
+      const { data: subDataRaw, error: subError } = await supabase
+        .rpc('get_user_subscription' as any, { p_user_id: user.id })
+        .maybeSingle();
+      
+      const subData = subDataRaw as SubscriptionRPCResponse | null;
+
+      if (subError && subError.code !== 'PGRST116') {
+        throw subError;
+      }
+
+      // Fetch plan limits using SQL function
+      const { data: limitsDataRaw, error: limitsError } = await supabase
+        .rpc('get_user_plan_limits' as any, { p_user_id: user.id })
+        .single();
+      
+      const limitsData = limitsDataRaw as PlanLimitsRPCResponse | null;
+
+      if (limitsError) {
+        console.warn('Failed to fetch plan limits:', limitsError);
+        // Use free plan limits as fallback
+        setPlanLimits({
+          planType: 'free',
+          maxTeamMembers: 1,
+          maxRecipes: 10,
+          maxProducts: 20,
+          maxSuppliers: 10,
+          hasAllergenManagement: false,
+          hasNutritionalCalculator: false,
+          hasCostControl: false,
+          hasApiAccess: false,
+          hasPrioritySupport: false,
+        });
+      } else if (limitsData) {
+        setPlanLimits({
+          planType: limitsData.plan_type,
+          maxTeamMembers: limitsData.max_team_members,
+          maxRecipes: limitsData.max_recipes,
+          maxProducts: limitsData.max_products,
+          maxSuppliers: limitsData.max_suppliers,
+          hasAllergenManagement: limitsData.has_allergen_management,
+          hasNutritionalCalculator: limitsData.has_nutritional_calculator,
+          hasCostControl: limitsData.has_cost_control,
+          hasApiAccess: limitsData.has_api_access,
+          hasPrioritySupport: limitsData.has_priority_support,
+        });
+      }
+
+      if (subData) {
+        setSubscription({
+          id: subData.id,
+          planType: subData.plan_type,
+          status: subData.status,
+          trialEnd: subData.trial_end,
+          currentPeriodEnd: subData.current_period_end,
+          organizationId: subData.organization_id,
+          hasOrganization: subData.has_organization,
+        });
+      } else {
+        // No subscription found - user is on free plan
+        setSubscription(null);
+      }
+    } catch (err: any) {
+      console.error('Error fetching subscription:', err);
+      setError(err.message || 'Failed to fetch subscription');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSubscription();
   }, [user?.id]);
 
-  // Fetch subscription data
-  useEffect(() => {
-    async function fetchData() {
-      if (!organizationId) {
-        setLoading(false);
-        return;
-      }
+  // Computed properties
+  const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
+  const isTrialing = subscription?.status === 'trialing';
+  const isFree = !subscription || planLimits?.planType === 'free';
 
-      try {
-        setLoading(true);
-        setError(null);
+  const trialDaysRemaining = isTrialing && subscription?.trialEnd
+    ? Math.max(0, Math.ceil((new Date(subscription.trialEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
 
-        const [subData, billingData] = await Promise.all([
-          getSubscription(organizationId),
-          getBillingHistory(organizationId),
-        ]);
+  const daysUntilRenewal = isActive && subscription?.currentPeriodEnd
+    ? Math.max(0, Math.ceil((new Date(subscription.currentPeriodEnd).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : null;
 
-        setSubscription(subData);
-        setBillingHistory(billingData);
-      } catch (err) {
-        console.error('Error fetching subscription:', err);
-        setError('Failed to load subscription data');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [organizationId]);
-
-  // Cancel subscription
-  const cancelSubscription = async () => {
-    if (!organizationId) {
-      toast.error('Organization not found');
-      return;
-    }
-
-    try {
-      const result = await cancelSubscriptionAPI(organizationId);
-      setSubscription(result);
-      toast.success('Subscription will be canceled at the end of the billing period');
-    } catch (err) {
-      console.error('Error canceling subscription:', err);
-      toast.error('Failed to cancel subscription. Please try again.');
-      throw err;
-    }
+  // Helper functions
+  const hasFeature = (feature: keyof PlanLimits): boolean => {
+    if (!planLimits) return false;
+    const value = planLimits[feature];
+    return typeof value === 'boolean' ? value : false;
   };
 
-  // Reactivate subscription
-  const reactivateSubscription = async () => {
-    if (!organizationId) {
-      toast.error('Organization not found');
-      return;
-    }
-
-    try {
-      const result = await reactivateSubscriptionAPI(organizationId);
-      setSubscription(result);
-      toast.success('Subscription reactivated successfully');
-    } catch (err) {
-      console.error('Error reactivating subscription:', err);
-      toast.error('Failed to reactivate subscription. Please try again.');
-      throw err;
-    }
+  const canAddTeamMember = (currentCount: number): boolean => {
+    if (!planLimits) return false;
+    return planLimits.maxTeamMembers === -1 || currentCount < planLimits.maxTeamMembers;
   };
 
-  // Open billing portal
-  const manageBilling = async () => {
-    if (!organizationId) {
-      toast.error('Organization not found');
-      return;
-    }
-
-    try {
-      await openCustomerPortal(organizationId);
-    } catch (err) {
-      console.error('Error opening billing portal:', err);
-      toast.error('Failed to open billing portal. Please try again.');
-      throw err;
-    }
+  const canAddRecipe = (currentCount: number): boolean => {
+    if (!planLimits) return false;
+    return planLimits.maxRecipes === -1 || currentCount < planLimits.maxRecipes;
   };
 
-  // Refresh subscription data
-  const refresh = async () => {
-    if (!organizationId) return;
+  const canAddProduct = (currentCount: number): boolean => {
+    if (!planLimits) return false;
+    return planLimits.maxProducts === -1 || currentCount < planLimits.maxProducts;
+  };
 
-    try {
-      const [subData, billingData] = await Promise.all([
-        getSubscription(organizationId),
-        getBillingHistory(organizationId),
-      ]);
-
-      setSubscription(subData);
-      setBillingHistory(billingData);
-    } catch (err) {
-      console.error('Error refreshing subscription:', err);
-      toast.error('Failed to refresh subscription data');
-    }
+  const canAddSupplier = (currentCount: number): boolean => {
+    if (!planLimits) return false;
+    return planLimits.maxSuppliers === -1 || currentCount < planLimits.maxSuppliers;
   };
 
   return {
     subscription,
-    billingHistory,
+    planLimits,
     loading,
     error,
-    cancelSubscription,
-    reactivateSubscription,
-    manageBilling,
-    refresh,
+    isActive,
+    isTrialing,
+    isFree,
+    trialDaysRemaining,
+    daysUntilRenewal,
+    refetch: fetchSubscription,
+    hasFeature,
+    canAddTeamMember,
+    canAddRecipe,
+    canAddProduct,
+    canAddSupplier,
   };
 }

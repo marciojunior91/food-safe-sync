@@ -95,6 +95,21 @@ export function QuickPrintCategoryView({
 
   // Render Categories View
   if (currentLevel === 'categories') {
+    if (categories.length === 0) {
+      return (
+        <div className={cn("text-center py-12", className)}>
+          <Package className="w-16 h-16 mx-auto mb-4 text-muted-foreground/30" />
+          <h3 className="text-lg font-semibold mb-2">No Categories Found</h3>
+          <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+            No label categories are available for your organization. Please contact your administrator or create categories in Settings.
+          </p>
+          <div className="text-xs text-muted-foreground/60">
+            Check browser console for details (F12)
+          </div>
+        </div>
+      );
+    }
+    
     return (
       <div className={cn("space-y-4", className)}>
         <p className="text-sm text-muted-foreground">

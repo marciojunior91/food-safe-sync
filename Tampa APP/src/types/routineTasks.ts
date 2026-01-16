@@ -107,6 +107,11 @@ export interface TaskAttachment {
 export interface CreateTaskInput {
   title: string;
   description?: string;
+  subtasks?: Array<{
+    id: string;
+    title: string;
+    completed: boolean;
+  }>;
   task_type: TaskType;
   priority?: TaskPriority;
   assigned_to?: string; // LEGACY: auth user_id - kept for backward compatibility
@@ -121,6 +126,11 @@ export interface CreateTaskInput {
 export interface UpdateTaskInput {
   title?: string;
   description?: string;
+  subtasks?: Array<{
+    id: string;
+    title: string;
+    completed: boolean;
+  }>;
   priority?: TaskPriority;
   status?: TaskStatus;
   assigned_to?: string; // LEGACY: auth user_id - kept for backward compatibility
@@ -169,4 +179,64 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   completed: 'Completed',
   overdue: 'Overdue',
   skipped: 'Skipped'
+};
+
+// ============================================================================
+// Task Activity Log Types
+// ============================================================================
+
+export type TaskActivityType =
+  | 'created'
+  | 'status_changed'
+  | 'assignment_changed'
+  | 'priority_changed'
+  | 'due_date_changed'
+  | 'title_updated'
+  | 'description_updated'
+  | 'note_added'
+  | 'attachment_added'
+  | 'attachment_removed'
+  | 'deleted';
+
+export interface TaskActivity {
+  id: string;
+  task_id: string;
+  organization_id: string;
+  activity_type: TaskActivityType;
+  performed_by?: string;
+  performed_by_name?: string;
+  field_name?: string;
+  old_value?: string;
+  new_value?: string;
+  notes?: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export const TASK_ACTIVITY_LABELS: Record<TaskActivityType, string> = {
+  created: 'Task Created',
+  status_changed: 'Status Changed',
+  assignment_changed: 'Assignment Changed',
+  priority_changed: 'Priority Changed',
+  due_date_changed: 'Due Date Changed',
+  title_updated: 'Title Updated',
+  description_updated: 'Description Updated',
+  note_added: 'Note Added',
+  attachment_added: 'Photo Added',
+  attachment_removed: 'Photo Removed',
+  deleted: 'Task Deleted'
+};
+
+export const TASK_ACTIVITY_ICONS: Record<TaskActivityType, string> = {
+  created: '✨',
+  status_changed: '🔄',
+  assignment_changed: '👤',
+  priority_changed: '⚡',
+  due_date_changed: '📅',
+  title_updated: '✏️',
+  description_updated: '📝',
+  note_added: '💬',
+  attachment_added: '📸',
+  attachment_removed: '🗑️',
+  deleted: '❌'
 };

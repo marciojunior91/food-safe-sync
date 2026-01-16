@@ -611,7 +611,7 @@ export default function Labeling() {
               </Badge>
             )}
           </Button>
-          <Button variant="hero" onClick={handleCreateLabel}>
+          <Button variant="hero" onClick={handleCreateLabel} className="text-white">
             <Plus className="w-4 h-4 mr-2" />
             New Label
           </Button>

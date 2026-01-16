@@ -24,6 +24,7 @@ import { AdminPanel } from "@/components/admin/AdminPanel";
 import { WasteTracker } from "@/components/analytics/WasteTracker";
 import { ComplianceReports } from "@/components/analytics/ComplianceReports";
 import { EfficiencyMetrics } from "@/components/analytics/EfficiencyMetrics";
+import { SubscriptionBadge } from "@/components/billing/SubscriptionBadge";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 
 export default function Dashboard() {
@@ -42,40 +43,42 @@ export default function Dashboard() {
     try {
       setLoading(true);
       
+      // TODO: Re-enable when prepared_items table is created
       // Fetch recent prepared items with recipe details
-      const { data: preparedItems, error } = await supabase
-        .from('prepared_items')
-        .select(`
-          *,
-          recipes:recipe_id (
-            name,
-            hold_time_days,
-            allergens
-          )
-        `)
-        .order('prepared_at', { ascending: false })
-        .limit(10);
+      // const { data: preparedItems, error } = await supabase
+      //   .from('prepared_items')
+      //   .select(`
+      //     *,
+      //     recipes:recipe_id (
+      //       name,
+      //       hold_time_days,
+      //       allergens
+      //     )
+      //   `)
+      //   .order('prepared_at', { ascending: false })
+      //   .limit(10);
 
-      if (error) throw error;
+      // if (error) throw error;
 
-      const processedActivity = preparedItems?.map(item => {
-        const recipe = item.recipes as any;
+      // const processedActivity = preparedItems?.map(item => {
+      //   const recipe = item.recipes as any;
         
-        // Calculate expiry based on hold time in days
-        const expiryDate = addDays(new Date(item.prepared_at), recipe.hold_time_days || 3);
-        const isExpiringSoon = isAfter(new Date(), addDays(expiryDate, -1)); // 1 day before expiry
-        const isExpired = isAfter(new Date(), expiryDate);
+      //   // Calculate expiry based on hold time in days
+      //   const expiryDate = addDays(new Date(item.prepared_at), recipe.hold_time_days || 3);
+      //   const isExpiringSoon = isAfter(new Date(), addDays(expiryDate, -1)); // 1 day before expiry
+      //   const isExpired = isAfter(new Date(), expiryDate);
 
-        return {
-          ...item,
-          recipe_name: recipe?.name || 'Unknown Recipe',
-          expiry_date: expiryDate,
-          status: isExpired ? 'expired' : isExpiringSoon ? 'expiring' : 'good',
-          allergens: recipe?.allergens || []
-        };
-      }) || [];
+      //   return {
+      //     ...item,
+      //     recipe_name: recipe?.name || 'Unknown Recipe',
+      //     expiry_date: expiryDate,
+      //     status: isExpired ? 'expired' : isExpiringSoon ? 'expiring' : 'good',
+      //     allergens: recipe?.allergens || []
+      //   };
+      // }) || [];
 
-      setRecentActivity(processedActivity);
+      // setRecentActivity(processedActivity);
+      setRecentActivity([]);
     } catch (error) {
       console.error('Error fetching recent activity:', error);
       toast({
@@ -90,14 +93,16 @@ export default function Dashboard() {
 
   const fetchWasteTotal = async () => {
     try {
-      const { data: wasteLogs, error } = await supabase
-        .from('waste_logs')
-        .select('estimated_cost');
+      // TODO: Re-enable when waste_logs table is created
+      // const { data: wasteLogs, error } = await supabase
+      //   .from('waste_logs')
+      //   .select('estimated_cost');
 
-      if (error) throw error;
+      // if (error) throw error;
 
-      const total = wasteLogs?.reduce((sum, log) => sum + (log.estimated_cost || 0), 0) || 0;
-      setTotalWaste(total);
+      // const total = wasteLogs?.reduce((sum, log) => sum + (log.estimated_cost || 0), 0) || 0;
+      // setTotalWaste(total);
+      setTotalWaste(0);
     } catch (error) {
       console.error('Error fetching waste total:', error);
     }
@@ -116,6 +121,11 @@ export default function Dashboard() {
         <div className="flex gap-3">
           <Button variant="hero">Generate Report</Button>
         </div>
+      </div>
+
+      {/* Subscription Badge */}
+      <div className="max-w-md">
+        <SubscriptionBadge />
       </div>
 
       {/* Active Alerts Dashboard */}

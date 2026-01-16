@@ -12,6 +12,7 @@ import { usePeople } from "@/hooks/usePeople";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useUserContext } from "@/hooks/useUserContext";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePlanEnforcement } from "@/hooks/usePlanEnforcement";
 import { UserFilters, UserProfile } from "@/types/people";
 import { TeamMember } from "@/types/teamMembers";
 import PeopleList from "@/components/people/PeopleList";
@@ -21,6 +22,7 @@ import EditUserDialog from "@/components/people/EditUserDialog";
 import { TeamMemberEditDialog } from "@/components/people/TeamMemberEditDialog";
 import CreateUserDialog from "@/components/people/CreateUserDialog";
 import CreateTeamMemberDialog from "@/components/people/CreateTeamMemberDialog";
+import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { Plus, RefreshCw, Users, Briefcase } from "lucide-react";
 
 export default function People() {
@@ -28,6 +30,7 @@ export default function People() {
   const { toast } = useToast();
   const { context, loading: contextLoading } = useUserContext();
   const { role, isAdmin, isManager, canManageTeamMembers } = useUserRole();
+  const { checkTeamMemberLimit, upgradeModalProps } = usePlanEnforcement();
   const [filters, setFilters] = useState<UserFilters>({});
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editingTeamMember, setEditingTeamMember] = useState<TeamMember | null>(null);
@@ -144,6 +147,24 @@ export default function People() {
     });
   };
 
+  // Handle add user button click with limit check
+  const handleAddUserClick = () => {
+    const currentCount = users.length;
+    if (!checkTeamMemberLimit(currentCount)) {
+      return; // Modal will show automatically
+    }
+    setCreateUserDialogOpen(true);
+  };
+
+  // Handle add team member button click with limit check
+  const handleAddTeamMemberClick = () => {
+    const currentCount = teamMembers.length;
+    if (!checkTeamMemberLimit(currentCount)) {
+      return; // Modal will show automatically
+    }
+    setCreateTeamMemberDialogOpen(true);
+  };
+
   if (contextLoading) {
     return (
       <div className="container mx-auto p-4 sm:p-6 space-y-6">
@@ -200,13 +221,13 @@ export default function People() {
           {canManageTeamMembers && (
             <>
               {activeTab === "users" && (
-                <Button onClick={() => setCreateUserDialogOpen(true)}>
+                <Button onClick={handleAddUserClick}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add User
                 </Button>
               )}
               {activeTab === "team" && (
-                <Button onClick={() => setCreateTeamMemberDialogOpen(true)}>
+                <Button onClick={handleAddTeamMemberClick}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Team Member
                 </Button>
@@ -402,6 +423,9 @@ export default function People() {
         onOpenChange={setCreateTeamMemberDialogOpen}
         onSuccess={handleCreateTeamMemberSuccess}
       />
+
+      {/* Upgrade Modal for Plan Limits */}
+      <UpgradeModal {...upgradeModalProps} />
     </div>
   );
 }

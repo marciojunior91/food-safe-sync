@@ -26,7 +26,7 @@ import DraftManagement from "./pages/DraftManagement";
 import LabelCategories from "./pages/LabelCategories";
 import UserProfile from "./components/people/UserProfile";
 import PricingPage from "./pages/PricingPage";
-import BillingPage from "./pages/BillingPage";
+import Billing from "./pages/Billing";
 
 const queryClient = new QueryClient();
 
@@ -62,7 +62,8 @@ const App = () => (
               
               {/* Billing & Pricing */}
               <Route path="pricing" element={<PricingPage />} />
-              <Route path="settings/billing" element={<BillingPage />} />
+              <Route path="billing" element={<Billing />} />
+              <Route path="settings/billing" element={<Billing />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

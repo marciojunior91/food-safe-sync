@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock } from "lucide-react";
+import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
@@ -470,41 +471,80 @@ export default function TasksOverview() {
       {viewMode === 'timeline' && (
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* Previous Day Button */}
               <Button
                 variant="outline"
+                size="icon"
                 onClick={() => {
                   const newDate = new Date(selectedDate);
                   newDate.setDate(newDate.getDate() - 1);
                   setSelectedDate(newDate);
                 }}
+                className="shrink-0"
               >
-                ← Previous Day
+                <ChevronLeft className="h-4 w-4" />
               </Button>
               
-              <div className="flex items-center gap-2">
+              {/* Center: Calendar Picker, Today Button, and Date Display */}
+              <div className="flex items-center gap-2 flex-wrap justify-center">
+                {/* Calendar Picker */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      <span className="hidden sm:inline">Select Date</span>
+                      <span className="sm:hidden">Date</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="center">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => date && setSelectedDate(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                {/* Today Button */}
                 <Button
-                  variant="outline"
+                  variant={format(selectedDate, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd") ? "default" : "outline"}
                   onClick={() => setSelectedDate(new Date())}
                 >
                   Today
                 </Button>
                 
-                <div className="text-center font-semibold">
+                {/* Selected Date Display */}
+                <div className="hidden md:block text-center font-semibold px-4 py-2 bg-muted rounded-md min-w-[200px]">
                   {format(selectedDate, "PPP")}
                 </div>
               </div>
               
+              {/* Next Day Button */}
               <Button
                 variant="outline"
+                size="icon"
                 onClick={() => {
                   const newDate = new Date(selectedDate);
                   newDate.setDate(newDate.getDate() + 1);
                   setSelectedDate(newDate);
                 }}
+                className="shrink-0"
               >
-                Next Day →
+                <ChevronRight className="h-4 w-4" />
               </Button>
+            </div>
+            
+            {/* Mobile Date Display (shown only on small screens) */}
+            <div className="md:hidden mt-4 text-center font-semibold text-sm text-muted-foreground">
+              {format(selectedDate, "PPP")}
             </div>
           </CardContent>
         </Card>
