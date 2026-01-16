@@ -74,7 +74,7 @@ export function AdminPanel() {
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Assigned Roles</p>
                 <div className="flex flex-wrap gap-2">
-                  {roles.length > 0 ? roles.map(role => <Badge key={role} variant={role === 'admin' ? 'default' : 'secondary'} className="flex items-center gap-1">
+                  {roles && roles.length > 0 ? roles.map(role => <Badge key={role} variant={role === 'admin' ? 'default' : 'secondary'} className="flex items-center gap-1">
                         <Shield className="w-3 h-3" />
                         {role}
                       </Badge>) : <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -101,7 +101,7 @@ export function AdminPanel() {
                 </p>
               </div>}
 
-            {!roles.length && <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            {(!roles || !roles.length) && <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-amber-800 text-sm">
                   <strong>Note:</strong> You don't have any roles assigned yet. Contact an administrator to assign you a role.
                 </p>
