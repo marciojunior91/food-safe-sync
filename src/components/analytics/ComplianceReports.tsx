@@ -25,10 +25,30 @@ export function ComplianceReports() {
   }, []);
   const fetchData = async () => {
     const {
-      data: checks
+      data: checks,
+      error
     } = await supabase.from("compliance_checks").select("*").order("checked_at", {
       ascending: false
     }).limit(5);
+    
+    if (error) {
+      // Handle case where table doesn't exist (PGRST205 error)
+      if (error.code === 'PGRST205') {
+        console.warn('compliance_checks table not found in database schema');
+        setRecentChecks([]);
+        setSummary({
+          total_checks: 0,
+          passed_count: 0,
+          failed_count: 0,
+          needs_attention_count: 0
+        });
+        return;
+      }
+      console.error('Error fetching compliance checks:', error);
+      setRecentChecks([]);
+      return;
+    }
+    
     if (checks) {
       setRecentChecks(checks);
       const totalChecks = checks.length;

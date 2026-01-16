@@ -93,17 +93,27 @@ export default function ExpiryAlerts() {
         ascending: true
       });
       if (error) {
+        // Handle case where table doesn't exist (PGRST205 error)
+        if (error.code === 'PGRST205') {
+          console.warn('prepared_items table not found in database schema');
+          setPreparedItems([]);
+          setLoading(false);
+          return;
+        }
         console.error('Error fetching prepared items:', error);
+        setPreparedItems([]);
         toast({
           title: "Error",
           description: "Failed to fetch prepared items",
           variant: "destructive"
         });
+        setLoading(false);
         return;
       }
       setPreparedItems(data || []);
     } catch (error) {
       console.error('Error:', error);
+      setPreparedItems([]);
       toast({
         title: "Error",
         description: "Failed to fetch prepared items",
@@ -141,5 +151,63 @@ export default function ExpiryAlerts() {
         </CardContent>
       </Card>;
   }
-  return;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="w-5 h-5" />
+          Expiry Alerts
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {/* Summary */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 bg-destructive/10 rounded-lg">
+              <div className="text-2xl font-bold text-destructive">{expiredCount}</div>
+              <div className="text-xs text-muted-foreground">Expired</div>
+            </div>
+            <div className="text-center p-3 bg-warning/10 rounded-lg">
+              <div className="text-2xl font-bold text-warning">{warningCount}</div>
+              <div className="text-xs text-muted-foreground">Expiring Soon</div>
+            </div>
+            <div className="text-center p-3 bg-success/10 rounded-lg">
+              <div className="text-2xl font-bold text-success">{soonCount}</div>
+              <div className="text-xs text-muted-foreground">Within 3 Days</div>
+            </div>
+          </div>
+
+          {/* Items List */}
+          <div className="space-y-2">
+            {filteredItems.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No items expiring within the next 3 days
+              </p>
+            ) : (
+              filteredItems.map(item => {
+                const expiryStatus = getExpiryStatus(item.expires_at);
+                const recipe = item.recipes as any;
+                
+                return (
+                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(expiryStatus.status)}
+                      <div>
+                        <p className="text-sm font-medium">{recipe?.name || 'Unknown Item'}</p>
+                        <p className="text-xs text-muted-foreground">{expiryStatus.message}</p>
+                      </div>
+                    </div>
+                    <Badge variant={getStatusBadgeVariant(expiryStatus.status)}>
+                      {expiryStatus.status}
+                    </Badge>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }

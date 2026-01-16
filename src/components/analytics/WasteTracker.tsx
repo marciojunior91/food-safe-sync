@@ -35,7 +35,20 @@ export function WasteTracker() {
     } = await supabase.from("waste_logs").select("*").order("logged_at", {
       ascending: false
     }).limit(10);
-    if (!error && data) {
+    
+    if (error) {
+      // Handle case where table doesn't exist (PGRST205 error)
+      if (error.code === 'PGRST205') {
+        console.warn('waste_logs table not found in database schema');
+        setLogs([]);
+        return;
+      }
+      console.error('Error fetching waste logs:', error);
+      setLogs([]);
+      return;
+    }
+    
+    if (data) {
       setLogs(data);
     }
   };

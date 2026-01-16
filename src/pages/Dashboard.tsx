@@ -56,7 +56,16 @@ export default function Dashboard() {
         .order('prepared_at', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        // Handle case where table doesn't exist (PGRST205 error)
+        if (error.code === 'PGRST205') {
+          console.warn('prepared_items table not found in database schema');
+          setRecentActivity([]);
+          setLoading(false);
+          return;
+        }
+        throw error;
+      }
 
       const processedActivity = preparedItems?.map(item => {
         const recipe = item.recipes as any;
@@ -78,6 +87,7 @@ export default function Dashboard() {
       setRecentActivity(processedActivity);
     } catch (error) {
       console.error('Error fetching recent activity:', error);
+      setRecentActivity([]);
       toast({
         title: "Error",
         description: "Failed to fetch recent activity",
@@ -94,12 +104,21 @@ export default function Dashboard() {
         .from('waste_logs')
         .select('estimated_cost');
 
-      if (error) throw error;
+      if (error) {
+        // Handle case where table doesn't exist (PGRST205 error)
+        if (error.code === 'PGRST205') {
+          console.warn('waste_logs table not found in database schema');
+          setTotalWaste(0);
+          return;
+        }
+        throw error;
+      }
 
       const total = wasteLogs?.reduce((sum, log) => sum + (log.estimated_cost || 0), 0) || 0;
       setTotalWaste(total);
     } catch (error) {
       console.error('Error fetching waste total:', error);
+      setTotalWaste(0);
     }
   };
 

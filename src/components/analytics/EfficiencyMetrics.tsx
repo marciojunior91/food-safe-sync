@@ -26,7 +26,21 @@ export function EfficiencyMetrics() {
       .select("*")
       .limit(5);
 
-    if (!error && data) {
+    if (error) {
+      // Handle case where view doesn't exist (PGRST205 error)
+      if (error.code === 'PGRST205') {
+        console.warn('efficiency_analytics view not found in database schema');
+        setMetrics([]);
+        setLoading(false);
+        return;
+      }
+      console.error('Error fetching efficiency metrics:', error);
+      setMetrics([]);
+      setLoading(false);
+      return;
+    }
+
+    if (data) {
       setMetrics(data);
     }
     setLoading(false);
