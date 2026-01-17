@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Food Service SaaS Design System - Professional, clean, food industry focused */
+
+@layer base {
+  :root {
+    /* Core brand colors - Tampa Orange Primary */
+    --primary: 22 95% 55%;         /* Tampa orange - vibrant & energetic */
+    --primary-light: 22 95% 65%;   /* Lighter orange for hover states */
+    --primary-foreground: 0 0% 100%;
+
+    /* Secondary colors - Complementary Deep Blue */
+    --secondary: 213 50% 35%;      /* Deep blue - professional contrast */
+    --secondary-light: 213 50% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Alert & warning colors */
+    --warning: 38 92% 50%;         /* Amber - alerts & warnings */
+    --warning-light: 38 92% 60%;
+    --warning-foreground: 0 0% 100%;
+    
+    --success: 142 76% 36%;        /* Green for success states */
+    --success-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;      /* Red for errors */
+    --destructive-foreground: 0 0% 100%;
+
+    /* Neutral palette - Clean whites with orange accents */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;        /* Almost black for contrast */
+    
+    --card: 0 0% 99%;              /* Slightly off-white for depth */
+    --card-foreground: 0 0% 10%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    --muted: 22 30% 96%;           /* Warm light orange tint */
+    --muted-foreground: 22 10% 40%;
+    
+    --accent: 22 100% 96%;         /* Light orange accent */
+    --accent-foreground: 22 95% 35%;
+    
+    --border: 22 20% 90%;          /* Warm neutral borders */
+    --input: 22 20% 92%;
+    --ring: 22 95% 55%;            /* Orange focus ring */
+
+    /* Gradients - Orange themed */
+    --gradient-primary: linear-gradient(135deg, hsl(22 95% 55%), hsl(22 95% 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(22 95% 45%), hsl(22 95% 55%));
+    --gradient-hero: linear-gradient(135deg, hsl(22 95% 55%) 0%, hsl(22 95% 70%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(22 100% 98% / 0.8), hsl(22 50% 96% / 0.4));
+
+    /* Shadows - Warm orange tint */
+    --shadow-card: 0 1px 3px 0 hsl(22 40% 20% / 0.08), 0 1px 2px 0 hsl(22 40% 20% / 0.05);
+    --shadow-card-hover: 0 4px 6px -1px hsl(22 60% 40% / 0.15), 0 2px 4px -1px hsl(22 60% 40% / 0.08);
+    --shadow-modal: 0 20px 25px -5px hsl(22 40% 20% / 0.12), 0 10px 10px -5px hsl(22 40% 20% / 0.06);
+
+    --radius: 0.5rem;
+
+    /* Sidebar - Orange accent theme */
+    --sidebar-background: 22 50% 98%;
+    --sidebar-foreground: 0 0% 15%;
+    --sidebar-primary: 22 95% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 22 80% 96%;
+    --sidebar-accent-foreground: 22 95% 35%;
+    --sidebar-border: 22 20% 90%;
+    --sidebar-ring: 22 95% 55%;
+  }
+
+  .dark {
+    /* Dark theme - Black with orange accents */
+    --background: 0 0% 8%;         /* Deep black background */
+    --foreground: 0 0% 98%;        /* Almost white text */
+
+    --card: 0 0% 10%;              /* Slightly lighter black for cards */
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 22 95% 60%;         /* Bright orange - stands out on dark */
+    --primary-light: 22 95% 70%;
+    --primary-foreground: 0 0% 10%;
+
+    --secondary: 22 95% 55%;       /* Consistent orange */
+    --secondary-light: 22 95% 65%;
+    --secondary-foreground: 0 0% 10%;
+
+    --muted: 0 0% 15%;             /* Dark muted */
+    --muted-foreground: 22 15% 70%;
+
+    --accent: 0 0% 15%;            /* Dark accent */
+    --accent-foreground: 22 95% 60%;
+
+    --border: 22 10% 20%;          /* Dark borders with orange hint */
+    --input: 22 10% 18%;
+    --ring: 22 95% 60%;            /* Orange focus ring */
+
+    --warning: 38 92% 55%;
+    --warning-light: 38 92% 65%;
+    --warning-foreground: 0 0% 10%;
+
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 10%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 10%;
+
+    /* Gradients - Dark with orange glow */
+    --gradient-primary: linear-gradient(135deg, hsl(22 95% 60%), hsl(22 95% 50%));
+    --gradient-secondary: linear-gradient(135deg, hsl(22 95% 50%), hsl(22 95% 40%));
+    --gradient-hero: linear-gradient(135deg, hsl(0 0% 8%) 0%, hsl(22 95% 20%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(22 40% 12% / 0.6), hsl(22 40% 10% / 0.3));
+
+    /* Shadows - Orange glow on dark */
+    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.3), 0 1px 2px 0 hsl(22 95% 60% / 0.05);
+    --shadow-card-hover: 0 4px 6px -1px hsl(22 95% 60% / 0.2), 0 2px 4px -1px hsl(22 95% 60% / 0.1);
+    --shadow-modal: 0 20px 25px -5px hsl(0 0% 0% / 0.4), 0 10px 10px -5px hsl(22 95% 60% / 0.08);
+
+    /* Sidebar - Dark with orange highlights */
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 90%;
+    --sidebar-primary: 22 95% 60%;
+    --sidebar-primary-foreground: 0 0% 10%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 22 95% 60%;
+    --sidebar-border: 22 10% 20%;
+    --sidebar-ring: 22 95% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
