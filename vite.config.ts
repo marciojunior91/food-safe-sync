@@ -2,19 +2,32 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { copyFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 
-// Plugin to create 200.html in dist for SPA routing (Vercel standard)
-const vercelSpaPlugin = () => ({
-  name: 'vercel-spa-plugin',
+// Plugin to create Vercel Build Output API configuration for SPA routing
+const vercelBuildOutputPlugin = () => ({
+  name: 'vercel-build-output',
   closeBundle() {
-    const indexPath = path.resolve(__dirname, 'dist', 'index.html');
-    const fallbackPath = path.resolve(__dirname, 'dist', '200.html');
+    const outputDir = path.resolve(__dirname, '.vercel', 'output');
+    const configPath = path.resolve(outputDir, 'config.json');
+    
     try {
-      copyFileSync(indexPath, fallbackPath);
-      console.log('✅ Created 200.html for Vercel SPA routing');
+      // Create .vercel/output directory
+      mkdirSync(outputDir, { recursive: true });
+      
+      // Create config.json with SPA routing configuration
+      const config = {
+        version: 3,
+        routes: [
+          { handle: "filesystem" },
+          { src: "/(.*)", dest: "/index.html" }
+        ]
+      };
+      
+      writeFileSync(configPath, JSON.stringify(config, null, 2));
+      console.log('✅ Created Vercel Build Output API config for SPA routing');
     } catch (err) {
-      console.error('❌ Failed to create 200.html:', err);
+      console.error('❌ Failed to create Vercel config:', err);
     }
   }
 });
@@ -29,7 +42,7 @@ export default defineConfig(({ mode }) => ({
     react(),
     mode === 'development' &&
     componentTagger(),
-    vercelSpaPlugin(),
+    vercelBuildOutputPlugin(),
   ].filter(Boolean),
   resolve: {
     alias: {
