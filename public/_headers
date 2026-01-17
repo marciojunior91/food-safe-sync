@@ -1,0 +1,17 @@
+/*
+  X-Robots-Tag: all
+
+/labeling
+  X-Content-Type-Options: nosniff
+  
+/recipes
+  X-Content-Type-Options: nosniff
+
+/inventory
+  X-Content-Type-Options: nosniff
+
+/people  
+  X-Content-Type-Options: nosniff
+
+/routine-tasks
+  X-Content-Type-Options: nosniff
