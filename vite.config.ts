@@ -4,26 +4,19 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { writeFileSync } from "fs";
 
-// Plugin to create vercel.json in dist for SPA routing
+// Plugin to create 200.html in dist for SPA routing (Vercel standard)
 const vercelSpaPlugin = () => ({
   name: 'vercel-spa-plugin',
   closeBundle() {
-    const vercelConfig = {
-      routes: [
-        {
-          src: "/assets/(.*)",
-          dest: "/assets/$1"
-        },
-        {
-          src: "/(.*)",
-          dest: "/index.html"
-        }
-      ]
-    };
-    writeFileSync(
-      path.resolve(__dirname, 'dist', 'vercel.json'),
-      JSON.stringify(vercelConfig, null, 2)
-    );
+    const indexPath = path.resolve(__dirname, 'dist', 'index.html');
+    const fallbackPath = path.resolve(__dirname, 'dist', '200.html');
+    const { copyFileSync } = require('fs');
+    try {
+      copyFileSync(indexPath, fallbackPath);
+      console.log('✅ Created 200.html for Vercel SPA routing');
+    } catch (err) {
+      console.error('❌ Failed to create 200.html:', err);
+    }
   }
 });
 
