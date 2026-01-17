@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd 'Tampa APP' && npm install && npm run build",
+  "buildCommand": "cd 'Tampa APP' && npm run build",
   "outputDirectory": "Tampa APP/dist",
   "installCommand": "cd 'Tampa APP' && npm install",
   "rewrites": [
