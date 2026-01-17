@@ -208,9 +208,9 @@ export function StaffManagement() {
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background opacity-100">
                   {staffRoles.map((role) => (
-                    <SelectItem key={role} value={role}>{role}</SelectItem>
+                    <SelectItem key={role} value={role} className="bg-background opacity-100">{role}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

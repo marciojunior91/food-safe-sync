@@ -1,28 +1,47 @@
+// ============================================================================
+// UserSelectionDialog - Team Member Selection for Shared Tablets
+// ============================================================================
+// This component allows users to select their team member identity on shared
+// tablet accounts. It's used in:
+// - Labeling module (who is preparing the product)
+// - Routine tasks module (who is assigned/completing tasks)
+// - Any operational workflow requiring individual identity tracking
+//
+// Authentication Flow:
+// Layer 1: Shared account already logged in (e.g., cook@restaurant.com)
+// Layer 2: Individual selects their team_member (e.g., "João Silva - Cook")
+// ============================================================================
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, User } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Search, User, CheckCircle2, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
-interface UserProfile {
-  id: string;
-  user_id: string;
-  display_name: string | null;
-  position: string | null;
-}
+import type { TeamMember } from "@/types/teamMembers";
+import { TEAM_MEMBER_ROLE_LABELS, TEAM_MEMBER_ROLE_COLORS } from "@/types/teamMembers";
 
 interface UserSelectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelectUser: (user: UserProfile) => void;
+  onSelectUser: (user: TeamMember) => void;
   organizationId?: string; // Optional: if provided, skip auth check
+  title?: string; // Optional: custom title
+  description?: string; // Optional: custom description
 }
 
-export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organizationId }: UserSelectionDialogProps) {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+export function UserSelectionDialog({ 
+  open, 
+  onOpenChange, 
+  onSelectUser, 
+  organizationId,
+  title = "Select Team Member",
+  description = "Choose who is preparing this product"
+}: UserSelectionDialogProps) {
+  const [users, setUsers] = useState<TeamMember[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -51,7 +70,7 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
           throw new Error("Not authenticated and no organization_id provided");
         }
 
-        console.log("Current user ID:", user.id);
+        console.log("[UserSelectionDialog] Current user ID:", user.id);
 
         const { data: currentProfile, error: profileError } = await supabase
           .from("profiles")
@@ -60,11 +79,11 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
           .maybeSingle();
 
         if (profileError) {
-          console.error("Profile error:", profileError);
+          console.error("[UserSelectionDialog] Profile error:", profileError);
           throw new Error(`Failed to fetch profile: ${profileError.message}`);
         }
 
-        console.log("Current profile organization_id:", currentProfile?.organization_id);
+        console.log("[UserSelectionDialog] Current profile organization_id:", currentProfile?.organization_id);
 
         if (!currentProfile?.organization_id) {
           toast({
@@ -79,34 +98,35 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
         orgId = currentProfile.organization_id;
       }
 
-      console.log("Fetching users for organization_id:", orgId);
+      console.log("[UserSelectionDialog] Fetching team members for organization_id:", orgId);
 
-      // Direct database query - secure with RLS policies
+      // Fetch active team members - secure with RLS policies
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, user_id, display_name, position')
+        .from('team_members')
+        .select('*')
         .eq('organization_id', orgId)
+        .eq('is_active', true)
         .order('display_name', { ascending: true });
 
       if (error) {
-        console.error("Error fetching users:", error);
-        throw new Error(`Failed to fetch users: ${error.message}`);
+        console.error("[UserSelectionDialog] Error fetching team members:", error);
+        throw new Error(`Failed to fetch team members: ${error.message}`);
       }
 
-      console.log("Fetched users:", data);
+      console.log("[UserSelectionDialog] Fetched team members:", data);
       setUsers(data || []);
       
       if (!data || data.length === 0) {
         toast({
-          title: "No Users Found",
-          description: "No users found in your organization. Make sure user profiles are created.",
+          title: "No Team Members Found",
+          description: "No active team members found in your organization. Please add team members first.",
         });
       }
     } catch (error) {
-      console.error("Error fetching users:", error);
+      console.error("[UserSelectionDialog] Error fetching team members:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load users",
+        description: error instanceof Error ? error.message : "Failed to load team members",
         variant: "destructive",
       });
     } finally {
@@ -116,10 +136,11 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
 
   const filteredUsers = users.filter(user => 
     user.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.position?.toLowerCase().includes(searchTerm.toLowerCase())
+    user.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSelectUser = (user: UserProfile) => {
+  const handleSelectUser = (user: TeamMember) => {
     onSelectUser(user);
     onOpenChange(false);
   };
@@ -134,13 +155,20 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
       .substring(0, 2);
   };
 
+  const getProfileCompletionIcon = (member: TeamMember) => {
+    if (member.profile_complete) {
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    }
+    return <AlertCircle className="h-4 w-4 text-amber-500" />;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Select User</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Choose who is preparing this product
+            {description}
           </DialogDescription>
         </DialogHeader>
 
@@ -148,7 +176,7 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name or position..."
+              placeholder="Search by name, position, or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -157,9 +185,11 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
 
           <div className="max-h-[400px] overflow-y-auto space-y-2">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">Loading users...</div>
+              <div className="text-center py-8 text-muted-foreground">Loading team members...</div>
             ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No users found</div>
+              <div className="text-center py-8 text-muted-foreground">
+                {searchTerm ? "No team members found matching your search" : "No team members found"}
+              </div>
             ) : (
               filteredUsers.map(user => (
                 <button
@@ -173,10 +203,25 @@ export function UserSelectionDialog({ open, onOpenChange, onSelectUser, organiza
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left">
-                    <p className="font-medium">{user.display_name || "No name"}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium">{user.display_name || "No name"}</p>
+                      {getProfileCompletionIcon(user)}
+                    </div>
                     {user.position && (
                       <p className="text-sm text-muted-foreground">{user.position}</p>
                     )}
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge
+                        variant="secondary"
+                        className="text-xs"
+                        style={{
+                          backgroundColor: TEAM_MEMBER_ROLE_COLORS[user.role_type] + '20',
+                          color: TEAM_MEMBER_ROLE_COLORS[user.role_type],
+                        }}
+                      >
+                        {TEAM_MEMBER_ROLE_LABELS[user.role_type]}
+                      </Badge>
+                    </div>
                   </div>
                 </button>
               ))

@@ -3,23 +3,57 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { TeamMember } from "@/types/teamMembers";
 import { 
   Printer, 
   Save, 
   X, 
   Package,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  ArrowLeft,
+  Plus,
+  Eye,
+  EyeOff,
+  ZoomIn,
+  ZoomOut,
+  Minus
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { LabelPreview } from "./LabelPreview";
+import { LabelPreviewCanvas, type LabelFormat, type PreviewScale } from "./LabelPreviewCanvas";
+import { AllergenSelectorEnhanced } from "./AllergenSelectorEnhanced";
+import { DuplicateProductWarning } from "./DuplicateProductWarning";
+import { useAllergens } from "@/hooks/useAllergens";
+import { useDuplicateDetection } from "@/hooks/useDuplicateDetection";
+import { usePrinter } from "@/hooks/usePrinter";
+import { usePrintQueue } from "@/hooks/usePrintQueue";
+import { saveLabelToDatabase } from "@/utils/zebraPrinter";
+import { Settings } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 
 export interface LabelData {
+  labelId?: string; // UUID from printed_labels table - for lifecycle tracking
   categoryId: string;
   categoryName: string;
+  subcategoryId?: string;
+  subcategoryName?: string;
   productId: string;
   productName: string;
   condition: string;
@@ -29,31 +63,54 @@ export interface LabelData {
   expiryDate: string;
   quantity: string;
   unit: string;
+  batchNumber: string;
+  allergens?: Array<{
+    id: string;
+    name: string;
+    icon: string | null;
+    severity: string;
+  }>;
+  organizationDetails?: {
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    foodSafetyRegistration?: string;
+  };
 }
 
 interface LabelFormProps {
   onSave?: (data: LabelData) => void;
   onPrint?: (data: LabelData) => void;
   onCancel?: () => void;
-  selectedUser?: {
-    id: string;
-    user_id: string;
-    display_name: string | null;
-  };
+  selectedUser?: TeamMember;
 }
 
 interface Category {
   id: string;
   name: string;
+  icon?: string | null;
 }
 
 interface Product {
   id: string;
   name: string;
+  category_id: string | null;
+  subcategory_id?: string | null;
   measuring_unit_id: string | null;
   measuring_units?: {
     name: string;
     abbreviation: string;
+  };
+  label_categories?: {
+    id: string;
+    name: string;
+    icon?: string | null;
+  };
+  label_subcategories?: {
+    id: string;
+    name: string;
+    icon?: string | null;
   };
 }
 
@@ -67,76 +124,527 @@ const CONDITIONS = [
 
 export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelFormProps) {
   const { toast } = useToast();
+  const { updateProductAllergens } = useAllergens();
+  const { user } = useAuth();
+  const { print, printer, settings, changePrinter, availablePrinters, isLoading: isPrinting } = usePrinter();
+  const { addToQueue } = usePrintQueue();
+  
+  // Organization ID fetched from user profile
+  const [organizationId, setOrganizationId] = useState<string>("");
+  
   const [categories, setCategories] = useState<Category[]>([]);
+  
+  // Separate subcategory states for main form and dialog
+  const [formSubcategories, setFormSubcategories] = useState<{ id: string; name: string; icon?: string | null }[]>([]);
+  const [loadingFormSubcategories, setLoadingFormSubcategories] = useState(false);
+  const [dialogSubcategories, setDialogSubcategories] = useState<{ id: string; name: string; icon?: string | null }[]>([]);
+  const [loadingDialogSubcategories, setLoadingDialogSubcategories] = useState(false);
+  
   const [products, setProducts] = useState<Product[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [categorySearch, setCategorySearch] = useState("");
   const [openCategory, setOpenCategory] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
   const [openCondition, setOpenCondition] = useState(false);
+  
+  // Allergen state
+  const [selectedAllergenIds, setSelectedAllergenIds] = useState<string[]>([]);
+  
+  // New category creation states
+  const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
+  // New product creation states
+  const [showCreateProductDialog, setShowCreateProductDialog] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductCategory, setNewProductCategory] = useState("");
+  const [newProductSubcategory, setNewProductSubcategory] = useState("");
+  const [creatingProduct, setCreatingProduct] = useState(false);
+
+  // Draft saving states
+  const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
+  
+  // Canvas preview states
+  const [showCanvasPreview, setShowCanvasPreview] = useState(false);
+  const [previewScale, setPreviewScale] = useState<PreviewScale>(1);
+  
+  // Organization details for label preview
+  const [organizationDetails, setOrganizationDetails] = useState<{
+    name: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+    foodSafetyRegistration?: string;
+  }>();
+  
+  // Duplicate detection for new product creation (only active when organizationId is loaded)
+  const {
+    similarProducts,
+    isLoading: isDuplicateCheckLoading,
+    isDuplicate,
+    error: duplicateCheckError,
+    checkDuplicate
+  } = useDuplicateDetection({
+    productName: newProductName,
+    organizationId: organizationId,
+    minSimilarity: 0.3, // 30% similarity threshold for suggestions
+    debounceMs: 500
+  });
+
+  const filteredCategories = categories.filter(category => 
+    category.name.toLowerCase().includes(categorySearch.toLowerCase())
+  );
 
   const today = new Date().toISOString().split('T')[0];
 
   const [labelData, setLabelData] = useState<LabelData>({
     categoryId: "",
     categoryName: "",
+    subcategoryId: "",
+    subcategoryName: "",
     productId: "",
     productName: "",
     condition: "",
-    preparedBy: selectedUser?.user_id || "",
+    preparedBy: selectedUser?.auth_role_id || user?.id || "", // ✅ Use auth_role_id or fallback to current user
     preparedByName: selectedUser?.display_name || "",
     prepDate: today,
     expiryDate: "",
     quantity: "",
-    unit: ""
+    unit: "",
+    batchNumber: ""
   });
 
+  // Fetch organization_id from user profile
   useEffect(() => {
-    if (selectedUser) {
-      setLabelData(prev => ({
-        ...prev,
-        preparedBy: selectedUser.user_id,
-        preparedByName: selectedUser.display_name || ""
-      }));
-    }
-  }, [selectedUser]);
+    const fetchOrganizationId = async () => {
+      if (!user?.id) return;
+      
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('user_id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (profile?.organization_id) {
+          setOrganizationId(profile.organization_id);
+          
+          // Fetch organization details for label preview
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('name, address, phone, email, food_safety_registration')
+            .eq('id', profile.organization_id)
+            .single();
+          
+          if (orgData) {
+            setOrganizationDetails({
+              name: orgData.name,
+              address: typeof orgData.address === 'string' 
+                ? orgData.address 
+                : orgData.address 
+                  ? JSON.stringify(orgData.address) 
+                  : undefined,
+              phone: orgData.phone || undefined,
+              email: orgData.email || undefined,
+              foodSafetyRegistration: orgData.food_safety_registration || undefined,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching organization_id:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load organization information",
+          variant: "destructive"
+        });
+      }
+    };
+    
+    fetchOrganizationId();
+  }, [user, toast]);
 
   useEffect(() => {
-    fetchCategories();
-    fetchProducts();
-  }, []);
+    const updatePreparedBy = async () => {
+      if (selectedUser) {
+        let userId = selectedUser.auth_role_id;
+        
+        // Fallback: if team member doesn't have auth_role_id, use current logged-in user
+        if (!userId && user?.id) {
+          userId = user.id;
+          console.warn(`Team member ${selectedUser.display_name} (${selectedUser.id}) is not linked to a user account. Using current user as fallback.`);
+        }
+        
+        setLabelData(prev => ({
+          ...prev,
+          preparedBy: userId || "",
+          preparedByName: selectedUser.display_name || ""
+        }));
+      }
+    };
+    
+    updatePreparedBy();
+  }, [selectedUser, user]);
+
+  useEffect(() => {
+    if (organizationId) {
+      fetchCategories();
+    }
+  }, [organizationId]);
+
+  // Fetch subcategories for MAIN FORM when category changes
+  useEffect(() => {
+    const fetchFormSubcategories = async () => {
+      if (!labelData.categoryId || labelData.categoryId === "all") {
+        setFormSubcategories([]);
+        return;
+      }
+
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching subcategories");
+        return;
+      }
+
+      try {
+        setLoadingFormSubcategories(true);
+        const { data, error } = await supabase
+          .from("label_subcategories")
+          .select("id, name")
+          .eq("category_id", labelData.categoryId)
+          .eq('organization_id', organizationId)
+          .order("name");
+
+        if (error) throw error;
+        
+        // Defensive: Ensure data is valid
+        const validSubcategories = (data || []).filter(sub => 
+          sub && typeof sub.id === 'string' && typeof sub.name === 'string'
+        );
+        
+        setFormSubcategories(validSubcategories);
+      } catch (error) {
+        console.error("Error fetching form subcategories:", error);
+        setFormSubcategories([]);
+      } finally {
+        setLoadingFormSubcategories(false);
+      }
+    };
+
+    fetchFormSubcategories();
+  }, [labelData.categoryId, organizationId]);
+
+  // Fetch subcategories for CREATE PRODUCT DIALOG when category changes
+  useEffect(() => {
+    const fetchDialogSubcategories = async () => {
+      if (!newProductCategory) {
+        setDialogSubcategories([]);
+        return;
+      }
+
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching dialog subcategories");
+        return;
+      }
+
+      try {
+        setLoadingDialogSubcategories(true);
+        const { data, error } = await supabase
+          .from("label_subcategories")
+          .select("id, name")
+          .eq("category_id", newProductCategory)
+          .eq('organization_id', organizationId)
+          .order("name");
+
+        if (error) throw error;
+        
+        // Defensive: Ensure data is valid
+        const validSubcategories = (data || []).filter(sub => 
+          sub && typeof sub.id === 'string' && typeof sub.name === 'string'
+        );
+        
+        setDialogSubcategories(validSubcategories);
+      } catch (error) {
+        console.error("Error fetching dialog subcategories:", error);
+        setDialogSubcategories([]);
+      } finally {
+        setLoadingDialogSubcategories(false);
+      }
+    };
+
+    fetchDialogSubcategories();
+  }, [newProductCategory, organizationId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts(labelData.categoryId, labelData.subcategoryId, productSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [labelData.categoryId, labelData.subcategoryId, productSearch]);
 
   const fetchCategories = async () => {
     try {
+      // Only fetch categories if we have organization_id
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching categories");
+        return;
+      }
+
       const { data, error } = await supabase
         .from("label_categories")
         .select("id, name")
+        .eq('organization_id', organizationId)
         .order("name");
 
       if (error) throw error;
+      console.log("Fetched categories:", data);
       setCategories(data || []);
     } catch (error) {
       console.error("Error fetching categories:", error);
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (categoryId?: string, subcategoryId?: string, search?: string) => {
     try {
-      const { data, error } = await supabase
+      // Don't fetch if we don't have organization_id yet
+      if (!organizationId) {
+        console.log("Waiting for organization_id before fetching products");
+        return;
+      }
+
+      let query = supabase
         .from("products")
         .select(`
           id,
           name,
+          category_id,
+          subcategory_id,
           measuring_unit_id,
           measuring_units:measuring_unit_id (
             name,
             abbreviation
+          ),
+          label_categories:category_id (
+            id,
+            name
+          ),
+          label_subcategories:subcategory_id (
+            id,
+            name
           )
         `)
-        .order("name");
+        .eq('organization_id', organizationId)
+        .order("name")
+        .limit(50);
+
+      if (categoryId && categoryId !== "all") {
+        query = query.eq("category_id", categoryId);
+      }
+
+      // Filter by subcategory if one is selected
+      if (subcategoryId) {
+        query = query.eq("subcategory_id", subcategoryId);
+      }
+
+      if (search) {
+        query = query.ilike("name", `%${search}%`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
-      setProducts(data || []);
+      
+      // Defensive: Ensure data is array and filter out any malformed products
+      const validProducts = (data || []).filter(product => 
+        product && 
+        typeof product.id === 'string' && 
+        typeof product.name === 'string'
+      );
+      
+      console.log("Fetched products:", validProducts.length, "valid products");
+      setProducts(validProducts);
     } catch (error) {
       console.error("Error fetching products:", error);
+      setProducts([]); // Set to empty array on error
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter a category name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCreatingCategory(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("label_categories")
+        .insert({
+          name: newCategoryName.trim()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        // Check for duplicate error (PostgreSQL error code 23505)
+        if (error.code === "23505") {
+          toast({
+            title: "Category Already Exists",
+            description: `A category named "${newCategoryName}" already exists in your organization.`,
+            variant: "destructive"
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      toast({
+        title: "Category Created",
+        description: `"${newCategoryName}" has been created successfully.`
+      });
+
+      // Update local state and select the new category
+      setCategories(prev => [...prev, data]);
+      setLabelData(prev => ({
+        ...prev,
+        categoryId: data.id,
+        categoryName: data.name,
+        productId: "",
+        productName: ""
+      }));
+
+      // Reset dialog state
+      setNewCategoryName("");
+      setShowCreateCategoryDialog(false);
+      setCategorySearch("");
+      setOpenCategory(false);
+
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create category",
+        variant: "destructive"
+      });
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
+  const handleCreateProduct = async () => {
+    if (!newProductName.trim()) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter a product name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!newProductCategory) {
+      toast({
+        title: "Category Required",
+        description: "Please select a category for the product",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setCreatingProduct(true);
+
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .insert({
+          name: newProductName.trim(),
+          category_id: newProductCategory,
+          subcategory_id: newProductSubcategory || null,
+          organization_id: organizationId  // Add organization_id to pass RLS
+        })
+        .select(`
+          id,
+          name,
+          category_id,
+          subcategory_id,
+          measuring_unit_id,
+          measuring_units:measuring_unit_id (
+            name,
+            abbreviation
+          ),
+          label_categories:category_id (
+            id,
+            name
+          ),
+          label_subcategories:subcategory_id (
+            id,
+            name
+          )
+        `)
+        .single();
+
+      if (error) {
+        // Check for duplicate error (PostgreSQL error code 23505)
+        if (error.code === "23505") {
+          toast({
+            title: "Product Already Exists",
+            description: `A product named "${newProductName}" already exists in your organization.`,
+            variant: "destructive"
+          });
+        } else {
+          throw error;
+        }
+        return;
+      }
+
+      toast({
+        title: "Product Created",
+        description: `"${newProductName}" has been created successfully.`
+      });
+
+      // Update local state and select the new product
+      setProducts(prev => [...prev, data]);
+      
+      // Update form with the newly created product
+      // This will also update category/subcategory if they differ from current selection
+      setLabelData(prev => ({
+        ...prev,
+        productId: data.id,
+        productName: data.name,
+        // Update category (may be different from current if dialog category != form category)
+        categoryId: data.category_id || prev.categoryId,
+        categoryName: data.label_categories?.name || prev.categoryName,
+        // Update subcategory (may be empty or different)
+        subcategoryId: data.subcategory_id || "",
+        subcategoryName: data.label_subcategories?.name || "",
+        unit: data.measuring_units?.abbreviation || ""
+      }));
+
+      // Reset dialog state
+      setNewProductName("");
+      setNewProductCategory("");
+      setNewProductSubcategory("");
+      setShowCreateProductDialog(false);
+      setProductSearch("");
+      setOpenProduct(false);
+
+    } catch (error) {
+      console.error("Error creating product:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive"
+      });
+    } finally {
+      setCreatingProduct(false);
     }
   };
 
@@ -176,17 +684,68 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
+    // When selecting a product, update ALL related fields including category and subcategory
     setLabelData(prev => ({
       ...prev,
       productId: product.id,
       productName: product.name,
-      unit: product.measuring_units?.abbreviation || ""
+      unit: product.measuring_units?.abbreviation || "",
+      // Update category from product (this will trigger subcategory fetch)
+      categoryId: product.category_id || prev.categoryId,
+      categoryName: product.label_categories?.name || prev.categoryName,
+      // Update subcategory from product
+      subcategoryId: product.subcategory_id || "",
+      subcategoryName: product.label_subcategories?.name || ""
     }));
     setOpenProduct(false);
   };
 
-  const handleSave = () => {
-    if (!labelData.productId || !labelData.categoryId || !labelData.condition) {
+  const handleSaveDraft = async () => {
+    if (!draftName.trim()) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter a draft name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSavingDraft(true);
+
+    try {
+      // user_id, created_at, updated_at são gerados automaticamente pelo banco
+      const { error } = await supabase
+        .from("label_drafts")
+        .insert({
+          draft_name: draftName.trim(),
+          form_data: labelData as any, // Cast to any to match Json type
+          user_id: (await supabase.auth.getUser()).data.user?.id || ''
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Draft Saved",
+        description: `Draft "${draftName}" has been saved successfully.`
+      });
+
+      setDraftName("");
+      setShowSaveDraftDialog(false);
+
+    } catch (error) {
+      console.error("Error saving draft:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save draft",
+        variant: "destructive"
+      });
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!labelData.productId || !labelData.condition) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -194,11 +753,17 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       });
       return;
     }
+
+    // Save allergens to product if any are selected
+    if (labelData.productId && selectedAllergenIds.length > 0) {
+      await updateProductAllergens(labelData.productId, selectedAllergenIds);
+    }
+
     onSave?.(labelData);
   };
 
-  const handlePrint = () => {
-    if (!labelData.productId || !labelData.categoryId || !labelData.condition) {
+  const handlePrint = async () => {
+    if (!labelData.productId || !labelData.condition) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -206,32 +771,169 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       });
       return;
     }
-    onPrint?.(labelData);
+
+    // Save allergens to product if any are selected
+    if (labelData.productId && selectedAllergenIds.length > 0) {
+      const success = await updateProductAllergens(labelData.productId, selectedAllergenIds);
+      if (!success) {
+        toast({
+          title: "Warning",
+          description: "Failed to save allergen information, but continuing with print",
+          variant: "destructive"
+        });
+      }
+    }
+
+    // Save label to database first
+    try {
+      await saveLabelToDatabase({
+        productId: labelData.productId,
+        productName: labelData.productName,
+        categoryId: labelData.categoryId === "all" ? null : labelData.categoryId,
+        categoryName: labelData.categoryName,
+        preparedBy: labelData.preparedBy,
+        preparedByName: labelData.preparedByName,
+        prepDate: labelData.prepDate,
+        expiryDate: labelData.expiryDate,
+        condition: labelData.condition,
+        quantity: labelData.quantity,
+        unit: labelData.unit,
+        batchNumber: labelData.batchNumber,
+        organizationId: organizationId || "", // Required for RLS
+      });
+
+      // Print using the new printer system
+      const success = await print({
+        productName: labelData.productName,
+        categoryName: labelData.categoryName,
+        subcategoryName: labelData.subcategoryName,
+        preparedDate: labelData.prepDate,
+        useByDate: labelData.expiryDate,
+        allergens: [], // Will be fetched from DB if needed
+        storageInstructions: `Condition: ${labelData.condition}`,
+        barcode: labelData.batchNumber,
+      });
+
+      if (success && onPrint) {
+        onPrint(labelData);
+      }
+    } catch (error) {
+      console.error("Error in print process:", error);
+      toast({
+        title: "Print Error",
+        description: "Failed to complete print operation",
+        variant: "destructive"
+      });
+    }
   };
+
+  // Handle add to print queue
+  const handleAddToQueue = () => {
+    // Validate required fields
+    if (!labelData.productId || !labelData.prepDate || !labelData.expiryDate) {
+      toast({
+        title: "Incomplete Form",
+        description: "Please fill in all required fields before adding to queue.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Get quantity (default to 1 if not specified or invalid)
+    const quantity = parseInt(labelData.quantity) || 1;
+
+    // Add to queue
+    addToQueue(labelData, quantity);
+
+    // Optional: Reset form after adding to queue
+    // Uncomment the lines below if you want to clear the form
+    // resetForm();
+  };
+
+  // Show loading state while organization ID is being fetched
+  if (!organizationId && user?.id) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading organization information...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Create Label</h2>
-          <p className="text-muted-foreground">Fill in the information for your food label</p>
+        <div className="flex items-center gap-4">
+          {onCancel && (
+            <Button onClick={onCancel} variant="ghost" size="icon">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          )}
+          <div>
+            <h2 className="text-2xl font-bold">Create Label</h2>
+            <p className="text-muted-foreground">Fill in the information for your food label</p>
+          </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={handleSave} variant="outline" className="flex items-center gap-2">
+          <Button onClick={() => setShowSaveDraftDialog(true)} variant="outline" className="flex items-center gap-2">
             <Save className="w-4 h-4" />
             Save Draft
           </Button>
-          <Button onClick={handlePrint} className="flex items-center gap-2">
-            <Printer className="w-4 h-4" />
-            Print Label
+          <Button 
+            onClick={handleAddToQueue} 
+            variant="outline" 
+            disabled={isPrinting || !labelData.productId || !labelData.prepDate || !labelData.expiryDate}
+            className="flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Add to Queue ({labelData.quantity || 1})
           </Button>
-          {onCancel && (
-            <Button onClick={onCancel} variant="ghost">
-              <X className="w-4 h-4" />
-            </Button>
-          )}
+          <Button onClick={handlePrint} disabled={isPrinting} variant="hero" className="flex items-center gap-2">
+            <Printer className="w-4 h-4" />
+            {isPrinting ? 'Printing...' : 'Print Now'}
+          </Button>
         </div>
       </div>
+
+      {/* Printer Selection Card */}
+      <Card className="bg-muted/50">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <Settings className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <Label className="text-sm font-medium">Current Printer</Label>
+                <p className="text-sm text-muted-foreground truncate">
+                  {settings?.name || 'No printer selected'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {settings?.paperWidth}mm × {settings?.paperHeight}mm
+                </p>
+              </div>
+            </div>
+            <Select value={settings?.type || 'generic'} onValueChange={changePrinter}>
+              <SelectTrigger className="w-[200px] flex-shrink-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availablePrinters.map(p => (
+                  <SelectItem key={p.type} value={p.type}>
+                    <div className="flex items-center gap-2">
+                      <Printer className="h-4 w-4 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium">{p.name}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-1">{p.description}</div>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -252,26 +954,100 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                   aria-expanded={openCategory}
                   className="w-full justify-between"
                 >
-                  {labelData.categoryName || "Select category..."}
+                  <span className="flex items-center gap-2">
+                    {labelData.categoryId && labelData.categoryId !== "all" && 
+                      categories.find(c => c.id === labelData.categoryId)?.icon && (
+                        <span className="text-lg">
+                          {categories.find(c => c.id === labelData.categoryId)?.icon}
+                        </span>
+                      )
+                    }
+                    <span>{labelData.categoryName || "Select category..."}</span>
+                  </span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search category..." />
+              <PopoverContent className="w-full p-0" align="start" side="bottom">
+                <Command shouldFilter={false}>
+                  <CommandInput 
+                    placeholder="Search category..." 
+                    value={categorySearch}
+                    onValueChange={setCategorySearch}
+                  />
                   <CommandList>
-                    <CommandEmpty>No category found.</CommandEmpty>
+                    {filteredCategories.length === 0 && (
+                      <CommandEmpty>
+                        <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            No category found. Would you like to create one?
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setNewCategoryName(categorySearch);
+                              setShowCreateCategoryDialog(true);
+                              setOpenCategory(false);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create "{categorySearch || 'New Category'}"
+                          </Button>
+                        </div>
+                      </CommandEmpty>
+                    )}
                     <CommandGroup>
-                      {categories.map((category) => (
+                      <CommandItem
+                        value="All Categories"
+                        onSelect={() => {
+                          // "All Categories" selection:
+                          // - Clears subcategory (disabled when "all")
+                          // - Clears product (will show all products)
+                          // - Clears search to start fresh
+                          setLabelData(prev => ({
+                            ...prev,
+                            categoryId: "all",
+                            categoryName: "All Categories",
+                            subcategoryId: "",
+                            subcategoryName: "",
+                            productId: "",
+                            productName: ""
+                          }));
+                          setProductSearch("");
+                          setCategorySearch("");
+                          setOpenCategory(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            labelData.categoryId === "all" ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        All Categories
+                      </CommandItem>
+                      {filteredCategories.map((category) => (
                         <CommandItem
                           key={category.id}
                           value={category.name}
                           onSelect={() => {
+                            // Category selection:
+                            // - Sets new category
+                            // - Clears subcategory (will load new subcategories via useEffect)
+                            // - Clears product (will filter by new category)
+                            // - Clears search to start fresh
                             setLabelData(prev => ({
                               ...prev,
                               categoryId: category.id,
-                              categoryName: category.name
+                              categoryName: category.name,
+                              subcategoryId: "",
+                              subcategoryName: "",
+                              productId: "",
+                              productName: ""
                             }));
+                            setProductSearch("");
+                            setCategorySearch("");
                             setOpenCategory(false);
                           }}
                         >
@@ -281,6 +1057,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                               labelData.categoryId === category.id ? "opacity-100" : "opacity-0"
                             )}
                           />
+                          {category.icon && <span className="mr-2 text-lg">{category.icon}</span>}
                           {category.name}
                         </CommandItem>
                       ))}
@@ -289,6 +1066,82 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                 </Command>
               </PopoverContent>
             </Popover>
+          </div>
+
+          {/* Subcategory - Always visible */}
+          <div className="space-y-2">
+            <Label htmlFor="subcategory">
+              Subcategory (Optional)
+              {!labelData.categoryId && <span className="text-xs text-muted-foreground ml-2">- Select a category first</span>}
+            </Label>
+            {labelData.categoryId && labelData.categoryId !== "all" ? (
+              loadingFormSubcategories ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  Loading subcategories...
+                </div>
+              ) : (
+                <Select
+                  value={labelData.subcategoryId || "none"}
+                  onValueChange={(value) => {
+                    // Subcategory selection:
+                    // - Keeps current category
+                    // - Sets new subcategory (or "" for "None")
+                    // - Clears product (will filter by category + subcategory)
+                    // - Clears search to start fresh
+                    const subcategory = formSubcategories.find(s => s.id === value);
+                    setLabelData(prev => ({
+                      ...prev,
+                      subcategoryId: value === "none" ? "" : value,
+                      subcategoryName: value === "none" ? "" : (subcategory?.name || ""),
+                      productId: "",
+                      productName: ""
+                    }));
+                    // Clear product search when subcategory changes
+                    setProductSearch("");
+                  }}
+                >
+                  <SelectTrigger id="subcategory">
+                    <SelectValue placeholder="Select a subcategory...">
+                      {labelData.subcategoryId && formSubcategories.find(s => s.id === labelData.subcategoryId) && (
+                        <span className="flex items-center gap-2">
+                          {formSubcategories.find(s => s.id === labelData.subcategoryId)?.icon && (
+                            <span className="text-lg">
+                              {formSubcategories.find(s => s.id === labelData.subcategoryId)?.icon}
+                            </span>
+                          )}
+                          <span>{labelData.subcategoryName}</span>
+                        </span>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {Array.isArray(formSubcategories) && formSubcategories.map((subcategory) => (
+                      <SelectItem key={subcategory.id} value={subcategory.id}>
+                        <span className="flex items-center gap-2">
+                          {subcategory.icon && <span className="text-lg">{subcategory.icon}</span>}
+                          <span>{subcategory.name}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            ) : (
+              <Select disabled>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a category first..." />
+                </SelectTrigger>
+              </Select>
+            )}
+            {labelData.categoryId && labelData.categoryId !== "all" && !loadingFormSubcategories && (
+              <p className="text-xs text-muted-foreground">
+                {formSubcategories.length > 0 
+                  ? `${formSubcategories.length} subcategor${formSubcategories.length === 1 ? 'y' : 'ies'} available`
+                  : "No subcategories available for this category"}
+              </p>
+            )}
           </div>
 
           {/* Product */}
@@ -306,28 +1159,56 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Search product..." />
+              <PopoverContent className="w-full p-0" align="start" side="bottom">
+                <Command shouldFilter={false}>
+                  <CommandInput 
+                    placeholder="Search product..." 
+                    value={productSearch}
+                    onValueChange={setProductSearch}
+                  />
                   <CommandList>
-                    <CommandEmpty>No product found.</CommandEmpty>
-                    <CommandGroup>
-                      {products.map((product) => (
-                        <CommandItem
-                          key={product.id}
-                          value={product.name}
-                          onSelect={() => handleProductChange(product.id)}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              labelData.productId === product.id ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {product.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
+                    {products.length === 0 && (
+                      <CommandEmpty>
+                        <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            No product found. Would you like to create one?
+                          </p>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setNewProductName(productSearch);
+                              setNewProductCategory(labelData.categoryId === "all" ? "" : labelData.categoryId);
+                              setShowCreateProductDialog(true);
+                              setOpenProduct(false);
+                            }}
+                            className="flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Create "{productSearch || 'New Product'}"
+                          </Button>
+                        </div>
+                      </CommandEmpty>
+                    )}
+                    {Array.isArray(products) && products.length > 0 && (
+                      <CommandGroup>
+                        {products.map((product) => (
+                          <CommandItem
+                            key={product.id}
+                            value={product.name}
+                            onSelect={() => handleProductChange(product.id)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                labelData.productId === product.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {product.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    )}
                   </CommandList>
                 </Command>
               </PopoverContent>
@@ -422,62 +1303,461 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="quantity">Quantity (Optional)</Label>
-              <Input
-                id="quantity"
-                type="number"
-                value={labelData.quantity}
-                onChange={(e) => setLabelData(prev => ({ ...prev, quantity: e.target.value }))}
-                placeholder="0"
-              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    const currentQty = parseInt(labelData.quantity) || 0;
+                    if (currentQty > 0) {
+                      setLabelData(prev => ({ ...prev, quantity: String(currentQty - 1) }));
+                    }
+                  }}
+                  disabled={!labelData.quantity || parseInt(labelData.quantity) <= 0}
+                  className="h-10 w-10 shrink-0"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  id="quantity"
+                  type="number"
+                  value={labelData.quantity}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Only allow positive numbers
+                    if (value === '' || parseInt(value) >= 0) {
+                      setLabelData(prev => ({ ...prev, quantity: value }));
+                    }
+                  }}
+                  placeholder="0"
+                  min="0"
+                  className="text-center"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => {
+                    const currentQty = parseInt(labelData.quantity) || 0;
+                    setLabelData(prev => ({ ...prev, quantity: String(currentQty + 1) }));
+                  }}
+                  className="h-10 w-10 shrink-0"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
             <div className="space-y-2">
-              <Label>Unit</Label>
-              <Input
-                value={labelData.unit}
-                readOnly
-                className="bg-muted"
-                placeholder="Auto-loaded"
-              />
+              <Label htmlFor="unit">Unit</Label>
+              <Select 
+                value={labelData.unit} 
+                onValueChange={(value) => setLabelData(prev => ({ ...prev, unit: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kg">kg (Kilogram)</SelectItem>
+                  <SelectItem value="g">g (Gram)</SelectItem>
+                  <SelectItem value="L">L (Liter)</SelectItem>
+                  <SelectItem value="mL">mL (Milliliter)</SelectItem>
+                  <SelectItem value="pcs">pcs (Pieces)</SelectItem>
+                  <SelectItem value="oz">oz (Ounce)</SelectItem>
+                  <SelectItem value="lb">lb (Pound)</SelectItem>
+                  <SelectItem value="gal">gal (Gallon)</SelectItem>
+                  <SelectItem value="servings">Servings</SelectItem>
+                  <SelectItem value="portions">Portions</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Auto-loaded from product or select manually
+              </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Label Preview */}
+      {/* Allergen Selector - Only show if product is selected */}
+      {labelData.productId && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Allergen Information</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AllergenSelectorEnhanced
+              selectedAllergenIds={selectedAllergenIds}
+              onChange={setSelectedAllergenIds}
+              productId={labelData.productId}
+              showCommonOnly={false}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Canvas-Based Preview (Multi-Format) */}
       <Card>
         <CardHeader>
-          <CardTitle>Label Preview</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              {showCanvasPreview ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+              Label Preview
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCanvasPreview(!showCanvasPreview)}
+              className="flex items-center gap-2"
+            >
+              {showCanvasPreview ? (
+                <>
+                  <EyeOff className="w-4 h-4" />
+                  Hide Preview
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4" />
+                  Show Preview
+                </>
+              )}
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground mt-2">
+            Preview shows how your label will look with the current printer: <span className="font-medium text-foreground">{settings?.name || 'No printer selected'}</span>
+          </p>
         </CardHeader>
-        <CardContent>
-          <div className="bg-white border-2 border-dashed border-gray-300 rounded-lg p-4 space-y-2 text-black">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-lg">{labelData.productName || "Product Name"}</h3>
-              <span className="text-xs bg-gray-200 px-2 py-1 rounded">
-                {labelData.categoryName || "Category"}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <strong>Condition:</strong> {CONDITIONS.find(c => c.value === labelData.condition)?.label || "N/A"}
-              </div>
-              <div>
-                <strong>Prepared by:</strong> {labelData.preparedByName || "N/A"}
-              </div>
-              <div>
-                <strong>Prep Date:</strong> {labelData.prepDate ? new Date(labelData.prepDate).toLocaleDateString() : "N/A"}
-              </div>
-              <div>
-                <strong>Expiry:</strong> {labelData.expiryDate ? new Date(labelData.expiryDate).toLocaleDateString() : "N/A"}
-              </div>
-              {labelData.quantity && (
-                <div className="col-span-2">
-                  <strong>Quantity:</strong> {labelData.quantity} {labelData.unit}
+        
+        {showCanvasPreview && (
+          <CardContent className="space-y-4">
+            {/* Preview Controls */}
+            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/50 rounded-lg">
+              {/* Current Printer Info */}
+              <div className="flex-1 space-y-2">
+                <Label className="text-xs font-medium">Current Printer</Label>
+                <div className="flex items-center gap-3 p-3 bg-background rounded-md border">
+                  <Printer className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-sm">{settings?.name || 'No printer selected'}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {settings?.paperWidth}mm × {settings?.paperHeight}mm
+                    </div>
+                  </div>
                 </div>
+              </div>
+
+              {/* Zoom Control */}
+              <div className="flex-1 space-y-2">
+                <Label className="text-xs font-medium flex items-center justify-between">
+                  <span>Zoom</span>
+                  <span className="text-muted-foreground">{Math.round(previewScale * 100)}%</span>
+                </Label>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
+                      const currentIndex = scales.indexOf(previewScale);
+                      if (currentIndex > 0) {
+                        setPreviewScale(scales[currentIndex - 1]);
+                      }
+                    }}
+                    disabled={previewScale <= 0.5}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                  <Slider
+                    value={[previewScale * 100]}
+                    onValueChange={([value]) => {
+                      const scale = value / 100;
+                      if (scale >= 0.5 && scale <= 1.5) {
+                        // Round to nearest valid scale
+                        const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
+                        const closest = scales.reduce((prev, curr) => 
+                          Math.abs(curr - scale) < Math.abs(prev - scale) ? curr : prev
+                        );
+                        setPreviewScale(closest);
+                      }
+                    }}
+                    min={50}
+                    max={150}
+                    step={25}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => {
+                      const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
+                      const currentIndex = scales.indexOf(previewScale);
+                      if (currentIndex < scales.length - 1) {
+                        setPreviewScale(scales[currentIndex + 1]);
+                      }
+                    }}
+                    disabled={previewScale >= 1.5}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Canvas Preview */}
+            <LabelPreviewCanvas
+              labelData={{
+                ...labelData,
+                organizationDetails, // Add organization details for preview
+              }}
+              format={(settings?.type as LabelFormat) || 'generic'}
+              scale={previewScale}
+              className="min-h-[400px]"
+            />
+
+            {/* Format Info */}
+            <div className="text-xs text-muted-foreground text-center p-4 bg-muted/30 rounded-lg">
+              <p>
+                All labels use the same professional layout. 
+                {settings?.type === 'pdf' && ' This preview shows how it will appear on A4 paper (210mm × 297mm).'}
+                {settings?.type === 'zebra' && ' This preview shows how it will appear on thermal printer labels (60mm × 60mm).'}
+                {settings?.type === 'generic' && ' This preview shows how it will appear on standard label paper (60mm × 60mm).'}
+                {!settings && ' Select a printer to see the label preview with appropriate dimensions.'}
+              </p>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Create Category Confirmation Dialog */}
+      <AlertDialog open={showCreateCategoryDialog} onOpenChange={setShowCreateCategoryDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create New Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to create a new category with the following name?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <Label htmlFor="category-name">Category Name</Label>
+            <Input
+              id="category-name"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              placeholder="Enter category name..."
+              className="mt-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !creatingCategory) {
+                  handleCreateCategory();
+                }
+              }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creatingCategory}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCreateCategory} 
+              disabled={creatingCategory || !newCategoryName.trim()}
+            >
+              {creatingCategory ? "Creating..." : "Create Category"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Save Draft Dialog */}
+      <AlertDialog open={showSaveDraftDialog} onOpenChange={setShowSaveDraftDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save Draft</AlertDialogTitle>
+            <AlertDialogDescription>
+              Give your draft a name to save your progress and continue later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="my-4">
+            <Label htmlFor="draft-name">Draft Name *</Label>
+            <Input
+              id="draft-name"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              placeholder="e.g., Chicken Breast Label"
+              className="mt-2"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !savingDraft && draftName.trim()) {
+                  handleSaveDraft();
+                }
+              }}
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={savingDraft}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleSaveDraft} 
+              disabled={savingDraft || !draftName.trim()}
+            >
+              {savingDraft ? "Saving..." : "Save Draft"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Create Product Confirmation Dialog */}
+      <AlertDialog open={showCreateProductDialog} onOpenChange={setShowCreateProductDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create New Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Fill in the details to create a new product.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 my-4">
+            <div>
+              <Label htmlFor="product-name">Product Name *</Label>
+              <Input
+                id="product-name"
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+                placeholder="Enter product name..."
+                className="mt-2"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !creatingProduct && newProductName.trim() && newProductCategory) {
+                    handleCreateProduct();
+                  }
+                }}
+              />
+              
+              {/* Duplicate Product Warning */}
+              {organizationId && (
+                <DuplicateProductWarning
+                  similarProducts={similarProducts}
+                  isLoading={isDuplicateCheckLoading}
+                  isDuplicate={isDuplicate}
+                  error={duplicateCheckError}
+                  onSelectProduct={(product) => {
+                    // Close the create product dialog
+                    setShowCreateProductDialog(false);
+                    
+                    // Find the full product details
+                    const existingProduct = products.find(p => p.id === product.product_id);
+                    if (existingProduct) {
+                      // Set the selected product in the main form
+                      setLabelData(prev => ({
+                        ...prev,
+                        productId: existingProduct.id,
+                        productName: existingProduct.name,
+                        categoryId: existingProduct.category_id || "",
+                        categoryName: existingProduct.label_categories?.name || "",
+                        subcategoryId: existingProduct.subcategory_id || "",
+                        subcategoryName: existingProduct.label_subcategories?.name || ""
+                      }));
+                      
+                      toast({
+                        title: "Product Selected",
+                        description: `Using existing product: ${existingProduct.name}`,
+                      });
+                    }
+                  }}
+                  showProceedButton={false}
+                />
               )}
             </div>
+            <div>
+              <Label htmlFor="product-category">Category *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between mt-2"
+                  >
+                    {categories.find(c => c.id === newProductCategory)?.name || "Select category..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search category..." />
+                    <CommandList>
+                      <CommandEmpty>No category found.</CommandEmpty>
+                      <CommandGroup>
+                        {categories.map((category) => (
+                          <CommandItem
+                            key={category.id}
+                            value={category.name}
+                            onSelect={() => setNewProductCategory(category.id)}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                newProductCategory === category.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {category.icon && <span className="mr-2 text-lg">{category.icon}</span>}
+                            {category.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {/* Subcategory Selection - Always visible */}
+            <div>
+              <Label htmlFor="product-subcategory">
+                Subcategory (Optional)
+                {!newProductCategory && <span className="text-xs text-muted-foreground ml-2">- Select a category first</span>}
+              </Label>
+              <div className="mt-2">
+                {newProductCategory ? (
+                  loadingDialogSubcategories ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      Loading subcategories...
+                    </div>
+                  ) : (
+                    <Select
+                      value={newProductSubcategory || "none"}
+                      onValueChange={(value) => setNewProductSubcategory(value === "none" ? "" : value)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a subcategory..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {Array.isArray(dialogSubcategories) && dialogSubcategories.map((subcategory) => (
+                          <SelectItem key={subcategory.id} value={subcategory.id}>
+                            <span className="flex items-center gap-2">
+                              {subcategory.icon && <span className="text-lg">{subcategory.icon}</span>}
+                              <span>{subcategory.name}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )
+                ) : (
+                  <Select disabled>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a category first..." />
+                    </SelectTrigger>
+                  </Select>
+                )}
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={creatingProduct}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCreateProduct} 
+              disabled={creatingProduct || !newProductName.trim() || !newProductCategory || isDuplicate}
+            >
+              {creatingProduct ? "Creating..." : "Create Product"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

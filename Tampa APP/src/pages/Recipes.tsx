@@ -9,8 +9,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
+import { usePlanEnforcement } from "@/hooks/usePlanEnforcement";
 import { CreateRecipeDialog } from "@/components/recipes/CreateRecipeDialog";
 import { PrepareRecipeDialog } from "@/components/recipes/PrepareRecipeDialog";
+import { RecipePrintButton } from "@/components/recipes/RecipePrintButton";
+import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { format } from "date-fns";
 import {
   AlertDialog,
@@ -63,23 +66,34 @@ export default function Recipes() {
   const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const { hasRole, roles, loading: rolesLoading } = useUserRole();
+  const { role, isAdmin, isLeaderChef, loading: rolesLoading } = useUserRole();
+  const { checkRecipeLimit, upgradeModalProps } = usePlanEnforcement();
   const { toast } = useToast();
   
   // Check if user can manage recipes (admin or leader_chef)
-  const canManageRecipes = hasRole('admin') || hasRole('leader_chef');
+  const canManageRecipes = isAdmin || isLeaderChef;
 
   // Debug logging
   useEffect(() => {
     console.log('🔍 Recipe Permissions Debug:', {
       userId: user?.id,
-      roles: roles,
+      role: role,
       rolesLoading: rolesLoading,
-      hasAdminRole: hasRole('admin'),
-      hasLeaderChefRole: hasRole('leader_chef'),
+      isAdmin: isAdmin,
+      isLeaderChef: isLeaderChef,
       canManageRecipes: canManageRecipes
     });
-  }, [user, roles, rolesLoading, canManageRecipes]);
+  }, [user, role, rolesLoading, isAdmin, isLeaderChef, canManageRecipes]);
+
+  // Handle create recipe button click with limit check
+  const handleCreateRecipeClick = () => {
+    const currentCount = recipes.length;
+    if (!checkRecipeLimit(currentCount)) {
+      return; // Modal will show automatically
+    }
+    setRecipeToEdit(null);
+    setIsCreateDialogOpen(true);
+  };
 
   useEffect(() => {
     fetchRecipes();
@@ -221,7 +235,9 @@ export default function Recipes() {
         <CardContent className="pt-4">
           <p className="text-sm font-mono">
             <strong>Debug Info:</strong> User ID: {user?.id?.slice(0, 8)}... | 
-            Roles: [{roles.join(', ') || 'none'}] | 
+            Role: {role || 'none'} | 
+            Is Admin: {isAdmin ? '✅' : '❌'} | 
+            Is Leader Chef: {isLeaderChef ? '✅' : '❌'} | 
             Can Manage: {canManageRecipes ? '✅ YES' : '❌ NO'} | 
             Loading: {rolesLoading ? 'Yes' : 'No'}
           </p>
@@ -236,10 +252,7 @@ export default function Recipes() {
           </p>
         </div>
         {canManageRecipes && (
-          <Button onClick={() => {
-            setRecipeToEdit(null);
-            setIsCreateDialogOpen(true);
-          }}>
+          <Button onClick={handleCreateRecipeClick}>
             <Plus className="w-4 h-4 mr-2" />
             Create Recipe
           </Button>
@@ -262,9 +275,9 @@ export default function Recipes() {
             <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-background opacity-100">
               {recipeCategories.map((category) => (
-                <SelectItem key={category} value={category}>{category}</SelectItem>
+                <SelectItem key={category} value={category} className="bg-background opacity-100">{category}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -410,6 +423,22 @@ export default function Recipes() {
                     Prepare Recipe
                   </Button>
                   
+                  {/* Print Label Button */}
+                  <RecipePrintButton
+                    recipe={{
+                      id: recipe.id,
+                      name: recipe.name,
+                      shelf_life_days: recipe.hold_time_days,
+                      allergens: recipe.allergens?.map((name, index) => ({ 
+                        id: `allergen-${index}`, 
+                        name 
+                      }))
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                  />
+                  
                   <div className="flex gap-2">
                     {/* Comments button - available to all users */}
                     <Button 
@@ -497,6 +526,9 @@ export default function Recipes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Upgrade Modal for Plan Limits */}
+      <UpgradeModal {...upgradeModalProps} />
     </div>
   );
 }

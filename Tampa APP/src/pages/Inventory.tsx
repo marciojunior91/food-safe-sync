@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StatsCard } from "@/components/StatsCard";
 import ExpiryAlerts from "@/components/ExpiryAlerts";
+import { usePlanEnforcement } from "@/hooks/usePlanEnforcement";
+import { UpgradeModal } from "@/components/billing/UpgradeModal";
+import { useToast } from "@/hooks/use-toast";
 
 const inventoryItems = [
   {
@@ -66,6 +69,21 @@ const reorderSuggestions = [
 ];
 
 export default function Inventory() {
+  const { checkProductLimit, upgradeModalProps } = usePlanEnforcement();
+  const { toast } = useToast();
+
+  const handleAddItemClick = () => {
+    const currentCount = inventoryItems.length;
+    if (!checkProductLimit(currentCount)) {
+      return; // Modal will show automatically
+    }
+    // TODO: Open add item dialog when implemented
+    toast({
+      title: "Coming Soon",
+      description: "Add item functionality will be implemented soon.",
+    });
+  };
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -81,7 +99,7 @@ export default function Inventory() {
             <Download className="w-4 h-4 mr-2" />
             Export Data
           </Button>
-          <Button variant="hero">
+          <Button variant="hero" onClick={handleAddItemClick}>
             <Plus className="w-4 h-4 mr-2" />
             Add Item
           </Button>
@@ -286,6 +304,8 @@ export default function Inventory() {
           </div>
         </div>
       </div>
+
+      <UpgradeModal {...upgradeModalProps} />
     </div>
   );
 }

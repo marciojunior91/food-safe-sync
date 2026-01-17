@@ -113,10 +113,10 @@ export function WasteTracker() {
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="kg">kg</SelectItem>
-                <SelectItem value="l">L</SelectItem>
-                <SelectItem value="pcs">pcs</SelectItem>
+              <SelectContent className="bg-background opacity-100">
+                <SelectItem value="kg" className="bg-background opacity-100">kg</SelectItem>
+                <SelectItem value="l" className="bg-background opacity-100">L</SelectItem>
+                <SelectItem value="pcs" className="bg-background opacity-100">pcs</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -127,11 +127,11 @@ export function WasteTracker() {
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="spoilage">Spoilage</SelectItem>
-              <SelectItem value="overcooking">Overcooking</SelectItem>
-              <SelectItem value="expired">Expired</SelectItem>
-              <SelectItem value="contamination">Contamination</SelectItem>
+            <SelectContent className="bg-background opacity-100">
+              <SelectItem value="spoilage" className="bg-background opacity-100">Spoilage</SelectItem>
+              <SelectItem value="overcooking" className="bg-background opacity-100">Overcooking</SelectItem>
+              <SelectItem value="expired" className="bg-background opacity-100">Expired</SelectItem>
+              <SelectItem value="contamination" className="bg-background opacity-100">Contamination</SelectItem>
             </SelectContent>
           </Select>
           <Input

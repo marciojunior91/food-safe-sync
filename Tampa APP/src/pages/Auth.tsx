@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Building2, ChefHat, AlertCircle } from 'lucide-react';
+import { ChefHat, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { TampaIcon } from '@/components/TampaIcon';
 
 const Auth = () => {
   const { user, signIn, signUp, loading } = useAuth();
@@ -93,10 +94,8 @@ const Auth = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <h1 className="font-bold text-xl">FoodService Hub</h1>
+              <TampaIcon className="w-8 h-8" />
+              <h1 className="font-bold text-xl">Tampa APP</h1>
             </div>
           </div>
         </div>
@@ -109,7 +108,7 @@ const Auth = () => {
             <div className="w-16 h-16 bg-gradient-primary rounded-lg flex items-center justify-center mx-auto">
               <ChefHat className="w-8 h-8 text-primary-foreground" />
             </div>
-            <CardTitle className="text-2xl">Welcome to FoodService Hub</CardTitle>
+            <CardTitle className="text-2xl">Welcome to Tampa APP</CardTitle>
             <CardDescription>
               Sign in to your account or create a new one to get started
             </CardDescription>

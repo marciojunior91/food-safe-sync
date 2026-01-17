@@ -1,0 +1,260 @@
+/**
+ *   'Fish and Seafo  // Fish and S  // Bakery Subcateg  // Raw Ingredie  'Nuts & Seeds': '  'Offal  // Dairy Su  'Whole Milk'  // Sauces &   'Mustards': '🟡',  'Fruit Des  // Prepared Foods   'Fresh Juices': '🧃',
+  'Smoothies': '🥤',
+  'Infused Waters': '💧',
+  'Cocktails': '🍸',
+  'Mocktails': '🥂',tegories
+  'Stocks & Broths': '🍲',
+  'Soups': '🍜',
+  'Salads': '🥗',s': '🍓',
+  'Ice Creams': '🍨',
+  'Sorbets': '🍧',
+  'Custards & Puddings': '🍮',Vinaigrettes': '🥗',
+  'Mayonnaise-Based': '🥚',
+  'Asian Sauces': '🥢',
+  'Latin Sauces': '🌮',ments Subcategories
+  'Mother Sauces': '🍲',
+  'Tomato-Based Sauces': '🍅',
+  'Cream-Based Sauces': '🥛',
+  'Wine-Based Sauces': '🍷',
+  'Stock Reductions': '🍲',
+  'Emulsified Sauces': '🥚',
+  'Buttermilk': '🥛',
+  'Yogurt': '🥛',
+  'Butter': '🧈',
+  'Clarified Butter': '🧈',
+  'Crème Fraîche': '🥛',
+  'Sour Cream': '🥛',ries
+  'Soft Cheeses': '🧀',
+  'Hard Cheeses': '🧀',
+  'Blue Cheeses': '💙',
+  'Fresh Cheeses': '🧀',
+  'Aged Cheeses': '�',',
+  'Charcuterie': '🥓',
+  'Sausages': '🌭',
+  
+  // Dairy Subcategories  'Oils & Fats': '🫒',
+  'Vinegars': '🍶',
+  'Spices': '🧂',
+  'Dried Herbs': '🍃',ubcategories
+  'Fresh Vegetables': '🥬',
+  'Fresh Fruits': '🍊',
+  'Herbs & Aromatics': '🌿',
+  'Leafy Greens': '🥬',
+  'Root Vegetables': '🥕',
+  'Mushrooms': '🍄',
+  'Legumes & Pulses': '🫘',
+  'Grains & Rice': '🌾','Artisan Breads': '🍞',
+  'Rolls & Buns': '🥖',
+  'Baguettes': '🥖',
+  'Croissants': '🥐',
+  'Pastries': '🧁',
+  'Danish': '🥮',
+  'Focaccia': '🫓',
+  'Flatbreads': '🫓',
+  'Specialty Breads': '🥨',categories
+  'Fresh Fish': '🐟',
+  'Frozen Fish': '🧊',
+  'Shellfish': '🦪',
+  'Crustaceans': '🦐',
+  'Mollusks': '🦑',
+  'Smoked Fish': '�',🐟', // Folder icon
+  'Bakery': '🍞', // Folder icon
+  'Raw Ingredients': '🥬', // Folder icon
+  'Meat & Poultry': '🥩', // Folder icon
+  'Dairy': '🥛', Print Category & Subcategory Icon Mappings
+ * Used for hierarchical navigation in Quick Print mode
+ * Based on Suflê restaurant structure
+ */
+
+// Category Icons (Main categories - Folder icons for navigation)
+export const CATEGORY_ICONS: Record<string, string> = {
+  'Fish and Seafood': '🦐', // Folder icon
+  'Bakery': '🍞', // Folder icon
+  'Raw Ingredients': '🥬', // Folder icon
+  'Meat & Poultry': '🥩', // Folder icon
+  'Dairy': '🥛',
+  'Sauces & Condiments': '🌶️',
+  'Desserts': '🍰',
+  'Prepared Foods': '🍽️',
+  'Beverages': '🥤',
+};
+
+// Subcategory Icons (Suflê-style subcategories)
+export const SUBCATEGORY_ICONS: Record<string, string> = {
+  // Fish and Seafood Subcategories
+  'Fresh Fish': '',
+  'Frozen Fish': '🧊',
+  'Shellfish': '🦪',
+  'Crustaceans': '🦐',
+  'Mollusks': '🦑',
+  'Smoked Fish': '💨',
+  'Canned Seafood': '🥫',
+  
+  // Bakery Subcategories
+  'Artisan Breads': '🍞',
+  'Rolls & Buns': '🥖',
+  'Baguettes': '🥖',
+  'Croissants': '🥐',
+  'Pastries': '🧁',
+  'Danish': '🥮',
+  'Focaccia': '🍞',
+  'Flatbreads': '🍞',
+  'Specialty Breads': '🥨',
+  
+  // Raw Ingredients Subcategories
+  'Fresh Vegetables': '🥬',
+  'Fresh Fruits': '🍊',
+  'Herbs & Aromatics': '🌿',
+  'Leafy Greens': '🥬',
+  'Root Vegetables': '🥕',
+  'Mushrooms': '🍄',
+  'Legumes & Pulses': '🥬',
+  'Grains & Rice': '🌾',
+  'Flours': '🌾',
+  'Nuts & Seeds': '🥜',
+  'Oils & Fats': '🍶',
+  'Vinegars': '🍶',
+  'Spices': '🧂',
+  'Dried Herbs': '🍃',
+  'Sugars & Sweeteners': '🍯',
+  
+  // Meat & Poultry Subcategories
+  'Beef': '🐄',
+  'Pork': '🐖',
+  'Lamb': '🐑',
+  'Veal': '🐮',
+  'Chicken': '🐔',
+  'Duck': '🦆',
+  'Turkey': '🦃',
+  'Game Meats': '🦌',
+  'Offal': '🍖',
+  'Charcuterie': '🥓',
+  'Sausages': '🌭',
+  
+  // Dairy Subcategories
+  'Soft Cheeses': '🧀',
+  'Hard Cheeses': '🧀',
+  'Blue Cheeses': '💙',
+  'Fresh Cheeses': '🧀',
+  'Aged Cheeses': '🧀',
+  'Heavy Cream': '🥛',
+  'Light Cream': '🥛',
+  'Whole Milk': '🥛',
+  'Buttermilk': '🥛',
+  'Yogurt': '🥛',
+  'Butter': '🧈',
+  'Clarified Butter': '🧈',
+  'Crème Fraîche': '🥛',
+  'Sour Cream': '🥛',
+
+  // Sauces & Condiments Subcategories
+  'Mother Sauces': '🥫',
+  'Tomato-Based Sauces': '🍅',
+  'Cream-Based Sauces': '🥛',
+  'Wine-Based Sauces': '🍷',
+  'Stock Reductions': '🍲',
+  'Emulsified Sauces': '🥚',
+  'Hot Sauces': '🌶️',
+  'Mustards': '🟡',
+  'Vinaigrettes': '🥗',
+  'Mayonnaise-Based': '🥚',
+  'Asian Sauces': '🥢',
+  'Latin Sauces': '🌮',
+  'Chutneys & Relishes': '🧉',
+  'Glazes': '✨',
+  'Compound Butters': '🧈',
+  
+  // Desserts Subcategories
+  'Soufflés': '🎈',
+  'Mousses': '☁️',
+  'Tarts & Pies': '🥧',
+  'Layer Cakes': '🎂',
+  'Cheesecakes': '🍰',
+  'Chocolate Desserts': '🍫',
+  'Fruit Desserts': '🍓',
+  'Ice Creams': '🍨',
+  'Sorbets': '🍧',
+  'Custards & Puddings': '🍮',
+  'Cookies & Biscuits': '🍪',
+  'Macarons': '🌈',
+  'Pastry Creams': '🥛',
+  'Ganaches': '🍫',
+  
+  // Prepared Foods Subcategories
+  'Stocks & Broths': '🍲',
+  'Soups': '🥣',
+  'Salads': '🥗',
+  'Pasta Dishes': '🍝',
+  'Rice Dishes': '🍚',
+  'Sandwiches': '🥪',
+  'Appetizers': '🍤',
+  'Side Dishes': '🍟',
+  'Entrees': '🍛',
+  'Casseroles': '🥘',
+  'Terrines & Pâtés': '🧈',
+  'Quiches & Tarts': '🥧',
+  
+  // Beverages Subcategories
+  'Coffee': '☕',
+  'Tea': '🍵',
+  'Fresh Juices': '🧃',
+  'Smoothies': '🥤',
+  'Infused Waters': '💧',
+  'Cocktails': '🍹',
+  'Mocktails': '🥂',
+  'House Specialties': '⭐',
+};
+
+// Default icons for fallback
+export const DEFAULT_ICONS = {
+  category: '📁',
+  subcategory: '📂',
+  product: '📦',
+};
+
+/**
+ * Get icon for a category by name
+ * @param categoryName - Name of the category
+ * @returns Emoji string or default category icon
+ */
+export function getCategoryIcon(categoryName: string): string {
+  return CATEGORY_ICONS[categoryName] || DEFAULT_ICONS.category;
+}
+
+/**
+ * Get icon for a subcategory by name
+ * @param subcategoryName - Name of the subcategory
+ * @returns Emoji string or default subcategory icon
+ */
+export function getSubcategoryIcon(subcategoryName: string): string {
+  return SUBCATEGORY_ICONS[subcategoryName] || DEFAULT_ICONS.subcategory;
+}
+
+/**
+ * Get product icon (always generic)
+ * @returns Default product icon
+ */
+export function getProductIcon(): string {
+  return DEFAULT_ICONS.product;
+}
+
+/**
+ * Navigation level types for breadcrumb
+ */
+export type NavigationLevelType = 'category' | 'subcategory' | 'product';
+
+/**
+ * Navigation level interface
+ */
+export interface NavigationLevel {
+  type: NavigationLevelType;
+  id: string | null;
+  name: string;
+  icon: string;
+}
+
+/**
+ * Print mode types
+ */
+export type PrintMode = 'products' | 'categories';

@@ -6,11 +6,11 @@ import {
   Shield, 
   Clock,
   Users,
-  Building2,
   ArrowRight,
   CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TampaIcon } from "@/components/TampaIcon";
 
 const features = [
   {
@@ -59,11 +59,9 @@ const Index = () => {
       <header className="border-b bg-card/80 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <h1 className="font-bold text-xl">FoodService Hub</h1>
+            <div className="flex items-center gap-3">
+              <TampaIcon className="w-12 h-12" />
+              <h1 className="font-bold text-xl">Tampa APP</h1>
             </div>
             <Button variant="hero" asChild>
               <a href="/auth">
@@ -178,14 +176,12 @@ const Index = () => {
       <footer className="border-t bg-card/80 backdrop-blur-sm py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="font-bold text-lg">FoodService Hub</span>
+            <div className="flex items-center gap-3">
+              <TampaIcon className="w-12 h-12" />
+              <span className="font-bold text-lg">Tampa APP</span>
             </div>
             <p className="text-muted-foreground">
-              © 2024 FoodService Hub. Professional food service management platform.
+              © 2024 Tampa APP. Smart Food Safety & Kitchen Management.
             </p>
           </div>
         </div>
