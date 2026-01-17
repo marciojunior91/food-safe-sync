@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
-import { writeFileSync } from "fs";
+import { copyFileSync } from "fs";
 
 // Plugin to create 200.html in dist for SPA routing (Vercel standard)
 const vercelSpaPlugin = () => ({
@@ -10,7 +10,6 @@ const vercelSpaPlugin = () => ({
   closeBundle() {
     const indexPath = path.resolve(__dirname, 'dist', 'index.html');
     const fallbackPath = path.resolve(__dirname, 'dist', '200.html');
-    const { copyFileSync } = require('fs');
     try {
       copyFileSync(indexPath, fallbackPath);
       console.log('✅ Created 200.html for Vercel SPA routing');
