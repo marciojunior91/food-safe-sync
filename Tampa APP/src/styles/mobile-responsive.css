@@ -1,0 +1,516 @@
+/* ============================================================================
+   MOBILE RESPONSIVENESS - iPad & iPhone Optimizations
+   ============================================================================
+   Breakpoints:
+   - iPhone SE: 375px
+   - iPhone 12/13/14: 390px
+   - iPhone 14 Pro Max: 430px
+   - iPad Mini: 768px
+   - iPad Air/Pro: 820px - 1024px
+============================================================================ */
+
+/* ============================================================================
+   BASE MOBILE IMPROVEMENTS
+============================================================================ */
+
+/* Ensure viewport is properly set for mobile devices */
+@media (max-width: 1024px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Improve touch targets - minimum 44x44px for iOS */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  /* Prevent text selection on double-tap */
+  .no-select-mobile {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* ============================================================================
+   LAYOUT ADJUSTMENTS - iPad (768px - 1024px)
+============================================================================ */
+
+@media (max-width: 1024px) and (min-width: 768px) {
+  /* Sidebar adjustments for iPad */
+  [data-sidebar="sidebar"] {
+    width: 240px !important;
+  }
+
+  /* Main content padding for iPad */
+  main {
+    padding: 1rem !important;
+  }
+
+  /* Dashboard cards - 2 columns on iPad */
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1rem !important;
+  }
+
+  /* Forms - adjust input sizes */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+    padding: 0.75rem !important;
+  }
+
+  /* Tables - allow horizontal scroll */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+  }
+
+  /* Dialog/Modal adjustments */
+  [role="dialog"],
+  .modal {
+    max-width: 90vw !important;
+    margin: 1rem !important;
+  }
+}
+
+/* ============================================================================
+   LAYOUT ADJUSTMENTS - iPhone (< 768px)
+============================================================================ */
+
+@media (max-width: 767px) {
+  /* Hide sidebar on mobile, show hamburger menu */
+  [data-sidebar="sidebar"] {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+
+  [data-sidebar="sidebar"][data-state="open"] {
+    transform: translateX(0);
+    position: fixed;
+    z-index: 50;
+    width: 280px !important;
+  }
+
+  /* Main content full width on mobile */
+  main {
+    padding: 0.75rem !important;
+    margin-left: 0 !important;
+  }
+
+  /* Dashboard cards - single column on mobile */
+  .dashboard-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  /* Card adjustments */
+  .card {
+    padding: 1rem !important;
+  }
+
+  /* Forms - mobile optimized */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom */
+    padding: 0.875rem !important;
+    border-radius: 0.5rem !important;
+  }
+
+  /* Buttons - larger touch targets */
+  button:not(.icon-only) {
+    min-height: 48px !important;
+    padding: 0.875rem 1.25rem !important;
+    font-size: 1rem !important;
+  }
+
+  /* Icon buttons */
+  button.icon-only {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* Tables - stack or scroll */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -0.75rem;
+    padding: 0 0.75rem;
+  }
+
+  table {
+    min-width: 100%;
+    font-size: 0.875rem;
+  }
+
+  th,
+  td {
+    padding: 0.625rem 0.5rem !important;
+  }
+
+  /* Dialog/Modal - full screen on mobile */
+  [role="dialog"],
+  .modal {
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Navigation tabs - horizontal scroll */
+  [role="tablist"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap !important;
+    gap: 0.5rem !important;
+  }
+
+  [role="tab"] {
+    white-space: nowrap;
+    min-width: max-content;
+  }
+}
+
+/* ============================================================================
+   SPECIFIC COMPONENT ADJUSTMENTS
+============================================================================ */
+
+/* Label Form (Labeling Page) - Mobile */
+@media (max-width: 767px) {
+  .label-form {
+    padding: 1rem !important;
+  }
+
+  .label-form .form-row {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  .label-form input,
+  .label-form select {
+    width: 100% !important;
+  }
+
+  /* Allergen selector - stack vertically */
+  .allergen-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Print buttons */
+  .print-actions {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+
+  .print-actions button {
+    width: 100% !important;
+  }
+}
+
+/* Print Queue - Mobile */
+@media (max-width: 767px) {
+  .print-queue {
+    padding: 0.75rem !important;
+  }
+
+  .print-queue-item {
+    padding: 0.875rem !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .print-queue-actions {
+    width: 100%;
+    margin-top: 0.75rem;
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .print-queue-actions button {
+    flex: 1;
+  }
+}
+
+/* Recipe Management - Mobile */
+@media (max-width: 767px) {
+  .recipe-card {
+    padding: 1rem !important;
+  }
+
+  .recipe-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .recipe-details {
+    flex-direction: column !important;
+  }
+
+  .ingredient-list {
+    font-size: 0.875rem;
+  }
+}
+
+/* Routine Tasks - Mobile */
+@media (max-width: 767px) {
+  .task-card {
+    padding: 0.875rem !important;
+  }
+
+  .task-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .task-actions {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  .subtask-list {
+    margin-left: 0 !important;
+  }
+}
+
+/* Analytics Dashboard - Mobile */
+@media (max-width: 767px) {
+  .chart-container {
+    height: 250px !important;
+    padding: 0.75rem !important;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .stat-card {
+    padding: 1rem !important;
+  }
+}
+
+/* People/Team Management - Mobile */
+@media (max-width: 767px) {
+  .team-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .team-member-card {
+    padding: 1rem !important;
+  }
+
+  .team-member-actions {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+}
+
+/* ============================================================================
+   NAVIGATION & HEADER - Mobile
+============================================================================ */
+
+@media (max-width: 767px) {
+  /* Header adjustments */
+  header {
+    padding: 0.75rem 1rem !important;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Mobile menu toggle */
+  .mobile-menu-toggle {
+    display: block !important;
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Breadcrumbs - horizontal scroll */
+  nav[aria-label="breadcrumb"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  nav[aria-label="breadcrumb"] ol {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+}
+
+/* ============================================================================
+   FORM IMPROVEMENTS - iOS Safari Specific
+============================================================================ */
+
+@supports (-webkit-touch-callout: none) {
+  /* iOS Safari specific fixes */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents zoom on focus */
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* Fix for iOS date/time picker */
+  input[type="date"],
+  input[type="time"] {
+    min-height: 44px !important;
+  }
+
+  /* Fix for select dropdown */
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    padding-right: 2.5rem !important;
+  }
+}
+
+/* ============================================================================
+   LANDSCAPE ORIENTATION - iPhone
+============================================================================ */
+
+@media (max-width: 896px) and (orientation: landscape) {
+  /* Reduce padding in landscape for more content */
+  main {
+    padding: 0.5rem !important;
+  }
+
+  /* Stack forms horizontally in landscape */
+  .label-form .form-row {
+    flex-direction: row !important;
+  }
+
+  /* Smaller modals in landscape */
+  [role="dialog"],
+  .modal {
+    max-height: 90vh !important;
+    overflow-y: auto;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES - Don't affect print output
+============================================================================ */
+
+@media print {
+  /* Reset mobile styles for print */
+  * {
+    transform: none !important;
+    position: static !important;
+  }
+
+  [data-sidebar="sidebar"] {
+    display: none !important;
+  }
+}
+
+/* ============================================================================
+   ACCESSIBILITY IMPROVEMENTS - Mobile
+============================================================================ */
+
+@media (max-width: 1024px) {
+  /* Focus styles - more visible on touch devices */
+  *:focus-visible {
+    outline: 3px solid var(--ring) !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Skip to content link */
+  .skip-to-content {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    padding: 8px 16px;
+    text-decoration: none;
+    z-index: 100;
+  }
+
+  .skip-to-content:focus {
+    top: 0;
+  }
+}
+
+/* ============================================================================
+   UTILITIES - Mobile Specific
+============================================================================ */
+
+/* Hide on mobile */
+.hide-mobile {
+  @media (max-width: 767px) {
+    display: none !important;
+  }
+}
+
+/* Show only on mobile */
+.show-mobile {
+  display: none !important;
+  
+  @media (max-width: 767px) {
+    display: block !important;
+  }
+}
+
+/* Horizontal scroll container */
+.mobile-scroll-x {
+  @media (max-width: 767px) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}
+
+/* Full bleed on mobile (break out of padding) */
+.mobile-full-bleed {
+  @media (max-width: 767px) {
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    border-radius: 0;
+  }
+}
+
+/* Stack on mobile */
+.mobile-stack {
+  @media (max-width: 767px) {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+}
