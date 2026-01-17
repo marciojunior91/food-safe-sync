@@ -1,0 +1,655 @@
+/* ============================================================================
+   IPAD RESPONSIVENESS - Specific optimizations for iPad devices
+   ============================================================================
+   Target: iPad Mini (768px) to iPad Pro (1024px)
+   Strategy: Optimize spacing and touch targets without breaking desktop
+============================================================================ */
+
+/* Only apply these styles to iPad-sized screens */
+@media (min-width: 768px) and (max-width: 1024px) {
+  
+  /* =========================================================================
+     QUICK PRINT GRID - Product Cards
+  ========================================================================= */
+  
+  /* Quick Print container - ensure proper layout */
+  div[class*="space-y"] {
+    width: 100% !important;
+  }
+  
+  /* Optimize grid for iPad - 2 columns gives better card size */
+  .quick-print-grid,
+  div[class*="grid"] > div[class*="grid"],
+  [class*="grid-cols-2"],
+  [class*="grid-cols-3"],
+  [class*="grid-cols-4"],
+  [class*="grid-cols-5"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1.5rem !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  
+  /* Ensure grid parent doesn't interfere */
+  .quick-print-grid > *,
+  div[class*="grid"] > div {
+    grid-column: span 1 !important;
+  }
+  
+  /* Product cards - much larger for iPad */
+  .quick-print-grid button,
+  div[class*="grid"] button[class*="min-h"],
+  button[class*="flex-col items-center"] {
+    min-height: 16rem !important;
+    height: 16rem !important;
+    width: 100% !important;
+    padding: 1.5rem !important;
+    font-size: 1.125rem !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+  }
+  
+  /* Product emoji/icon - larger */
+  .quick-print-grid button div[class*="text-5xl"],
+  .quick-print-grid button div[class*="text-6xl"],
+  button[class*="flex-col"] div[class*="text-"] {
+    font-size: 5rem !important;
+    line-height: 1 !important;
+  }
+  
+  /* Product names - much larger font for readability */
+  .quick-print-grid button span[class*="text-"],
+  .quick-print-grid button span[class*="font-medium"],
+  button[class*="flex-col"] span[class*="text-"] {
+    font-size: 1.25rem !important;
+    line-height: 1.5 !important;
+    max-width: 100% !important;
+    text-align: center !important;
+    word-wrap: break-word !important;
+  }
+  
+  /* Quick add button (+) - much more prominent */
+  .quick-print-grid button div[class*="rounded-full"],
+  .quick-print-grid button > div > div[class*="h-8 w-8"],
+  button div[class*="absolute top-"] div[class*="rounded-full"] {
+    width: 3.5rem !important;
+    height: 3.5rem !important;
+    min-width: 3.5rem !important;
+    min-height: 3.5rem !important;
+  }
+  
+  .quick-print-grid button div[class*="rounded-full"] svg {
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+  
+  /* =========================================================================
+     HEADER & NAVIGATION
+  ========================================================================= */
+  
+  /* Header - prevent overflow and allow wrapping */
+  header {
+    padding: 1rem 1.5rem !important;
+  }
+  
+  /* Header actions container - allow wrapping */
+  header > div,
+  header div[class*="flex"] {
+    flex-wrap: wrap !important;
+    gap: 0.75rem !important;
+  }
+  
+  /* Page header with title and buttons */
+  div[class*="flex items-start justify-between"],
+  div[class*="flex items-center justify-between"] {
+    flex-wrap: wrap !important;
+    gap: 1rem !important;
+  }
+  
+  /* Ensure buttons don't overflow */
+  header button,
+  div[class*="flex items-start"] > button,
+  div[class*="flex items-center"] > button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+  
+  /* Main content - maximize space */
+  main {
+    padding: 1.5rem !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Content containers - full width */
+  main > div {
+    max-width: 100% !important;
+  }
+  
+  /* Increase header touch targets */
+  header button {
+    min-height: 48px !important;
+    padding: 0.75rem 1rem !important;
+  }
+  
+  /* Tabs - better spacing */
+  [role="tablist"] {
+    gap: 1.25rem !important;
+  }
+  
+  [role="tab"] {
+    padding: 1rem 2rem !important;
+    font-size: 1.125rem !important;
+    min-height: 48px !important;
+  }
+  
+  /* Tab buttons specifically */
+  button[role="tab"] {
+    font-weight: 500 !important;
+  }
+  
+  /* =========================================================================
+     SIDEBAR
+  ========================================================================= */
+  
+  /* Sidebar - optimize width for iPad */
+  [data-sidebar="sidebar"] {
+    width: 260px !important;
+    min-width: 260px !important;
+  }
+  
+  /* Sidebar header/logo - prevent text wrapping */
+  [data-sidebar="sidebar"] > div:first-child,
+  [data-sidebar="sidebar"] header,
+  [data-sidebar="sidebar"] div[class*="flex items-center"] {
+    padding: 1rem !important;
+    flex-wrap: nowrap !important;
+    gap: 0.75rem !important;
+  }
+  
+  /* Logo image - fixed size */
+  [data-sidebar="sidebar"] img,
+  [data-sidebar="sidebar"] svg {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Logo text - prevent wrapping */
+  [data-sidebar="sidebar"] span,
+  [data-sidebar="sidebar"] h1,
+  [data-sidebar="sidebar"] div[class*="text"] {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 1.125rem !important;
+    font-weight: 600 !important;
+  }
+  
+  /* Sidebar menu items - increase touch area */
+  [data-sidebar="sidebar"] a,
+  [data-sidebar="sidebar"] button {
+    min-height: 48px !important;
+    padding: 0.875rem 1rem !important;
+    white-space: nowrap !important;
+  }
+  
+  /* =========================================================================
+     FORMS & INPUTS
+  ========================================================================= */
+  
+  /* All form inputs - prevent iOS zoom and improve touch */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom */
+    min-height: 48px !important;
+    padding: 0.875rem 1rem !important;
+  }
+  
+  /* Form labels - larger for readability */
+  label {
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+  }
+  
+  /* =========================================================================
+     BUTTONS
+  ========================================================================= */
+  
+  /* All buttons - minimum touch target */
+  button:not(.icon-only) {
+    min-height: 48px !important;
+    padding: 0.875rem 1.5rem !important;
+    font-size: 1rem !important;
+  }
+  
+  /* Icon-only buttons */
+  button.icon-only,
+  button[class*="w-8"],
+  button[class*="h-8"],
+  button[class*="size-8"] {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 0.5rem !important;
+  }
+  
+  /* Header buttons specifically - ensure they fit */
+  header button,
+  div[class*="flex items-start"] > div > button,
+  div[class*="flex items-center"] > div > button {
+    font-size: 0.9375rem !important;
+    padding: 0.75rem 1.25rem !important;
+    white-space: nowrap !important;
+  }
+  
+  /* Button groups - allow wrapping */
+  div[class*="flex gap"] {
+    flex-wrap: wrap !important;
+  }
+  
+  /* =========================================================================
+     CARDS & CONTAINERS
+  ========================================================================= */
+  
+  /* Card padding - more breathing room */
+  .card,
+  [class*="Card"] {
+    padding: 1.5rem !important;
+  }
+  
+  /* Card headers */
+  .card-header,
+  [class*="CardHeader"] {
+    padding: 1.25rem 1.5rem !important;
+  }
+  
+  /* =========================================================================
+     SEARCH & FILTERS
+  ========================================================================= */
+  
+  /* Search input - prominent on iPad */
+  input[placeholder*="Search"],
+  input[placeholder*="search"],
+  input[type="search"] {
+    min-height: 48px !important;
+    font-size: 1rem !important;
+    padding: 0.875rem 1.25rem !important;
+  }
+  
+  /* Filter buttons */
+  button[class*="filter"],
+  .filter-button {
+    min-height: 48px !important;
+    padding: 0.875rem 1.25rem !important;
+  }
+  
+  /* =========================================================================
+     DIALOGS & MODALS
+  ========================================================================= */
+  
+  /* Dialog containers - optimize for iPad screen */
+  [role="dialog"],
+  .dialog,
+  .modal {
+    max-width: 85vw !important;
+    max-height: 85vh !important;
+  }
+  
+  /* Dialog headers */
+  [role="dialog"] header,
+  .dialog-header,
+  .modal-header {
+    padding: 1.25rem 1.5rem !important;
+  }
+  
+  /* Dialog content */
+  [role="dialog"] main,
+  .dialog-content,
+  .modal-content {
+    padding: 1.5rem !important;
+  }
+  
+  /* =========================================================================
+     PRINT QUEUE
+  ========================================================================= */
+  
+  /* Print queue badge - larger for visibility */
+  .print-queue-badge {
+    min-width: 28px !important;
+    min-height: 28px !important;
+    font-size: 0.875rem !important;
+  }
+  
+  /* Print queue items */
+  .print-queue-item {
+    padding: 1rem 1.25rem !important;
+    min-height: 64px !important;
+  }
+  
+  /* =========================================================================
+     TABLES
+  ========================================================================= */
+  
+  /* Table cells - better padding */
+  table th,
+  table td {
+    padding: 1rem 0.875rem !important;
+    font-size: 0.9375rem !important;
+  }
+  
+  /* Table actions - ensure touch targets */
+  table button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+  
+  /* =========================================================================
+     BADGES & LABELS
+  ========================================================================= */
+  
+  /* Status badges - standard size */
+  .badge,
+  [class*="Badge"],
+  div[class*="Badge"] {
+    padding: 0.5rem 0.875rem !important;
+    font-size: 0.875rem !important;
+    min-height: 28px !important;
+    font-weight: 600 !important;
+  }
+  
+  /* Expiry badges on product cards - FORCE small size */
+  .quick-print-grid .badge,
+  .quick-print-grid [class*="Badge"],
+  .quick-print-grid div[class*="absolute"] [class*="Badge"],
+  .quick-print-grid div[class*="absolute"] > div,
+  .quick-print-grid button div[class*="Badge"],
+  button[class*="flex-col"] div[class*="absolute"] [class*="Badge"],
+  button[class*="flex-col"] div[class*="absolute"] > div,
+  button div[class*="top-2"] [class*="Badge"],
+  button div[class*="top-2"] > div {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.6875rem !important;
+    line-height: 1.2 !important;
+    font-weight: 600 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+    max-width: fit-content !important;
+    height: auto !important;
+    min-height: auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+  
+  /* =========================================================================
+     SPECIFIC PAGE ADJUSTMENTS
+  ========================================================================= */
+  
+  /* Label Management page */
+  .label-form .form-row {
+    gap: 1.25rem !important;
+  }
+  
+  .label-form input,
+  .label-form select {
+    min-height: 48px !important;
+  }
+  
+  /* Recipe page */
+  .recipe-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1.25rem !important;
+  }
+  
+  /* Tasks page */
+  .task-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1.25rem !important;
+  }
+  
+  /* Analytics page */
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1.25rem !important;
+  }
+  
+  .chart-container {
+    min-height: 350px !important;
+  }
+  
+  /* =========================================================================
+     ACCESSIBILITY IMPROVEMENTS
+  ========================================================================= */
+  
+  /* Focus states - more visible on touch devices */
+  *:focus-visible {
+    outline: 3px solid var(--ring) !important;
+    outline-offset: 2px !important;
+  }
+  
+  /* Touch device detection - hover effects are automatic */
+  
+  /* =========================================================================
+     LANDSCAPE ORIENTATION - iPad
+  ========================================================================= */
+  
+  @media (orientation: landscape) {
+    /* Header - single line in landscape */
+    header > div,
+    header div[class*="flex"] {
+      flex-wrap: nowrap !important;
+    }
+    
+    /* Main content - reduce padding for more space */
+    main {
+      padding: 1rem 1.5rem !important;
+      overflow-x: hidden !important;
+    }
+    
+    /* Prevent text wrapping in headings */
+    h1, h2, h3, h4, h5, h6 {
+      white-space: nowrap !important;
+    }
+    
+    /* Page title and section headings */
+    div[class*="text-3xl"],
+    div[class*="text-2xl"],
+    div[class*="text-xl"],
+    span[class*="text-xl"],
+    div[class*="font-bold"],
+    div[class*="font-semibold"] {
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+    
+    /* Quick Print section - full width */
+    div[class*="space-y"] {
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    
+    /* Quick Print card/groupbox - full width */
+    section,
+    div[class*="rounded"],
+    div[class*="border"],
+    .card {
+      width: 100% !important;
+      max-width: 100% !important;
+      overflow-x: hidden !important;
+    }
+    
+    /* 3 columns in landscape - better spacing than 4 */
+    .quick-print-grid,
+    div[class*="grid"] > div[class*="grid"],
+    [class*="grid-cols-2"],
+    [class*="grid-cols-3"],
+    [class*="grid-cols-4"],
+    [class*="grid-cols-5"] {
+      display: grid !important;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+      gap: 1.25rem !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+    
+    /* Ensure all grid items have equal width */
+    .quick-print-grid > *,
+    div[class*="grid"] > div[class*="grid"] > *,
+    [class*="grid-cols"] > * {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+    }
+    
+    /* Cards optimized for landscape - equal sizes */
+    .quick-print-grid button,
+    div[class*="grid"] button[class*="min-h"],
+    button[class*="flex-col items-center"] {
+      min-height: 13rem !important;
+      height: 13rem !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+    }
+    
+    /* Slightly smaller emoji in landscape */
+    .quick-print-grid button div[class*="text-5xl"],
+    .quick-print-grid button div[class*="text-6xl"],
+    button[class*="flex-col"] div[class*="text-"] {
+      font-size: 3.5rem !important;
+    }
+    
+    /* Product names */
+    .quick-print-grid button span[class*="text-"],
+    button[class*="flex-col"] span[class*="text-"] {
+      font-size: 1rem !important;
+    }
+    
+    /* Quick add button */
+    .quick-print-grid button div[class*="rounded-full"],
+    button div[class*="absolute top-"] div[class*="rounded-full"] {
+      width: 2.75rem !important;
+      height: 2.75rem !important;
+      min-width: 2.75rem !important;
+      min-height: 2.75rem !important;
+    }
+    
+    .quick-print-grid button div[class*="rounded-full"] svg {
+      width: 1.5rem !important;
+      height: 1.5rem !important;
+    }
+    
+    /* Other grids - 3 columns */
+    .recipe-grid,
+    .task-grid,
+    .dashboard-grid {
+      grid-template-columns: repeat(3, 1fr) !important;
+    }
+    
+    /* Adjust sidebar for landscape */
+    [data-sidebar="sidebar"] {
+      width: 240px !important;
+      min-width: 240px !important;
+    }
+    
+    /* Sidebar logo/header - compact in landscape */
+    [data-sidebar="sidebar"] > div:first-child,
+    [data-sidebar="sidebar"] header {
+      padding: 0.75rem 1rem !important;
+      flex-wrap: nowrap !important;
+      white-space: nowrap !important;
+    }
+    
+    /* Logo image - slightly smaller in landscape */
+    [data-sidebar="sidebar"] img,
+    [data-sidebar="sidebar"] svg {
+      width: 28px !important;
+      height: 28px !important;
+      min-width: 28px !important;
+      min-height: 28px !important;
+      flex-shrink: 0 !important;
+    }
+    
+    /* Logo text - smaller in landscape, no wrap */
+    [data-sidebar="sidebar"] span,
+    [data-sidebar="sidebar"] h1,
+    [data-sidebar="sidebar"] div[class*="font"] {
+      font-size: 0.9375rem !important;
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+    
+    /* Quick Print heading - no wrap */
+    h2,
+    h3,
+    div[class*="text-2xl"],
+    div[class*="text-xl"],
+    span[class*="text-xl"] {
+      white-space: nowrap !important;
+      overflow: visible !important;
+    }
+    
+    /* Tabs - more compact */
+    [role="tab"] {
+      padding: 0.875rem 1.5rem !important;
+      font-size: 1rem !important;
+    }
+    
+    /* Badges in landscape - keep small */
+    .quick-print-grid .badge,
+    .quick-print-grid [class*="Badge"],
+    .quick-print-grid div[class*="absolute"] [class*="Badge"],
+    .quick-print-grid div[class*="absolute"] > div,
+    button[class*="flex-col"] div[class*="absolute"] [class*="Badge"],
+    button[class*="flex-col"] div[class*="absolute"] > div,
+    button div[class*="top-2"] [class*="Badge"],
+    button div[class*="top-2"] > div {
+      padding: 0.25rem 0.5rem !important;
+      font-size: 0.6875rem !important;
+      line-height: 1.2 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-align: center !important;
+    }
+  }
+}
+
+/* ============================================================================
+   UTILITIES FOR IPAD
+============================================================================ */
+
+/* Hide on iPad only */
+.hide-ipad {
+  @media (min-width: 768px) and (max-width: 1024px) {
+    display: none !important;
+  }
+}
+
+/* Show only on iPad */
+.show-ipad {
+  display: none !important;
+  
+  @media (min-width: 768px) and (max-width: 1024px) {
+    display: block !important;
+  }
+}
+
+/* Touch-friendly scrolling for iPad */
+.ipad-scroll {
+  @media (min-width: 768px) and (max-width: 1024px) {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+}
