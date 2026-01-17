@@ -1,7 +1,8 @@
 {
   "buildCommand": "cd 'Tampa APP' && npm run build",
   "outputDirectory": "Tampa APP/dist",
-  "installCommand": "cd 'Tampa APP' && npm install",
+  "installCommand": "cd 'Tampa APP' && npm install --legacy-peer-deps",
+  "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",
