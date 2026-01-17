@@ -67,36 +67,39 @@ export default function Dashboard() {
     try {
       setLoading(true);
       
-      // Fetch recent prepared items with recipe details
-      const { data: preparedItems, error } = await supabase
-        .from('prepared_items')
+      // Fetch recent recipes as placeholder until prepared_items table is created
+      const { data: recipes, error } = await supabase
+        .from('recipes')
         .select(`
-          *,
-          recipes:recipe_id (
-            name,
-            hold_time_days,
-            allergens
-          )
+          id,
+          name,
+          hold_time_days,
+          allergens,
+          created_at
         `)
-        .order('prepared_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching recipes:', error);
+        setRecentActivity([]);
+        return;
+      }
 
-      const processedActivity = preparedItems?.map(item => {
-        const recipe = item.recipes as any;
-        
-        // Calculate expiry based on hold time in days
-        const expiryDate = addDays(new Date(item.prepared_at), recipe.hold_time_days || 3);
+      const processedActivity = recipes?.map(recipe => {
+        // Use current time as placeholder for prepared_at
+        const preparedAt = new Date();
+        const expiryDate = addDays(preparedAt, recipe.hold_time_days || 3);
         const isExpiringSoon = isAfter(new Date(), addDays(expiryDate, -1)); // 1 day before expiry
         const isExpired = isAfter(new Date(), expiryDate);
 
         return {
-          ...item,
-          recipe_name: recipe?.name || 'Unknown Recipe',
+          id: recipe.id,
+          recipe_name: recipe.name,
+          prepared_at: preparedAt.toISOString(),
           expiry_date: expiryDate,
           status: isExpired ? 'expired' : isExpiringSoon ? 'expiring' : 'good',
-          allergens: recipe?.allergens || []
+          allergens: recipe.allergens || []
         };
       }) || [];
 
