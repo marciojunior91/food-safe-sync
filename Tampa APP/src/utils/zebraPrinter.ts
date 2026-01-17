@@ -283,8 +283,15 @@ const sendToPrinter = async (zpl: string, quantity: number = 1): Promise<void> =
 /**
  * Main function to print a label
  * Saves to database first, then sends to printer with labelId in QR code
+ * 
+ * @param data - Label data to print
+ * @param testMode - If true, only saves to database without trying to connect to printer (for testing)
+ *                   Can also be controlled via VITE_PRINTER_TEST_MODE environment variable
  */
-export const printLabel = async (data: LabelPrintData): Promise<{ success: boolean; labelId?: string; error?: string }> => {
+export const printLabel = async (
+  data: LabelPrintData, 
+  testMode: boolean = import.meta.env.VITE_PRINTER_TEST_MODE === 'true'
+): Promise<{ success: boolean; labelId?: string; error?: string; zpl?: string }> => {
   try {
     // 1. Save to database first to get the labelId
     const labelId = await saveLabelToDatabase(data);
@@ -293,7 +300,20 @@ export const printLabel = async (data: LabelPrintData): Promise<{ success: boole
     const dataWithLabelId = { ...data, labelId: labelId || undefined };
     const zpl = generateZPL(dataWithLabelId);
 
-    // 3. Send to printer
+    // 3. TEST MODE: Skip printer connection, just return success with ZPL for preview
+    if (testMode) {
+      console.log('🧪 TEST MODE: Label saved to database, skipping printer connection');
+      console.log('💾 Label ID:', labelId);
+      console.log('✅ Database insert successful!');
+      console.log('📄 ZPL Code generated (', zpl.length, 'characters)');
+      return {
+        success: true,
+        labelId: labelId || undefined,
+        zpl: zpl, // Return ZPL for preview/download
+      };
+    }
+
+    // 4. PRODUCTION MODE: Send to printer
     const printQuantity = data.quantity ? parseInt(data.quantity) : 1;
     await sendToPrinter(zpl, printQuantity);
 

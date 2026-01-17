@@ -72,7 +72,7 @@ export class ZebraPrinter implements PrinterDriver {
     return this.connected;
   }
 
-  async print(labelData: any): Promise<boolean> {
+  async print(labelData: any, testMode: boolean = import.meta.env.VITE_PRINTER_TEST_MODE === 'true'): Promise<boolean> {
     try {
       // Convert label data to LabelPrintData format
       const printData = await this.convertToLabelPrintData(labelData);
@@ -81,13 +81,20 @@ export class ZebraPrinter implements PrinterDriver {
       // 1. Save to database (get labelId)
       // 2. Generate ZPL with BOPP design
       // 3. Include labelId in QR code
-      const result = await printWithZebra(printData);
+      // testMode=true: Skip printer connection, only save to DB
+      const result = await printWithZebra(printData, testMode);
       
       if (!result.success) {
         throw new Error(result.error || 'Print failed');
       }
       
-      console.log(`Label printed successfully. LabelId: ${result.labelId}`);
+      if (testMode) {
+        console.log(`🧪 TEST MODE: Label saved to DB. LabelId: ${result.labelId}`);
+        console.log('ZPL Preview:', result.zpl);
+      } else {
+        console.log(`Label printed successfully. LabelId: ${result.labelId}`);
+      }
+      
       return true;
     } catch (error) {
       console.error('ZPL generation error:', error);

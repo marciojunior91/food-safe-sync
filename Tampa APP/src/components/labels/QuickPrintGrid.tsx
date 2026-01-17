@@ -714,14 +714,19 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                               
                               {/* Quick Add Button (Top-Right) */}
                               {!isLoading && !isSuccess && (
-                                <Button
-                                  size="icon"
-                                  variant="secondary"
-                                  className="h-8 w-8 rounded-full shadow-md hover:scale-110 bg-primary text-primary-foreground hover:bg-primary/90 pointer-events-auto transition-transform shrink-0"
+                                <div
+                                  role="button"
+                                  tabIndex={0}
+                                  className="h-8 w-8 rounded-full shadow-md hover:scale-110 bg-primary text-primary-foreground hover:bg-primary/90 pointer-events-auto transition-transform shrink-0 flex items-center justify-center cursor-pointer"
                                   onClick={(e) => handleQuickAdd(e, product)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      handleQuickAdd(e as any, product);
+                                    }
+                                  }}
                                 >
                                   <Plus className="w-4 h-4" />
-                                </Button>
+                                </div>
                               )}
                             </div>
                             
