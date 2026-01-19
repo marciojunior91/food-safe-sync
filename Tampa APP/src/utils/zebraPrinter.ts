@@ -104,67 +104,67 @@ const generateZPL = (data: LabelPrintData): string => {
 
 ^XA
 ^MMT
-^PW394  // 5cm = 394 dots at 203 DPI
-^LL394  // 5cm = 394 dots at 203 DPI
+^PW812  // 4 inches = 812 dots at 203 DPI (102mm)
+^LL1218 // 6 inches = 1218 dots at 203 DPI (152mm)
 ^LS0
 
-// Product Name Header (scaled from 560x60 to 354x40)
-^FO15,15^GB364,40,2^FS
-^FO20,18^A0N,30,30^FD${productName}^FS
+// Product Name Header (bold, centered)
+^FO30,30^GB752,80,3^FS
+^FO50,45^A0N,50,50^FD${productName}^FS
 
-^FO15,60^GB364,1,1^FS
+^FO30,120^GB752,2,2^FS
 
-// Condition & Quantity (scaled font from 24 to 18)
-^FO20,65^A0N,18,18^FD${condition.toUpperCase()}${quantity ? ` / ${quantity} ${unit || ''}` : ''}^FS
+// Condition & Quantity
+^FO50,140^A0N,35,35^FD${condition.toUpperCase()}${quantity ? ` / ${quantity} ${unit || ''}` : ''}^FS
 
-^FO15,88^GB364,1,1^FS
+^FO30,190^GB752,2,2^FS
 
-// Manufacturing & Expiry Dates (scaled font from 20 to 15)
-^FO20,93^A0N,15,15^FDMfg Date:^FS
-^FO150,93^A0N,15,15^FD${prepDate}^FS
+// Manufacturing & Expiry Dates
+^FO50,210^A0N,30,30^FDMfg Date:^FS
+^FO350,210^A0N,30,30^FD${prepDate}^FS
 
-^FO20,110^A0N,15,15^FDExpiry:^FS
-^FO150,110^A0N,15,15^FD${expiryDate}^FS
+^FO50,260^A0N,30,30^FDExpiry:^FS
+^FO350,260^A0N,30,30^FD${expiryDate}^FS
 
 ${data.batchNumber ? `
-^FO20,127^A0N,14,14^FDBatch:^FS
-^FO100,127^A0N,14,14^FD${data.batchNumber}^FS
+^FO50,310^A0N,28,28^FDBatch:^FS
+^FO250,310^A0N,28,28^FD${data.batchNumber}^FS
 ` : ''}
 
 ${categoryName && categoryName !== 'Quick Print' ? `
-^FO20,${data.batchNumber ? '144' : '127'}^A0N,14,14^FDCategory:^FS
-^FO100,${data.batchNumber ? '144' : '127'}^A0N,14,14^FD${categoryName}^FS
+^FO50,${data.batchNumber ? '360' : '310'}^A0N,28,28^FDCategory:^FS
+^FO250,${data.batchNumber ? '360' : '310'}^A0N,28,28^FD${categoryName}^FS
 ` : ''}
 
-^FO15,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '162' : '145') : (data.batchNumber ? '145' : '127')}^GB364,1,1^FS
+^FO30,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '410' : '360') : (data.batchNumber ? '360' : '310')}^GB752,2,2^FS
 
 ${allergens && allergens.length > 0 ? `
-^FO20,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '167' : '150') : (data.batchNumber ? '150' : '132')}^A0N,13,13^FDAllergens:^FS
-^FO20,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '182' : '165') : (data.batchNumber ? '165' : '147')}^A0N,12,12^FD${allergenText.length > 35 ? allergenText.substring(0, 35) + '...' : allergenText}^FS
-^FO15,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '198' : '181') : (data.batchNumber ? '181' : '163')}^GB364,1,1^FS
+^FO50,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '430' : '380') : (data.batchNumber ? '380' : '330')}^A0N,26,26^FDAllergens:^FS
+^FO50,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '470' : '420') : (data.batchNumber ? '420' : '370')}^A0N,24,24^FD${allergenText.length > 45 ? allergenText.substring(0, 45) + '...' : allergenText}^FS
+^FO30,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '510' : '460') : (data.batchNumber ? '460' : '410')}^GB752,2,2^FS
 ` : ''}
 
-// Prepared By (scaled font from 20 to 15)
-^FO20,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '203' : '186') : (data.batchNumber ? '186' : '168')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '167' : '150') : (data.batchNumber ? '150' : '132'))
-}^A0N,15,15^FDPrepared By: ${preparedByName.toUpperCase()}^FS
+// Prepared By
+^FO50,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '530' : '480') : (data.batchNumber ? '480' : '430')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '430' : '380') : (data.batchNumber ? '380' : '330'))
+}^A0N,28,28^FDPrepared By: ${preparedByName.toUpperCase()}^FS
 
-^FO15,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '220' : '203') : (data.batchNumber ? '203' : '185')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '184' : '167') : (data.batchNumber ? '167' : '149'))
-}^GB364,1,1^FS
+^FO30,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '570' : '520') : (data.batchNumber ? '520' : '470')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '470' : '420') : (data.batchNumber ? '420' : '370'))
+}^GB752,2,2^FS
 
-${labelId ? `^FO20,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '225' : '208') : (data.batchNumber ? '208' : '190')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '189' : '172') : (data.batchNumber ? '172' : '154'))
-}^A0N,10,10^FD#${labelId.substring(0, 8).toUpperCase()}^FS` : ''}
+${labelId ? `^FO50,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '590' : '540') : (data.batchNumber ? '540' : '490')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '490' : '440') : (data.batchNumber ? '440' : '390'))
+}^A0N,20,20^FDLabel ID: #${labelId.substring(0, 8).toUpperCase()}^FS` : ''}
 
-// QR Code (scaled from size 4 to size 3, moved to bottom right)
-^FO300,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '250' : '233') : (data.batchNumber ? '233' : '215')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '214' : '197') : (data.batchNumber ? '197' : '179'))
-}^BQN,2,3^FDQA,${qrData}^FS
+// QR Code (bottom right, larger for readability)
+^FO600,${allergens && allergens.length > 0 ? 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '950' : '900') : (data.batchNumber ? '900' : '850')) : 
+  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '850' : '800') : (data.batchNumber ? '800' : '750'))
+}^BQN,2,6^FDQA,${qrData}^FS
 
 ^XZ
 `;
@@ -261,17 +261,22 @@ const sendToPrinter = async (zpl: string, quantity: number = 1): Promise<void> =
 
       socket.onerror = (error) => {
         console.error('Printer WebSocket Error:', error);
+        console.error('Error details:', {
+          type: error.type,
+          readyState: socket.readyState
+        });
         socket.close();
-        reject(new Error('Failed to connect to printer. Make sure Zebra Browser Print is running.'));
+        reject(new Error('Failed to connect to printer. Make sure Zebra Printer Setup is running and Web Services is enabled.'));
       };
 
-      // Timeout after 5 seconds
+      // Timeout after 10 seconds (increased for Bluetooth latency)
       setTimeout(() => {
         if (socket.readyState !== WebSocket.CLOSED) {
+          console.warn('WebSocket timeout - closing connection');
           socket.close();
-          reject(new Error('Printer connection timeout'));
+          reject(new Error('Printer connection timeout. Check if Zebra Printer Setup is connected to printer.'));
         }
-      }, 5000);
+      }, 10000);
 
     } catch (error) {
       console.error('Error setting up printer connection:', error);

@@ -27,6 +27,7 @@ import LabelCategories from "./pages/LabelCategories";
 import UserProfile from "./components/people/UserProfile";
 import PricingPage from "./pages/PricingPage";
 import Billing from "./pages/Billing";
+import FeedModuleV2 from "./pages/FeedModuleV2";
 
 const queryClient = new QueryClient();
 
@@ -54,7 +55,8 @@ const App = () => (
                 <Route path="training" element={<Training />} />
                 <Route path="people" element={<People />} />
                 <Route path="people/:userId" element={<UserProfile />} />
-                <Route path="feed" element={<Feed />} />
+                <Route path="feed" element={<FeedModuleV2 />} />
+                <Route path="feed-old" element={<Feed />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="traffic-light" element={<ProductTrafficLight />} />
               <Route path="drafts" element={<DraftManagement />} />

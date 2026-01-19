@@ -3,6 +3,7 @@
 // Team member selection allows staff to identify themselves on shared accounts
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -20,11 +21,13 @@ import { Plus, RefreshCw, User, AlertCircle } from "lucide-react";
 import type { TeamMember } from "@/types/teamMembers";
 
 export default function FeedModule() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { context, loading: contextLoading } = useUserContext();
   const [filters, setFilters] = useState<FeedFiltersType>({});
   const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
   
   const {
     feedItems,
@@ -35,6 +38,14 @@ export default function FeedModule() {
     markAsRead,
     deleteFeedItem,
   } = useFeed(context?.user_id, context?.organization_id);
+
+  // Auto-open user selection dialog on first mount if no user selected
+  useEffect(() => {
+    if (!contextLoading && context?.organization_id && !selectedUser && !hasAutoOpened) {
+      setUserDialogOpen(true);
+      setHasAutoOpened(true);
+    }
+  }, [contextLoading, context?.organization_id, selectedUser, hasAutoOpened]);
 
   // Fetch feed on mount and when filters change
   useEffect(() => {
@@ -180,10 +191,11 @@ export default function FeedModule() {
                 variant="outline"
                 size="sm"
                 className="shrink-0"
-                onClick={() => toast({
-                  title: "Navigate to People",
-                  description: "Open People module to complete profile",
-                })}
+                onClick={() => {
+                  // Navigate to People module with this member ID
+                  // For admins: go directly, for staff: will require PIN verification
+                  navigate(`/people/${selectedUser.id}`);
+                }}
               >
                 Complete Profile
               </Button>

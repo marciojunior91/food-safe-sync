@@ -1,5 +1,7 @@
-// UserProfile Component - Detailed user view with tabs
-// Shows complete user information, documents, activity, and settings
+// UserProfile Component - Team Member Profile View
+// Shows complete team member information, documents, and settings
+// Note: This component displays TEAM MEMBERS (real people with profiles)
+// NOT auth users (which are just shared login accounts)
 
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -10,9 +12,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { usePeople } from "@/hooks/usePeople";
+import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useUserContext } from "@/hooks/useUserContext";
-import { UserProfile as UserProfileType, UserDocument } from "@/types/people";
+import { TeamMember } from "@/types/teamMembers";
 import {
   ArrowLeft,
   Mail,
@@ -32,34 +34,34 @@ import {
   CheckCircle,
   Clock,
 } from "lucide-react";
-import { format, formatDistanceToNow, isAfter, isBefore, addDays } from "date-fns";
-import EditUserDialog from "./EditUserDialog";
+import { format, formatDistanceToNow } from "date-fns";
+import { TeamMemberEditDialog } from "./TeamMemberEditDialog";
 
 export default function UserProfile() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context } = useUserContext();
-  const { users, loading, fetchUsers } = usePeople(context?.organization_id);
+  const { teamMembers, loading, fetchTeamMembers } = useTeamMembers();
   
   const [activeTab, setActiveTab] = useState("overview");
-  const [user, setUser] = useState<UserProfileType | null>(null);
+  const [teamMember, setTeamMember] = useState<TeamMember | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  // Fetch user data
+  // Fetch team members
   useEffect(() => {
     if (context?.organization_id && userId) {
-      fetchUsers({ search: userId });
+      fetchTeamMembers({ organization_id: context.organization_id });
     }
-  }, [context?.organization_id, userId, fetchUsers]);
+  }, [context?.organization_id, userId]);
 
-  // Find the specific user
+  // Find the specific team member by ID
   useEffect(() => {
-    if (users.length > 0 && userId) {
-      const foundUser = users.find((u) => u.user_id === userId);
-      setUser(foundUser || null);
+    if (teamMembers.length > 0 && userId) {
+      const foundMember = teamMembers.find((m) => m.id === userId);
+      setTeamMember(foundMember || null);
     }
-  }, [users, userId]);
+  }, [teamMembers, userId]);
 
   // Get user initials for avatar
   const getInitials = (name: string) => {
@@ -71,104 +73,25 @@ export default function UserProfile() {
       .slice(0, 2);
   };
 
-  // Get role color
-  const getRoleColor = (role: string) => {
-    const colors = {
-      admin: "bg-red-500",
-      owner: "bg-purple-500",
-      leader_chef: "bg-orange-500",
-      cook: "bg-blue-500",
-      barista: "bg-green-500",
-    };
-    return colors[role as keyof typeof colors] || "bg-gray-500";
-  };
-
-  // Get role badge variant
-  const getRoleBadgeVariant = (role: string) => {
-    const variants = {
-      admin: "destructive",
-      owner: "default",
-      leader_chef: "secondary",
-      cook: "outline",
-      barista: "outline",
-    };
-    return variants[role as keyof typeof variants] || "outline";
-  };
-
-  // Calculate compliance status
-  const getComplianceStatus = (documents?: UserDocument[]) => {
-    if (!documents || documents.length === 0) {
-      return {
-        status: "no_documents",
-        badge: <Badge variant="outline">No Documents</Badge>,
-        color: "text-muted-foreground",
-      };
-    }
-
-    const now = new Date();
-    const thirtyDaysFromNow = addDays(now, 30);
-
-    const hasExpired = documents.some(
-      (doc) => doc.expiration_date && isBefore(new Date(doc.expiration_date), now)
-    );
-
-    const hasExpiringSoon = documents.some(
-      (doc) =>
-        doc.expiration_date &&
-        isAfter(new Date(doc.expiration_date), now) &&
-        isBefore(new Date(doc.expiration_date), thirtyDaysFromNow)
-    );
-
-    if (hasExpired) {
-      return {
-        status: "expired",
-        badge: <Badge variant="destructive">🔴 Expired Documents</Badge>,
-        color: "text-red-600",
-      };
-    }
-
-    if (hasExpiringSoon) {
-      return {
-        status: "expiring",
-        badge: <Badge className="bg-amber-600">🟡 Expiring Soon</Badge>,
-        color: "text-amber-600",
-      };
-    }
-
-    return {
-      status: "compliant",
-      badge: <Badge className="bg-green-600">✅ Compliant</Badge>,
-      color: "text-green-600",
-    };
-  };
-
-  // Handle edit user
+  // Handle edit team member
   const handleEdit = () => {
     setEditDialogOpen(true);
   };
 
   // Handle edit success
   const handleEditSuccess = () => {
-    // Refresh user data
+    // Refresh team member data
     if (context?.organization_id && userId) {
-      fetchUsers({ search: userId });
+      fetchTeamMembers({ organization_id: context.organization_id });
     }
   };
 
-  // Handle delete user
+  // Handle delete team member
   const handleDelete = () => {
     toast({
       title: "Are you sure?",
-      description: "Delete user functionality will be implemented with confirmation.",
+      description: "Delete team member functionality will be implemented with confirmation.",
       variant: "destructive",
-    });
-  };
-
-  // Handle document upload
-  const handleUploadDocument = () => {
-    toast({
-      title: "Coming soon!",
-      description: "Document upload will be implemented.",
     });
   };
 
@@ -176,7 +99,7 @@ export default function UserProfile() {
   const canEdit =
     context?.user_role === "admin" ||
     context?.user_role === "owner" ||
-    context?.user_id === userId;
+    context?.user_role === "manager";
 
   // Loading state
   if (loading) {
@@ -191,17 +114,17 @@ export default function UserProfile() {
     );
   }
 
-  // User not found
-  if (!user) {
+  // Team member not found
+  if (!teamMember) {
     return (
       <div className="container mx-auto p-4 sm:p-6 space-y-6">
         <Card>
           <CardContent className="p-12 text-center space-y-4">
             <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground" />
             <div>
-              <p className="font-medium">User not found</p>
+              <p className="font-medium">Team Member not found</p>
               <p className="text-sm text-muted-foreground">
-                The user profile you're looking for doesn't exist or you don't have access.
+                The team member profile you're looking for doesn't exist or you don't have access.
               </p>
             </div>
             <Button onClick={() => navigate("/people")} variant="outline">
@@ -213,8 +136,6 @@ export default function UserProfile() {
       </div>
     );
   }
-
-  const compliance = getComplianceStatus(user.user_documents);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 space-y-6">
@@ -228,9 +149,9 @@ export default function UserProfile() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-3xl font-bold tracking-tight">User Profile</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Team Member Profile</h1>
           <p className="text-muted-foreground">
-            View and manage user information
+            {teamMember.display_name}
           </p>
         </div>
         {canEdit && (
@@ -239,9 +160,7 @@ export default function UserProfile() {
               <Edit className="w-4 h-4 mr-2" />
               Edit
             </Button>
-            {(context?.user_role === "admin" || 
-              context?.user_role === "owner" || 
-              context?.user_role === "leader_chef") && (
+            {(context?.user_role === "admin" || context?.user_role === "owner") && (
               <Button variant="destructive" onClick={handleDelete}>
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
@@ -251,345 +170,120 @@ export default function UserProfile() {
         )}
       </div>
 
-      {/* User Header Card */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Avatar */}
-            <div className="flex flex-col items-center gap-3">
-              <Avatar className={`w-24 h-24 ${getRoleColor(user.role)} text-white text-2xl`}>
-                <AvatarFallback className="bg-transparent">
-                  {getInitials(user.display_name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="text-center">
-                <Badge variant={getRoleBadgeVariant(user.role) as any}>
-                  {user.role === "leader_chef" ? "Leader Chef" : user.role}
-                </Badge>
+        {/* Team Member Profile Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <Avatar className="w-20 h-20">
+                  <AvatarFallback className="text-2xl">
+                    {getInitials(teamMember.display_name || "?")}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle className="text-2xl">{teamMember.display_name}</CardTitle>
+                  <CardDescription className="text-base mt-1">
+                    {teamMember.position || "No position set"}
+                  </CardDescription>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge variant="outline">
+                      {teamMember.role_type}
+                    </Badge>
+                    {!teamMember.profile_complete && (
+                      <Badge variant="destructive">
+                        Profile Incomplete
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Contact Information */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Contact Information</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {teamMember.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{teamMember.email}</span>
+                  </div>
+                )}
+                {teamMember.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{teamMember.phone}</span>
+                  </div>
+                )}
+                {teamMember.address && (
+                  <div className="flex items-center gap-2 sm:col-span-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">{teamMember.address}</span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* User Info */}
-            <div className="flex-1 space-y-4">
-              <div>
-                <h2 className="text-2xl font-bold">{user.display_name}</h2>
-                {user.position && (
-                  <p className="text-muted-foreground">{user.position}</p>
-                )}
-              </div>
+            <Separator />
 
-              <div className="flex flex-wrap gap-2">
-                {compliance.badge}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {user.email && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
-                    <a href={`mailto:${user.email}`} className="hover:underline">
-                      {user.email}
-                    </a>
-                  </div>
-                )}
-                {user.phone && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="w-4 h-4 text-muted-foreground" />
-                    <a href={`tel:${user.phone}`} className="hover:underline">
-                      {user.phone}
-                    </a>
-                  </div>
-                )}
-                {user.hire_date && (
-                  <div className="flex items-center gap-2 text-sm">
+            {/* Employment Information */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Employment Details</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {teamMember.hire_date && (
+                  <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>
-                      Hired {format(new Date(user.hire_date), "MMM d, yyyy")}
+                    <span className="text-sm">
+                      Hired: {format(new Date(teamMember.hire_date), "MMM d, yyyy")}
                     </span>
                   </div>
                 )}
-                {user.department_id && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Briefcase className="w-4 h-4 text-muted-foreground" />
-                    <span>Dept: {user.department_id}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm">Role: {teamMember.role_type}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">
-            <Shield className="w-4 h-4 mr-2" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="documents">
-            <FileText className="w-4 h-4 mr-2" />
-            Documents
-          </TabsTrigger>
-          <TabsTrigger value="activity">
-            <Activity className="w-4 h-4 mr-2" />
-            Activity
-          </TabsTrigger>
-          <TabsTrigger value="settings">
-            <Settings className="w-4 h-4 mr-2" />
-            Settings
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Basic user details and contact information</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                  <p className="mt-1">{user.display_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Email</label>
-                  <p className="mt-1">{user.email || "Not provided"}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Phone</label>
-                  <p className="mt-1">{user.phone || "Not provided"}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Position</label>
-                  <p className="mt-1">{user.position || "Not specified"}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Department</label>
-                  <p className="mt-1">{user.department_id || "Not assigned"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Employment Information</CardTitle>
-              <CardDescription>Work-related details and status</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Role</label>
-                  <p className="mt-1">
-                    <Badge variant={getRoleBadgeVariant(user.role) as any}>
-                      {user.role === "leader_chef" ? "Leader Chef" : user.role}
-                    </Badge>
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Hire Date</label>
-                  <p className="mt-1">
-                    {user.hire_date
-                      ? format(new Date(user.hire_date), "MMM d, yyyy")
-                      : "Not provided"}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Time at Company</label>
-                  <p className="mt-1">
-                    {user.hire_date
-                      ? formatDistanceToNow(new Date(user.hire_date), { addSuffix: false })
-                      : "Unknown"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Compliance Status</CardTitle>
-              <CardDescription>Document compliance and certifications</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {compliance.status === "compliant" && (
-                    <CheckCircle className="w-8 h-8 text-green-600" />
-                  )}
-                  {compliance.status === "expiring" && (
-                    <Clock className="w-8 h-8 text-amber-600" />
-                  )}
-                  {compliance.status === "expired" && (
-                    <AlertCircle className="w-8 h-8 text-red-600" />
-                  )}
-                  <div>
-                    <p className={`font-medium ${compliance.color}`}>
-                      {compliance.status === "compliant" && "All Documents Valid"}
-                      {compliance.status === "expiring" && "Documents Expiring Soon"}
-                      {compliance.status === "expired" && "Expired Documents"}
-                      {compliance.status === "no_documents" && "No Documents on File"}
+            {!teamMember.profile_complete && teamMember.required_fields_missing && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg text-amber-600">Missing Information</h3>
+                  <div className="bg-amber-50 dark:bg-amber-950/20 p-4 rounded-lg">
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Please complete the following fields to finish profile setup:
                     </p>
-                    <p className="text-sm text-muted-foreground">
-                      {user.user_documents?.length || 0} document(s) on file
-                    </p>
+                    <ul className="list-disc list-inside mt-2 text-sm text-amber-700 dark:text-amber-300">
+                      {teamMember.required_fields_missing.map((field: string) => (
+                        <li key={field}>{field}</li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
-                <Button variant="outline" onClick={() => setActiveTab("documents")}>
-                  View Documents
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </>
+            )}
 
-        {/* Documents Tab */}
-        <TabsContent value="documents" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Documents & Certifications</CardTitle>
-                  <CardDescription>
-                    Manage user documents, certificates, and compliance files
-                  </CardDescription>
-                </div>
-                {canEdit && (
-                  <Button onClick={handleUploadDocument}>
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Document
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {!user.user_documents || user.user_documents.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="font-medium">No documents on file</p>
-                  <p className="text-sm text-muted-foreground">
-                    Upload certificates and compliance documents
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {user.user_documents.map((doc) => {
-                    const isExpired =
-                      doc.expiration_date &&
-                      isBefore(new Date(doc.expiration_date), new Date());
-                    const isExpiringSoon =
-                      doc.expiration_date &&
-                      !isExpired &&
-                      isBefore(new Date(doc.expiration_date), addDays(new Date(), 30));
+            <Separator />
 
-                    return (
-                      <Card key={doc.id}>
-                        <CardContent className="pt-6">
-                          <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-4">
-                              <div className="p-3 bg-muted rounded-lg">
-                                <FileText className="w-6 h-6" />
-                              </div>
-                              <div className="space-y-1">
-                                <p className="font-medium">{doc.document_name}</p>
-                                <p className="text-xs text-muted-foreground capitalize">
-                                  {doc.document_type.replace("_", " ")}
-                                </p>
-                                {doc.expiration_date && (
-                                  <p className="text-sm text-muted-foreground">
-                                    Expires: {format(new Date(doc.expiration_date), "MMM d, yyyy")}
-                                    {!isExpired && (
-                                      <span className="ml-2">
-                                        ({formatDistanceToNow(new Date(doc.expiration_date), {
-                                          addSuffix: true,
-                                        })})
-                                      </span>
-                                    )}
-                                  </p>
-                                )}
-                                <div className="flex items-center gap-2">
-                                  {isExpired && (
-                                    <Badge variant="destructive" className="text-xs">
-                                      Expired
-                                    </Badge>
-                                  )}
-                                  {isExpiringSoon && (
-                                    <Badge className="bg-amber-600 text-xs">
-                                      Expiring Soon
-                                    </Badge>
-                                  )}
-                                  {!isExpired && !isExpiringSoon && (
-                                    <Badge className="bg-green-600 text-xs">
-                                      Valid
-                                    </Badge>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <Button variant="ghost" size="sm">
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            {/* Edit Button */}
+            <div className="flex justify-end">
+              <Button onClick={handleEdit}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Profile & Upload Documents
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Activity Tab */}
-        <TabsContent value="activity" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-              <CardDescription>User actions and timeline</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="font-medium">Activity tracking coming soon</p>
-                <p className="text-sm text-muted-foreground">
-                  View task completions, logins, and system actions
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Settings Tab */}
-        <TabsContent value="settings" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Settings</CardTitle>
-              <CardDescription>Manage permissions and preferences</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Settings className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="font-medium">Settings management coming soon</p>
-                <p className="text-sm text-muted-foreground">
-                  Configure notifications, permissions, and preferences
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-
-      {/* Edit User Dialog */}
-      {user && (
-        <EditUserDialog
+        {/* Team Member Edit Dialog */}
+        <TeamMemberEditDialog
+          teamMember={teamMember}
           open={editDialogOpen}
           onOpenChange={setEditDialogOpen}
-          user={user}
           onSuccess={handleEditSuccess}
         />
-      )}
-    </div>
-  );
+      </div>
+    );
 }

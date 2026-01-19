@@ -206,6 +206,11 @@ export const useTeamMembers = () => {
       // Refresh list
       await fetchTeamMembers();
 
+      // Check and update profile completion after edit
+      setTimeout(async () => {
+        await checkProfileCompletion(id);
+      }, 500);
+
       return teamMember;
     } catch (err) {
       const error = err as Error;
@@ -314,6 +319,109 @@ export const useTeamMembers = () => {
   // Get incomplete profiles
   const getIncompleteProfiles = async (): Promise<TeamMember[]> => {
     return fetchTeamMembers({ profile_complete: false, is_active: true });
+  };
+
+  /**
+   * Check if team member profile is complete and update flag
+   * This is called after editing to verify if all requirements are met
+   */
+  const checkProfileCompletion = async (memberId: string): Promise<void> => {
+    try {
+      // Fetch team member data
+      const { data: member, error: memberError } = await supabase
+        .from('team_members')
+        .select('*')
+        .eq('id', memberId)
+        .single();
+
+      if (memberError) throw memberError;
+
+      // Check if all required fields are filled
+      const requiredFields = {
+        display_name: member.display_name,
+        email: member.email,
+        phone: member.phone,
+        position: member.position,
+        hire_date: member.hire_date,
+      };
+
+      const optionalButImportant = {
+        date_of_birth: member.date_of_birth,
+        address: member.address,
+        emergency_contact_name: member.emergency_contact_name,
+        emergency_contact_phone: member.emergency_contact_phone,
+      };
+
+      // Profile is complete if all required fields are filled
+      // and at least some important fields
+      const allRequiredFilled = Object.values(requiredFields).every(field => field);
+      const optionalFilledCount = Object.values(optionalButImportant).filter(field => field).length;
+      const someOptionalFilled = optionalFilledCount >= 2;
+      
+      // Check if there are any active certificates
+      const { data: certs, error: certsError } = await supabase
+        .from('team_member_certificates')
+        .select('id')
+        .eq('team_member_id', memberId)
+        .eq('status', 'active');
+
+      if (certsError) throw certsError;
+
+      const hasCertificates = certs && certs.length > 0;
+
+      // Debug logging
+      console.log(`[Profile Completion Check] Member: ${member.display_name}`);
+      console.log('Required fields:', {
+        allFilled: allRequiredFilled,
+        fields: Object.entries(requiredFields).map(([key, val]) => ({ [key]: !!val }))
+      });
+      console.log('Optional fields:', {
+        filled: optionalFilledCount,
+        needed: 2,
+        fields: Object.entries(optionalButImportant).map(([key, val]) => ({ [key]: !!val }))
+      });
+      console.log('Certificates:', { count: certs?.length || 0, hasActive: hasCertificates });
+
+      // Profile is complete if:
+      // 1. All required fields filled
+      // 2. Some optional fields filled (at least 2)
+      // 3. At least one certificate uploaded
+      const isComplete = allRequiredFilled && someOptionalFilled && hasCertificates;
+
+      console.log('Completion result:', {
+        isComplete,
+        currentFlag: member.profile_complete,
+        willUpdate: member.profile_complete !== isComplete
+      });
+
+      // Update profile_complete flag if changed
+      if (member.profile_complete !== isComplete) {
+        const { error: updateError } = await supabase
+          .from('team_members')
+          .update({ profile_complete: isComplete })
+          .eq('id', memberId);
+
+        if (updateError) throw updateError;
+
+        console.log(`✅ Profile completion updated for ${memberId}: ${isComplete}`);
+        
+        // Show toast notification
+        toast({
+          title: isComplete ? '🎉 Profile Complete!' : 'Profile Updated',
+          description: isComplete 
+            ? 'All required information has been provided.' 
+            : 'Profile completion status updated.',
+        });
+
+        // Refresh the list to show updated status
+        await fetchTeamMembers();
+      } else {
+        console.log(`ℹ️ Profile completion unchanged: ${isComplete}`);
+      }
+    } catch (error) {
+      console.error('[useTeamMembers] Error checking profile completion:', error);
+      // Don't throw - this is a background check
+    }
   };
 
   // NOTE: No initial load here - let the component decide when to fetch

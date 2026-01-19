@@ -17,7 +17,8 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest --watch"
+    "test:watch": "vitest --watch",
+    "validate:mobile": "node scripts/validate-iphone-responsive.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

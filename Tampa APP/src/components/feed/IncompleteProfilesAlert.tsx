@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +33,7 @@ export function IncompleteProfilesAlert({
   organizationId, 
   userRole 
 }: IncompleteProfilesAlertProps) {
+  const navigate = useNavigate();
   const [incompleteMembers, setIncompleteMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -193,9 +195,8 @@ export function IncompleteProfilesAlert({
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        // Navigate to People module with this member selected
-                        // For now, just log the action
-                        console.log('View profile:', member.id);
+                        // Navigate to People module with this member ID
+                        navigate(`/people/${member.id}`);
                       }}
                     >
                       View Profile
