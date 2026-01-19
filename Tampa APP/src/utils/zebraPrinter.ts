@@ -233,53 +233,150 @@ export const saveLabelToDatabase = async (data: LabelPrintData): Promise<string 
 
 /**
  * Send ZPL to Zebra printer via WebSocket
+ * Tries multiple ports in order:
+ * - 6101: Zebra Browser Print (desktop/mobile)
+ * - 9100: Web Services (Link-OS)
+ * - 9200: Zebra Setup Utilities
  */
 const sendToPrinter = async (zpl: string, quantity: number = 1): Promise<void> => {
-  return new Promise((resolve, reject) => {
+  // Ports to try in order of likelihood for Zebra Printer Setup on iOS
+  const ports = [
+    { port: 6101, name: 'Zebra Browser Print' },
+    { port: 9100, name: 'Web Services' },
+    { port: 9200, name: 'Zebra Setup Utilities' }
+  ];
+
+  console.log('🖨️ ============================================');
+  console.log('🖨️ ZEBRA PRINTER - DETAILED CONNECTION LOG');
+  console.log('🖨️ ============================================');
+  console.log('📱 Device: iPhone via Zebra Printer Setup App');
+  console.log('🔌 Connection: Bluetooth');
+  console.log('📄 ZPL Length:', zpl.length, 'characters');
+  console.log('🔢 Quantity:', quantity);
+  console.log('🌐 Attempting connection to localhost...');
+  console.log('🖨️ ============================================\n');
+
+  let lastError: Error | null = null;
+
+  // Try each port sequentially
+  for (const { port, name } of ports) {
     try {
-      // Connect to local Zebra Browser Print service
-      const socket = new WebSocket('ws://127.0.0.1:9100/');
+      console.log(`\n🔍 [ATTEMPT ${ports.indexOf({ port, name }) + 1}/${ports.length}] Trying ${name} on port ${port}...`);
+      await attemptConnection(zpl, quantity, port, name);
+      
+      // If we get here, connection succeeded!
+      console.log(`\n✅ ============================================`);
+      console.log(`✅ SUCCESS! Connected via ${name} (port ${port})`);
+      console.log(`✅ ============================================\n`);
+      return; // Exit successfully
+      
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`❌ [PORT ${port}] ${name} failed:`, error instanceof Error ? error.message : error);
+      console.log(`⏭️  Trying next port...\n`);
+      continue; // Try next port
+    }
+  }
 
-      socket.onopen = () => {
-        console.log('Connected to printer');
-        // Add quantity command to ZPL
-        const zplWithQuantity = zpl.replace('^XZ', `^PQ${quantity}^XZ`);
-        socket.send(zplWithQuantity);
-        console.log('Label sent to printer');
-      };
+  // If we get here, all ports failed
+  console.error('\n❌ ============================================');
+  console.error('❌ ALL CONNECTION ATTEMPTS FAILED');
+  console.error('❌ ============================================');
+  console.error('❌ Tried ports:', ports.map(p => `${p.port} (${p.name})`).join(', '));
+  console.error('❌ Last error:', lastError?.message);
+  console.error('\n🔧 TROUBLESHOOTING STEPS:');
+  console.error('1. ✅ Zebra Printer Setup app is OPEN (not closed)');
+  console.error('2. ✅ Printer is CONNECTED via Bluetooth (🟢 green status)');
+  console.error('3. ✅ Web Services is ENABLED (if option appears)');
+  console.error('4. ✅ App is in FOREGROUND or background refresh enabled');
+  console.error('5. 🔄 Try closing and reopening Zebra Printer Setup');
+  console.error('6. 🔄 Try disconnecting and reconnecting printer');
+  console.error('❌ ============================================\n');
+  
+  throw new Error(`Failed to connect to printer on any port. Last error: ${lastError?.message}`);
+};
 
-      socket.onmessage = () => {
-        console.log('Printer acknowledged');
-        socket.close();
-        resolve();
-      };
+/**
+ * Attempt WebSocket connection on specific port
+ */
+const attemptConnection = async (
+  zpl: string, 
+  quantity: number, 
+  port: number,
+  portName: string
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const wsUrl = `ws://127.0.0.1:${port}/`;
+    console.log(`🔗 Connecting to: ${wsUrl}`);
+    console.log(`⏱️  Timeout: 10 seconds`);
+    
+    let socket: WebSocket;
+    let timeoutId: NodeJS.Timeout;
 
-      socket.onclose = () => {
-        console.log('Printer connection closed');
-        resolve();
-      };
-
-      socket.onerror = (error) => {
-        console.error('Printer WebSocket Error:', error);
-        console.error('Error details:', {
-          type: error.type,
-          readyState: socket.readyState
-        });
-        socket.close();
-        reject(new Error('Failed to connect to printer. Make sure Zebra Printer Setup is running and Web Services is enabled.'));
-      };
-
-      // Timeout after 10 seconds (increased for Bluetooth latency)
-      setTimeout(() => {
+    try {
+      socket = new WebSocket(wsUrl);
+      
+      // Set timeout
+      timeoutId = setTimeout(() => {
         if (socket.readyState !== WebSocket.CLOSED) {
-          console.warn('WebSocket timeout - closing connection');
+          console.warn(`⏱️  [PORT ${port}] Timeout after 10 seconds`);
           socket.close();
-          reject(new Error('Printer connection timeout. Check if Zebra Printer Setup is connected to printer.'));
+          reject(new Error(`Connection timeout on port ${port}`));
         }
       }, 10000);
 
+      socket.onopen = () => {
+        console.log(`✅ [PORT ${port}] WebSocket OPENED successfully`);
+        console.log(`📊 ReadyState: ${socket.readyState} (1=OPEN)`);
+        
+        // Add quantity command to ZPL
+        const zplWithQuantity = zpl.replace('^XZ', `^PQ${quantity}^XZ`);
+        
+        console.log(`📤 Sending ZPL (${zplWithQuantity.length} chars)...`);
+        socket.send(zplWithQuantity);
+        console.log(`✅ [PORT ${port}] ZPL sent successfully`);
+      };
+
+      socket.onmessage = (event) => {
+        console.log(`📨 [PORT ${port}] Printer acknowledged:`, event.data);
+        clearTimeout(timeoutId);
+        socket.close();
+        resolve();
+      };
+
+      socket.onclose = (event) => {
+        console.log(`🔒 [PORT ${port}] WebSocket closed`);
+        console.log(`   Code: ${event.code}`);
+        console.log(`   Reason: ${event.reason || 'No reason provided'}`);
+        console.log(`   Clean: ${event.wasClean}`);
+        clearTimeout(timeoutId);
+        
+        if (event.wasClean) {
+          resolve(); // Normal closure
+        } else {
+          reject(new Error(`Connection closed unexpectedly (code: ${event.code})`));
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error(`❌ [PORT ${port}] WebSocket ERROR`);
+        console.error(`   Event type: ${error.type}`);
+        console.error(`   ReadyState: ${socket.readyState}`);
+        console.error(`   ReadyState meaning:`, {
+          0: 'CONNECTING',
+          1: 'OPEN',
+          2: 'CLOSING',
+          3: 'CLOSED'
+        }[socket.readyState]);
+        
+        clearTimeout(timeoutId);
+        socket.close();
+        reject(new Error(`WebSocket error on port ${port}: ${error.type}`));
+      };
+
     } catch (error) {
-      console.error('Error setting up printer connection:', error);
+      console.error(`❌ [PORT ${port}] Failed to create WebSocket:`, error);
+      if (timeoutId) clearTimeout(timeoutId);
       reject(error);
     }
   });
@@ -297,20 +394,39 @@ export const printLabel = async (
   data: LabelPrintData, 
   testMode: boolean = import.meta.env.VITE_PRINTER_TEST_MODE === 'true'
 ): Promise<{ success: boolean; labelId?: string; error?: string; zpl?: string }> => {
+  console.log('\n🏷️  ============================================');
+  console.log('🏷️  ZEBRA LABEL PRINTING - START');
+  console.log('🏷️  ============================================');
+  console.log('📦 Product:', data.productName);
+  console.log('🏢 Organization:', data.organizationId);
+  console.log('👤 Prepared by:', data.preparedByName);
+  console.log('📅 Prep date:', data.prepDate);
+  console.log('📅 Expiry date:', data.expiryDate);
+  console.log('🧪 Test mode:', testMode);
+  console.log('🏷️  ============================================\n');
+
   try {
     // 1. Save to database first to get the labelId
+    console.log('💾 [STEP 1/3] Saving label to database...');
     const labelId = await saveLabelToDatabase(data);
+    console.log(`✅ [STEP 1/3] Label saved! ID: ${labelId}\n`);
 
     // 2. Generate ZPL with labelId included in QR code
+    console.log('📝 [STEP 2/3] Generating ZPL code...');
     const dataWithLabelId = { ...data, labelId: labelId || undefined };
     const zpl = generateZPL(dataWithLabelId);
+    console.log(`✅ [STEP 2/3] ZPL generated (${zpl.length} characters)\n`);
 
     // 3. TEST MODE: Skip printer connection, just return success with ZPL for preview
     if (testMode) {
-      console.log('🧪 TEST MODE: Label saved to database, skipping printer connection');
+      console.log('🧪 ============================================');
+      console.log('🧪 TEST MODE ENABLED - SKIPPING PRINTER');
+      console.log('🧪 ============================================');
       console.log('💾 Label ID:', labelId);
       console.log('✅ Database insert successful!');
       console.log('📄 ZPL Code generated (', zpl.length, 'characters)');
+      console.log('🧪 ============================================\n');
+      
       return {
         success: true,
         labelId: labelId || undefined,
@@ -319,15 +435,30 @@ export const printLabel = async (
     }
 
     // 4. PRODUCTION MODE: Send to printer
+    console.log('🖨️  [STEP 3/3] Sending to printer...');
     const printQuantity = data.quantity ? parseInt(data.quantity) : 1;
     await sendToPrinter(zpl, printQuantity);
+    
+    console.log('\n✅ ============================================');
+    console.log('✅ LABEL PRINTED SUCCESSFULLY!');
+    console.log('✅ ============================================');
+    console.log('🏷️  Label ID:', labelId);
+    console.log('🖨️  Quantity:', printQuantity);
+    console.log('✅ ============================================\n');
 
     return {
       success: true,
       labelId: labelId || undefined,
     };
   } catch (error) {
-    console.error('Error printing label:', error);
+    console.error('\n❌ ============================================');
+    console.error('❌ LABEL PRINTING FAILED');
+    console.error('❌ ============================================');
+    console.error('❌ Error:', error);
+    console.error('❌ Message:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('❌ Stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('❌ ============================================\n');
+    
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',

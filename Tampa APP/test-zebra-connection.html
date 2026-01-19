@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zebra Connection Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-box {
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 2px solid #444;
+        }
+        .test-box.testing {
+            border-color: #ffa500;
+            background: #332800;
+        }
+        .test-box.success {
+            border-color: #00ff00;
+            background: #003300;
+        }
+        .test-box.failed {
+            border-color: #ff0000;
+            background: #330000;
+        }
+        button {
+            background: #0066ff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            margin: 10px 0;
+        }
+        button:active {
+            background: #0052cc;
+        }
+        .log {
+            background: #000;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        .log div {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #666;
+            padding-left: 10px;
+        }
+        .log .success { border-left-color: #00ff00; color: #00ff00; }
+        .log .error { border-left-color: #ff0000; color: #ff6666; }
+        .log .info { border-left-color: #0066ff; color: #66aaff; }
+        .log .warn { border-left-color: #ffa500; color: #ffcc66; }
+        h1 { text-align: center; }
+        h2 { margin-top: 0; }
+        .status {
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 10px;
+            background: #1a1a1a;
+            border-radius: 4px;
+        }
+        .instructions {
+            background: #003366;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0066ff;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🖨️ Zebra Printer Connection Test</h1>
+    
+    <div class="instructions">
+        <strong>📋 INSTRUÇÕES ANTES DE TESTAR:</strong>
+        <ol>
+            <li>✅ Abra o app <strong>Zebra Printer Setup</strong></li>
+            <li>✅ Certifique-se que a impressora está <strong>CONECTADA via Bluetooth</strong> (🟢 verde)</li>
+            <li>✅ Deixe o app em <strong>primeiro plano</strong> (não minimize)</li>
+            <li>✅ Depois clique nos botões abaixo para testar cada porta</li>
+        </ol>
+    </div>
+
+    <button onclick="testAllPorts()">🔍 TEST ALL PORTS (Auto)</button>
+
+    <div id="port6101" class="test-box">
+        <h2>Port 6101 - Zebra Browser Print</h2>
+        <div class="status">Status: Waiting...</div>
+        <button onclick="testPort(6101)">Test Port 6101</button>
+        <div id="log6101" class="log"></div>
+    </div>
+
+    <div id="port9100" class="test-box">
+        <h2>Port 9100 - Web Services</h2>
+        <div class="status">Status: Waiting...</div>
+        <button onclick="testPort(9100)">Test Port 9100</button>
+        <div id="log9100" class="log"></div>
+    </div>
+
+    <div id="port9200" class="test-box">
+        <h2>Port 9200 - Setup Utilities</h2>
+        <div class="status">Status: Waiting...</div>
+        <button onclick="testPort(9200)">Test Port 9200</button>
+        <div id="log9200" class="log"></div>
+    </div>
+
+    <script>
+        function log(port, message, type = 'info') {
+            const logDiv = document.getElementById(`log${port}`);
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[PORT ${port}] ${message}`);
+        }
+
+        function setStatus(port, status, message) {
+            const box = document.getElementById(`port${port}`);
+            const statusDiv = box.querySelector('.status');
+            
+            box.className = `test-box ${status}`;
+            
+            const emoji = {
+                testing: '⏳',
+                success: '✅',
+                failed: '❌'
+            }[status] || '⏸️';
+            
+            statusDiv.textContent = `Status: ${emoji} ${message}`;
+        }
+
+        async function testPort(port) {
+            const logDiv = document.getElementById(`log${port}`);
+            logDiv.innerHTML = ''; // Clear previous logs
+            
+            log(port, `Starting connection test...`, 'info');
+            setStatus(port, 'testing', 'Testing connection...');
+
+            const wsUrl = `ws://127.0.0.1:${port}/`;
+            log(port, `Connecting to: ${wsUrl}`, 'info');
+
+            try {
+                const socket = new WebSocket(wsUrl);
+                let connectionSuccess = false;
+
+                // Timeout after 5 seconds
+                const timeout = setTimeout(() => {
+                    if (!connectionSuccess) {
+                        log(port, `⏱️ Timeout after 5 seconds`, 'error');
+                        socket.close();
+                        setStatus(port, 'failed', 'Connection timeout');
+                    }
+                }, 5000);
+
+                socket.onopen = () => {
+                    connectionSuccess = true;
+                    clearTimeout(timeout);
+                    
+                    log(port, `✅ WebSocket OPENED!`, 'success');
+                    log(port, `ReadyState: ${socket.readyState} (OPEN)`, 'success');
+                    
+                    // Send a simple test ZPL command
+                    const testZPL = `^XA^FO50,50^A0N,50,50^FDTEST^FS^XZ`;
+                    log(port, `Sending test ZPL: ${testZPL}`, 'info');
+                    
+                    try {
+                        socket.send(testZPL);
+                        log(port, `✅ ZPL sent successfully!`, 'success');
+                        setStatus(port, 'success', '✅ CONNECTION WORKS!');
+                        
+                        // Close after success
+                        setTimeout(() => {
+                            socket.close();
+                            log(port, `Connection closed (success)`, 'info');
+                        }, 1000);
+                    } catch (sendError) {
+                        log(port, `❌ Failed to send ZPL: ${sendError.message}`, 'error');
+                        setStatus(port, 'failed', 'Send failed');
+                        socket.close();
+                    }
+                };
+
+                socket.onmessage = (event) => {
+                    log(port, `📨 Printer response: ${event.data}`, 'success');
+                };
+
+                socket.onerror = (error) => {
+                    clearTimeout(timeout);
+                    log(port, `❌ WebSocket ERROR`, 'error');
+                    log(port, `Error type: ${error.type}`, 'error');
+                    log(port, `ReadyState: ${socket.readyState}`, 'error');
+                    setStatus(port, 'failed', 'Connection error');
+                };
+
+                socket.onclose = (event) => {
+                    clearTimeout(timeout);
+                    log(port, `🔒 WebSocket closed`, 'warn');
+                    log(port, `Code: ${event.code}`, 'warn');
+                    log(port, `Reason: ${event.reason || 'No reason'}`, 'warn');
+                    log(port, `Clean: ${event.wasClean}`, 'warn');
+                    
+                    if (!connectionSuccess) {
+                        setStatus(port, 'failed', 'Connection closed before opening');
+                    }
+                };
+
+            } catch (error) {
+                log(port, `❌ Exception: ${error.message}`, 'error');
+                setStatus(port, 'failed', `Exception: ${error.message}`);
+            }
+        }
+
+        async function testAllPorts() {
+            const ports = [6101, 9100, 9200];
+            
+            for (const port of ports) {
+                await testPort(port);
+                // Wait 2 seconds between tests
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
+    </script>
+</body>
+</html>

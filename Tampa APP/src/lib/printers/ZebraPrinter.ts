@@ -73,31 +73,60 @@ export class ZebraPrinter implements PrinterDriver {
   }
 
   async print(labelData: any, testMode: boolean = import.meta.env.VITE_PRINTER_TEST_MODE === 'true'): Promise<boolean> {
+    console.log('\n🖨️  ============================================');
+    console.log('🖨️  ZEBRA PRINTER - PRINT REQUEST');
+    console.log('🖨️  ============================================');
+    console.log('📦 Input data:', JSON.stringify(labelData, null, 2));
+    console.log('🧪 Test mode:', testMode);
+    console.log('🖨️  ============================================\n');
+
     try {
       // Convert label data to LabelPrintData format
+      console.log('🔄 Converting label data to LabelPrintData format...');
       const printData = await this.convertToLabelPrintData(labelData);
+      console.log('✅ Conversion successful:', {
+        productId: printData.productId,
+        productName: printData.productName,
+        organizationId: printData.organizationId,
+        preparedBy: printData.preparedBy,
+        preparedByName: printData.preparedByName,
+      });
       
       // Use updated zebraPrinter.ts which includes:
       // 1. Save to database (get labelId)
       // 2. Generate ZPL with BOPP design
       // 3. Include labelId in QR code
       // testMode=true: Skip printer connection, only save to DB
+      console.log('📡 Calling printWithZebra utility...\n');
       const result = await printWithZebra(printData, testMode);
       
       if (!result.success) {
+        console.error('❌ Print failed:', result.error);
         throw new Error(result.error || 'Print failed');
       }
       
       if (testMode) {
-        console.log(`🧪 TEST MODE: Label saved to DB. LabelId: ${result.labelId}`);
-        console.log('ZPL Preview:', result.zpl);
+        console.log(`\n🧪 ============================================`);
+        console.log(`🧪 TEST MODE: Label saved to DB`);
+        console.log(`🧪 LabelId: ${result.labelId}`);
+        console.log(`🧪 ZPL Length: ${result.zpl?.length || 0} chars`);
+        console.log(`🧪 ============================================\n`);
       } else {
-        console.log(`Label printed successfully. LabelId: ${result.labelId}`);
+        console.log(`\n✅ ============================================`);
+        console.log(`✅ Label printed successfully`);
+        console.log(`✅ LabelId: ${result.labelId}`);
+        console.log(`✅ ============================================\n`);
       }
       
       return true;
     } catch (error) {
-      console.error('ZPL generation error:', error);
+      console.error('\n❌ ============================================');
+      console.error('❌ ZPL GENERATION ERROR');
+      console.error('❌ ============================================');
+      console.error('❌ Error:', error);
+      console.error('❌ Message:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('❌ Stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('❌ ============================================\n');
       return false;
     }
   }
@@ -139,8 +168,14 @@ export class ZebraPrinter implements PrinterDriver {
    * Fetches missing data from Supabase if needed
    */
   private async convertToLabelPrintData(labelData: LabelData): Promise<LabelPrintData> {
+    console.log('🔍 ============================================');
+    console.log('🔍 CONVERTING LABEL DATA');
+    console.log('🔍 ============================================');
+    
     // Get current user and organization
+    console.log('👤 Fetching current user...');
     const { data: { user } } = await supabase.auth.getUser();
+    console.log('✅ User:', user?.id || 'No user logged in');
     
     let organizationId = labelData.organizationId;
     let preparedBy = labelData.preparedBy;
@@ -148,6 +183,7 @@ export class ZebraPrinter implements PrinterDriver {
     
     // Fetch organization and user info if not provided
     if (user && (!organizationId || !preparedBy)) {
+      console.log('🔍 Fetching profile data from Supabase...');
       const { data: profile } = await supabase
         .from('profiles')
         .select('organization_id, display_name')
@@ -155,27 +191,41 @@ export class ZebraPrinter implements PrinterDriver {
         .single();
       
       if (profile) {
+        console.log('✅ Profile found:', {
+          organization_id: profile.organization_id,
+          display_name: profile.display_name,
+        });
         organizationId = organizationId || profile.organization_id;
         preparedBy = preparedBy || user.id;
         preparedByName = preparedByName || profile.display_name || 'Unknown';
+      } else {
+        console.warn('⚠️  No profile found for user');
       }
     }
     
+    // Validation
     if (!organizationId) {
+      console.error('❌ VALIDATION FAILED: Missing organization_id');
       throw new Error('Organization ID is required for printing');
     }
     
     if (!preparedBy || !preparedByName) {
+      console.error('❌ VALIDATION FAILED: Missing prepared_by information');
       throw new Error('Prepared by information is required for printing');
     }
     
-    // ❌ REMOVED: Organization details fetch - No org data on labels per requirements
-    // Labels should only contain product, preparer, and safety information
+    console.log('✅ Validation passed:', {
+      organizationId,
+      preparedBy,
+      preparedByName,
+    });
     
     // Parse condition from storage instructions if not provided
     const condition = labelData.condition || 
                      labelData.storageInstructions || 
                      'Refrigerate';
+    
+    console.log('🏷️  Building LabelPrintData object...');
     
     // Build LabelPrintData object
     const printData: LabelPrintData = {
@@ -189,7 +239,6 @@ export class ZebraPrinter implements PrinterDriver {
       expiryDate: labelData.useByDate,
       condition,
       organizationId,
-      // ❌ REMOVED: organizationDetails - No org data on labels
       quantity: labelData.quantity,
       unit: labelData.unit,
       batchNumber: labelData.barcode || '',
@@ -200,6 +249,9 @@ export class ZebraPrinter implements PrinterDriver {
         severity: 'low'
       }))
     };
+    
+    console.log('✅ LabelPrintData created successfully');
+    console.log('🔍 ============================================\n');
     
     return printData;
   }
