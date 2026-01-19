@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
+// Force bundle rebuild - version 2.0.0 with multi-port support
 export interface OrganizationDetails {
   name: string;
   address?: string;
