@@ -395,6 +395,12 @@ export const printLabel = async (
   data: LabelPrintData, 
   testMode: boolean = import.meta.env.VITE_PRINTER_TEST_MODE === 'true'
 ): Promise<{ success: boolean; labelId?: string; error?: string; zpl?: string }> => {
+  // VERSION CHECK - If you see this, new code is loaded!
+  console.log('\n🚀 ============================================');
+  console.log('🚀 CODE VERSION: 2.0.0 - MULTI-PORT SUPPORT');
+  console.log('🚀 Build Date: 2026-01-19 01:30 BRT');
+  console.log('🚀 ============================================\n');
+  
   console.log('\n🏷️  ============================================');
   console.log('🏷️  ZEBRA LABEL PRINTING - START');
   console.log('🏷️  ============================================');
