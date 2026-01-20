@@ -2,6 +2,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 // Force bundle rebuild - version 2.0.0 with multi-port support
 // Build timestamp: 2026-01-19T05:00:00Z - FORCE REBUILD #2
+// CRITICAL: This file MUST generate a different hash!
+console.log('[zebraPrinter.ts] Module loaded - Build #3 - Multi-port support active');
+
 export interface OrganizationDetails {
   name: string;
   address?: string;
