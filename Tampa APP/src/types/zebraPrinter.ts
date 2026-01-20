@@ -16,39 +16,41 @@ export interface ZebraPrinterConfig {
   id: string; // Unique identifier (UUID)
   name: string; // User-friendly name (e.g., "ZD411-Kitchen")
   model: string; // "ZD411", "ZD620", etc.
-  serialNumber: string; // Zebra serial number
+  serialNumber: string; // Zebra serial number (maps to serial_number in DB)
   
   // Connection details
-  connectionType: ConnectionType;
+  connectionType: ConnectionType; // maps to connection_type in DB
   
   // Bluetooth specific
   bluetoothAddress?: string; // MAC address
   bluetoothName?: string; // Device name from pairing
   
   // Wi-Fi / Network specific
-  ipAddress?: string; // e.g., "192.168.1.100"
+  ipAddress?: string; // e.g., "192.168.1.100" (maps to ip_address in DB)
   port?: number; // Default: 9100 (Web Services) or 6101 (Browser Print)
+  websocketPort?: number; // WebSocket port (maps to websocket_port in DB)
   
   // Physical location
   location?: string; // e.g., "Kitchen Station 1"
   station?: string; // Workstation identifier
   
   // Settings
-  paperWidth: number; // in mm (default: 102)
-  paperHeight: number; // in mm (default: 152)
-  dpi: number; // 203 or 300
-  darkness: number; // 0-30 (print darkness)
-  speed: number; // 2-12 (print speed)
+  paperWidth?: number; // in mm (default: 102) - maps to label_width_mm in DB
+  paperHeight?: number; // in mm (default: 152) - maps to label_height_mm in DB
+  dpi?: number; // 203 or 300 - maps to print_density_dpi in DB
+  darkness?: number; // 0-30 (print darkness) - maps to default_darkness in DB
+  speed?: number; // 2-12 (print speed) - maps to default_print_speed in DB
   
   // State
   status: PrinterStatus;
-  lastSeen?: string; // ISO timestamp
-  isDefault: boolean; // Default printer for this station
+  lastSeen?: string; // ISO timestamp (maps to last_seen_at in DB)
+  isDefault: boolean; // Default printer for this station (maps to is_default in DB)
+  enabled?: boolean; // Is printer enabled
   
   // Metadata
-  createdAt: string;
-  updatedAt: string;
-  organizationId: string; // RLS
+  createdAt: string; // maps to created_at in DB
+  updatedAt: string; // maps to updated_at in DB
+  organizationId: string; // RLS (maps to organization_id in DB)
 }
 
 /**
@@ -60,7 +62,10 @@ export interface ConnectionResult {
   printer?: ZebraPrinterConfig;
   error?: string;
   latency?: number; // ms
+  latencyMs?: number; // ms - alias for latency
   timestamp: string;
+  method?: string; // Connection method used
+  port?: number; // Port used for connection
 }
 
 /**
@@ -100,6 +105,7 @@ export interface PrintJobResult {
  * Printer Discovery Result
  */
 export interface DiscoveredPrinter {
+  id?: string; // Optional unique identifier
   name: string;
   model?: string;
   serialNumber?: string;
@@ -107,8 +113,10 @@ export interface DiscoveredPrinter {
   
   // Connection details
   bluetoothAddress?: string;
+  bluetoothName?: string; // Bluetooth device name
   ipAddress?: string;
   port?: number;
+  method?: string; // Discovery method (e.g., "WebSocket", "Bluetooth")
   
   // Signal strength (if available)
   rssi?: number; // Bluetooth signal strength
@@ -126,8 +134,10 @@ export interface PrinterStats {
   successfulJobs: number;
   failedJobs: number;
   averageLatency: number; // ms
+  avgLatencyMs?: number; // ms - alias for averageLatency
   lastJobAt?: string;
   uptime?: number; // percentage
+  uptimePercentage?: number; // percentage - alias for uptime
 }
 
 /**

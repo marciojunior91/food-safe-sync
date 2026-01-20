@@ -1,9 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
+import { printerDiagnostics } from "./printerDiagnostics";
 
-// Force bundle rebuild - version 2.0.0 with multi-port support
-// Build timestamp: 2026-01-19T05:00:00Z - FORCE REBUILD #2
-// CRITICAL: This file MUST generate a different hash!
-console.log('[zebraPrinter.ts] Module loaded - Build #3 - Multi-port support active');
+// Force bundle rebuild - version 2.1.0 with PERSISTENT LOGGING
+// Build timestamp: 2026-01-20T06:45:00Z - DIAGNOSTIC LOGGING ACTIVE
+// CRITICAL: Logs now persist in LocalStorage - accessible even if bundle doesn't update!
+console.log('[zebraPrinter.ts] Module loaded - Build #4 - Diagnostic logging active');
+printerDiagnostics.info('zebraPrinter.ts module loaded - Multi-port support + Persistent logging', {
+  version: '2.1.0',
+  buildDate: '2026-01-20T06:45:00Z'
+});
 
 export interface OrganizationDetails {
   name: string;
@@ -251,52 +256,65 @@ const sendToPrinter = async (zpl: string, quantity: number = 1): Promise<void> =
     { port: 9200, name: 'Zebra Setup Utilities' }
   ];
 
-  console.log('🖨️ ============================================');
-  console.log('🖨️ ZEBRA PRINTER - DETAILED CONNECTION LOG');
-  console.log('🖨️ ============================================');
-  console.log('📱 Device: iPhone via Zebra Printer Setup App');
-  console.log('🔌 Connection: Bluetooth');
-  console.log('📄 ZPL Length:', zpl.length, 'characters');
-  console.log('🔢 Quantity:', quantity);
-  console.log('🌐 Attempting connection to localhost...');
-  console.log('🖨️ ============================================\n');
+  printerDiagnostics.info('🖨️ Starting print job', {
+    device: 'iPhone via Zebra Printer Setup App',
+    connection: 'Bluetooth',
+    zplLength: zpl.length,
+    quantity,
+    portsToTry: ports.map(p => `${p.port} (${p.name})`)
+  });
 
   let lastError: Error | null = null;
 
   // Try each port sequentially
   for (const { port, name } of ports) {
+    const attemptNumber = ports.findIndex(p => p.port === port) + 1;
+    
     try {
-      console.log(`\n🔍 [ATTEMPT ${ports.indexOf({ port, name }) + 1}/${ports.length}] Trying ${name} on port ${port}...`);
+      printerDiagnostics.info(`🔍 Attempting connection`, {
+        attempt: `${attemptNumber}/${ports.length}`,
+        port,
+        name
+      }, port);
+      
       await attemptConnection(zpl, quantity, port, name);
       
       // If we get here, connection succeeded!
-      console.log(`\n✅ ============================================`);
-      console.log(`✅ SUCCESS! Connected via ${name} (port ${port})`);
-      console.log(`✅ ============================================\n`);
+      printerDiagnostics.success(`✅ Print job completed successfully!`, {
+        port,
+        name,
+        quantity
+      }, port);
+      
       return; // Exit successfully
       
     } catch (error) {
       lastError = error as Error;
-      console.error(`❌ [PORT ${port}] ${name} failed:`, error instanceof Error ? error.message : error);
-      console.log(`⏭️  Trying next port...\n`);
+      printerDiagnostics.error(`Connection failed`, {
+        port,
+        name,
+        error: error instanceof Error ? error.message : String(error),
+        willRetry: attemptNumber < ports.length
+      }, port);
+      
       continue; // Try next port
     }
   }
 
   // If we get here, all ports failed
-  console.error('\n❌ ============================================');
-  console.error('❌ ALL CONNECTION ATTEMPTS FAILED');
-  console.error('❌ ============================================');
-  console.error('❌ Tried ports:', ports.map(p => `${p.port} (${p.name})`).join(', '));
-  console.error('❌ Last error:', lastError?.message);
-  console.error('\n🔧 TROUBLESHOOTING STEPS:');
-  console.error('1. ✅ Zebra Printer Setup app is OPEN (not closed)');
-  console.error('2. ✅ Printer is CONNECTED via Bluetooth (🟢 green status)');
-  console.error('3. ✅ Web Services is ENABLED (if option appears)');
-  console.error('4. ✅ App is in FOREGROUND or background refresh enabled');
-  console.error('5. 🔄 Try closing and reopening Zebra Printer Setup');
-  console.error('6. 🔄 Try disconnecting and reconnecting printer');
-  console.error('❌ ============================================\n');
+  const errorMessage = 'All connection attempts failed';
+  printerDiagnostics.error(errorMessage, {
+    triedPorts: ports.map(p => `${p.port} (${p.name})`),
+    lastError: lastError?.message,
+    troubleshooting: [
+      'Zebra Printer Setup app is OPEN (not closed)',
+      'Printer is CONNECTED via Bluetooth (🟢 green status)',
+      'Web Services is ENABLED (if option appears)',
+      'App is in FOREGROUND or background refresh enabled',
+      'Try closing and reopening Zebra Printer Setup',
+      'Try disconnecting and reconnecting printer'
+    ]
+  });
   
   throw new Error(`Failed to connect to printer on any port. Last error: ${lastError?.message}`);
 };
@@ -312,8 +330,10 @@ const attemptConnection = async (
 ): Promise<void> => {
   return new Promise((resolve, reject) => {
     const wsUrl = `ws://127.0.0.1:${port}/`;
-    console.log(`🔗 Connecting to: ${wsUrl}`);
-    console.log(`⏱️  Timeout: 10 seconds`);
+    
+    printerDiagnostics.info(`Connecting to ${wsUrl}`, {
+      timeout: '10 seconds'
+    }, port);
     
     let socket: WebSocket;
     let timeoutId: NodeJS.Timeout;
@@ -324,36 +344,48 @@ const attemptConnection = async (
       // Set timeout
       timeoutId = setTimeout(() => {
         if (socket.readyState !== WebSocket.CLOSED) {
-          console.warn(`⏱️  [PORT ${port}] Timeout after 10 seconds`);
+          printerDiagnostics.warning('Connection timeout after 10 seconds', {}, port);
           socket.close();
           reject(new Error(`Connection timeout on port ${port}`));
         }
       }, 10000);
 
       socket.onopen = () => {
-        console.log(`✅ [PORT ${port}] WebSocket OPENED successfully`);
-        console.log(`📊 ReadyState: ${socket.readyState} (1=OPEN)`);
+        printerDiagnostics.success('WebSocket opened successfully', {
+          readyState: socket.readyState,
+          readyStateMeaning: 'OPEN'
+        }, port);
         
         // Add quantity command to ZPL
         const zplWithQuantity = zpl.replace('^XZ', `^PQ${quantity}^XZ`);
         
-        console.log(`📤 Sending ZPL (${zplWithQuantity.length} chars)...`);
+        printerDiagnostics.info(`Sending ZPL`, {
+          length: zplWithQuantity.length,
+          quantity
+        }, port);
+        
         socket.send(zplWithQuantity);
-        console.log(`✅ [PORT ${port}] ZPL sent successfully`);
+        
+        printerDiagnostics.success('ZPL sent successfully', {}, port);
       };
 
       socket.onmessage = (event) => {
-        console.log(`📨 [PORT ${port}] Printer acknowledged:`, event.data);
+        printerDiagnostics.success('Printer acknowledged', {
+          response: event.data
+        }, port);
+        
         clearTimeout(timeoutId);
         socket.close();
         resolve();
       };
 
       socket.onclose = (event) => {
-        console.log(`🔒 [PORT ${port}] WebSocket closed`);
-        console.log(`   Code: ${event.code}`);
-        console.log(`   Reason: ${event.reason || 'No reason provided'}`);
-        console.log(`   Clean: ${event.wasClean}`);
+        printerDiagnostics.info('WebSocket closed', {
+          code: event.code,
+          reason: event.reason || 'No reason provided',
+          wasClean: event.wasClean
+        }, port);
+        
         clearTimeout(timeoutId);
         
         if (event.wasClean) {
@@ -364,15 +396,11 @@ const attemptConnection = async (
       };
 
       socket.onerror = (error) => {
-        console.error(`❌ [PORT ${port}] WebSocket ERROR`);
-        console.error(`   Event type: ${error.type}`);
-        console.error(`   ReadyState: ${socket.readyState}`);
-        console.error(`   ReadyState meaning:`, {
-          0: 'CONNECTING',
-          1: 'OPEN',
-          2: 'CLOSING',
-          3: 'CLOSED'
-        }[socket.readyState]);
+        printerDiagnostics.error('WebSocket error', {
+          type: error.type,
+          readyState: socket.readyState,
+          readyStateMeaning: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][socket.readyState]
+        }, port);
         
         clearTimeout(timeoutId);
         socket.close();
@@ -380,7 +408,10 @@ const attemptConnection = async (
       };
 
     } catch (error) {
-      console.error(`❌ [PORT ${port}] Failed to create WebSocket:`, error);
+      printerDiagnostics.error('Failed to create WebSocket', {
+        error: error instanceof Error ? error.message : String(error)
+      }, port);
+      
       if (timeoutId) clearTimeout(timeoutId);
       reject(error);
     }

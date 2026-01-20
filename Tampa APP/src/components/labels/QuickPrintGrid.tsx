@@ -668,7 +668,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
               <>
                 {/* Grid View - TOUCH-FRIENDLY with larger buttons */}
                 {viewMode === "grid" && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 quick-print-grid">
                     {filteredProducts.map((product) => {
                       const isLoading = printingProductId === product.id;
                       const isSuccess = successProductId === product.id;
@@ -752,13 +752,13 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                                 </div>
                               )}
                               
-                              <span className="text-sm sm:text-base font-medium text-center line-clamp-2 px-2 w-full">
+                              <span className="text-xs sm:text-sm font-medium text-center line-clamp-3 px-1 w-full leading-tight">
                                 {product.name}
                               </span>
                             </div>
                             
                             {/* Bottom Info - Empty space for consistency */}
-                            <div className="w-full flex flex-col items-center gap-1 min-h-[1.5rem]">
+                            <div className="w-full flex flex-col items-center gap-1 min-h-[1rem]">
                             </div>
                           </Button>
                           
@@ -767,7 +767,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             <Badge 
                               variant="secondary"
                               className={cn(
-                                "absolute bottom-2 right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs font-bold shadow-sm z-10",
+                                "absolute bottom-2 right-2 h-5 w-5 sm:h-6 sm:w-6 rounded-full p-0 flex items-center justify-center text-[10px] sm:text-xs font-bold shadow-sm z-10",
                                 hasCriticalAllergens 
                                   ? "bg-red-500 text-white border-red-600" 
                                   : "bg-yellow-500 text-white border-yellow-600"

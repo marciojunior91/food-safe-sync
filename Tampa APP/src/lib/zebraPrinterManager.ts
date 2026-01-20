@@ -23,6 +23,66 @@ import type {
   ConnectionType,
   ZEBRA_PORTS,
 } from '@/types/zebraPrinter';
+import type { Database } from '@/integrations/supabase/types';
+
+// Type helpers for database conversion
+type DbPrinter = Database['public']['Tables']['zebra_printers']['Row'];
+type DbPrinterInsert = Database['public']['Tables']['zebra_printers']['Insert'];
+type DbPrintJob = Database['public']['Tables']['zebra_print_jobs']['Row'];
+type DbPrintJobInsert = Database['public']['Tables']['zebra_print_jobs']['Insert'];
+
+/**
+ * Convert database printer row to ZebraPrinterConfig
+ */
+function dbToConfig(db: DbPrinter): ZebraPrinterConfig {
+  return {
+    id: db.id,
+    name: db.name,
+    model: db.model,
+    serialNumber: db.serial_number,
+    connectionType: db.connection_type as ConnectionType,
+    ipAddress: db.ip_address || undefined,
+    port: db.port || undefined,
+    websocketPort: db.websocket_port || undefined,
+    paperWidth: db.label_width_mm || undefined,
+    paperHeight: db.label_height_mm || undefined,
+    dpi: db.print_density_dpi || undefined,
+    darkness: db.default_darkness || undefined,
+    speed: db.default_print_speed || undefined,
+    status: db.status as any,
+    lastSeen: db.last_seen_at || undefined,
+    isDefault: db.is_default,
+    enabled: db.enabled,
+    createdAt: db.created_at,
+    updatedAt: db.updated_at,
+    organizationId: db.organization_id,
+  };
+}
+
+/**
+ * Convert ZebraPrinterConfig to database insert format
+ */
+function configToDbInsert(config: Omit<ZebraPrinterConfig, 'id' | 'createdAt' | 'updatedAt'>): DbPrinterInsert {
+  return {
+    name: config.name,
+    model: config.model,
+    serial_number: config.serialNumber,
+    connection_type: config.connectionType,
+    ip_address: config.ipAddress || null,
+    port: config.port || null,
+    websocket_port: config.websocketPort || null,
+    label_width_mm: config.paperWidth || null,
+    label_height_mm: config.paperHeight || null,
+    print_density_dpi: config.dpi || null,
+    default_darkness: config.darkness || null,
+    default_print_speed: config.speed || null,
+    status: config.status,
+    last_seen_at: config.lastSeen || null,
+    is_default: config.isDefault,
+    enabled: config.enabled ?? true,
+    organization_id: config.organizationId,
+  };
+}
 
 export class ZebraPrinterManager {
   private static instance: ZebraPrinterManager;
@@ -69,7 +129,7 @@ export class ZebraPrinterManager {
       
       if (printers) {
         printers.forEach(printer => {
-          this.printers.set(printer.id, printer as ZebraPrinterConfig);
+          this.printers.set(printer.id, dbToConfig(printer));
         });
       }
       
@@ -137,12 +197,42 @@ export class ZebraPrinterManager {
   
   /**
    * Test connection to a printer
+   * Overload: accepts printer config object
+   */
+  async testConnection(printer: ZebraPrinterConfig): Promise<ConnectionResult>;
+  
+  /**
+   * Test connection to a printer
+   * Overload: accepts IP and port
    */
   async testConnection(
     ipOrAddress: string,
     port: number,
+    timeout?: number
+  ): Promise<ConnectionResult>;
+  
+  /**
+   * Test connection to a printer (implementation)
+   */
+  async testConnection(
+    printerOrIp: ZebraPrinterConfig | string,
+    port?: number,
     timeout: number = 5000
   ): Promise<ConnectionResult> {
+    // Handle overload: if first arg is a printer config
+    if (typeof printerOrIp === 'object') {
+      const printer = printerOrIp;
+      const ip = printer.ipAddress || '127.0.0.1';
+      const printerPort = printer.websocketPort || printer.port || 9100;
+      return this.testConnection(ip, printerPort, timeout);
+    }
+    
+    // Original implementation
+    const ipOrAddress = printerOrIp;
+    if (!port) {
+      throw new Error('Port is required when testing connection by IP');
+    }
+    
     const startTime = Date.now();
     
     return new Promise((resolve) => {
@@ -202,26 +292,21 @@ export class ZebraPrinterManager {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
     
-    const now = new Date().toISOString();
-    const newPrinter: ZebraPrinterConfig = {
-      ...config,
-      id: crypto.randomUUID(),
-      createdAt: now,
-      updatedAt: now,
-    };
+    const dbInsert = configToDbInsert(config);
     
     const { data, error } = await supabase
       .from('zebra_printers')
-      .insert(newPrinter)
+      .insert(dbInsert)
       .select()
       .single();
     
     if (error) throw error;
     
+    const newPrinter = dbToConfig(data);
     this.printers.set(newPrinter.id, newPrinter);
     console.log(`✅ Added printer: ${newPrinter.name}`);
     
-    return data as ZebraPrinterConfig;
+    return newPrinter;
   }
   
   /**
@@ -269,6 +354,13 @@ export class ZebraPrinterManager {
    */
   getPrinters(): ZebraPrinterConfig[] {
     return Array.from(this.printers.values());
+  }
+  
+  /**
+   * Get all printers (alias for getPrinters)
+   */
+  async getAllPrinters(): Promise<ZebraPrinterConfig[]> {
+    return this.getPrinters();
   }
   
   /**
@@ -449,16 +541,26 @@ export class ZebraPrinterManager {
    */
   private async logPrintJob(result: PrintJobResult): Promise<void> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!profile?.organization_id) return;
+      
       await supabase.from('zebra_print_jobs').insert({
         job_id: result.jobId,
-        label_id: result.labelId,
         printer_id: result.printerId,
-        printer_name: result.printerName,
+        organization_id: profile.organization_id,
         status: result.status,
         printed_at: result.printedAt,
-        printed_by: result.printedBy,
-        error: result.error,
-        latency_ms: result.latency,
+        error_message: result.error || null,
+        latency_ms: result.latency || null,
+        label_data: result.labelId ? { label_id: result.labelId } : null,
       });
     } catch (error) {
       console.error('Failed to log print job:', error);
@@ -480,15 +582,19 @@ export class ZebraPrinterManager {
     const successful = jobs.filter(j => j.status === 'success');
     const failed = jobs.filter(j => j.status === 'failed');
     const totalLatency = jobs.reduce((sum, j) => sum + (j.latency_ms || 0), 0);
+    const avgLatency = jobs.length > 0 ? totalLatency / jobs.length : 0;
+    const uptimePercent = jobs.length > 0 ? (successful.length / jobs.length) * 100 : 0;
     
     return {
       printerId,
       totalJobs: jobs.length,
       successfulJobs: successful.length,
       failedJobs: failed.length,
-      averageLatency: jobs.length > 0 ? totalLatency / jobs.length : 0,
-      lastJobAt: jobs[0]?.printed_at,
-      uptime: jobs.length > 0 ? (successful.length / jobs.length) * 100 : 0,
+      averageLatency: avgLatency,
+      avgLatencyMs: avgLatency, // alias
+      lastJobAt: jobs[0]?.printed_at || undefined,
+      uptime: uptimePercent,
+      uptimePercentage: uptimePercent, // alias
     };
   }
 }

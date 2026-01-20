@@ -164,15 +164,18 @@ export function PrinterManagementPanel({
     // Auto-add discovered printers
     for (const printer of discovered) {
       try {
-        const config: Partial<ZebraPrinterConfig> = {
+        const config: Omit<ZebraPrinterConfig, 'id' | 'createdAt' | 'updatedAt'> = {
           name: printer.name,
-          model: printer.model,
+          model: printer.model || 'ZD411',
+          serialNumber: printer.serialNumber || 'UNKNOWN',
           connectionType: printer.connectionType,
           ipAddress: printer.ipAddress,
           port: printer.port,
           bluetoothAddress: printer.bluetoothAddress,
           bluetoothName: printer.bluetoothName,
-          status: 'offline'
+          status: 'offline',
+          isDefault: false,
+          organizationId: organizationId,
         };
 
         await manager.addPrinter(config);
@@ -424,7 +427,32 @@ export function PrinterManagementPanel({
               if (selectedPrinter) {
                 await manager.updatePrinter(selectedPrinter.id, config);
               } else {
-                await manager.addPrinter(config);
+                // Para nova impressora, garantir campos obrigatórios
+                const newConfig: Omit<ZebraPrinterConfig, 'id' | 'createdAt' | 'updatedAt'> = {
+                  name: config.name || 'Nova Impressora',
+                  model: config.model || 'ZD411',
+                  serialNumber: config.serialNumber || 'UNKNOWN',
+                  connectionType: config.connectionType || 'wifi',
+                  status: config.status || 'offline',
+                  isDefault: config.isDefault || false,
+                  organizationId: organizationId,
+                  // Campos opcionais
+                  ipAddress: config.ipAddress,
+                  port: config.port,
+                  websocketPort: config.websocketPort,
+                  bluetoothAddress: config.bluetoothAddress,
+                  bluetoothName: config.bluetoothName,
+                  location: config.location,
+                  station: config.station,
+                  paperWidth: config.paperWidth,
+                  paperHeight: config.paperHeight,
+                  dpi: config.dpi,
+                  darkness: config.darkness,
+                  speed: config.speed,
+                  enabled: config.enabled,
+                  lastSeen: config.lastSeen,
+                };
+                await manager.addPrinter(newConfig);
               }
               await loadPrinters();
               setShowConfigDialog(false);

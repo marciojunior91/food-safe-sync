@@ -28,6 +28,7 @@ import UserProfile from "./components/people/UserProfile";
 import PricingPage from "./pages/PricingPage";
 import Billing from "./pages/Billing";
 import FeedModuleV2 from "./pages/FeedModuleV2";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +62,9 @@ const App = () => (
               <Route path="traffic-light" element={<ProductTrafficLight />} />
               <Route path="drafts" element={<DraftManagement />} />
               <Route path="label-categories" element={<LabelCategories />} />
+              
+              {/* Settings */}
+              <Route path="settings" element={<Settings />} />
               
               {/* Billing & Pricing */}
               <Route path="pricing" element={<PricingPage />} />

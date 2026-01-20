@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Settings, Users, Shield, AlertCircle } from "lucide-react";
-import { StaffManagement } from "@/components/admin/StaffManagement";
+import { Settings, Shield, AlertCircle } from "lucide-react";
+import { PrinterManagementPanel } from "@/components/printers/PrinterManagementPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -14,8 +14,7 @@ export function AdminPanel() {
     user
   } = useAuth();
   const {
-    roles,
-    highestRole,
+    role,
     loading: rolesLoading,
     isAdmin,
     isManager
@@ -74,10 +73,10 @@ export function AdminPanel() {
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Assigned Roles</p>
                 <div className="flex flex-wrap gap-2">
-                  {roles && roles.length > 0 ? roles.map(role => <Badge key={role} variant={role === 'admin' ? 'default' : 'secondary'} className="flex items-center gap-1">
+                  {role ? <Badge variant={role === 'admin' ? 'default' : 'secondary'} className="flex items-center gap-1">
                         <Shield className="w-3 h-3" />
                         {role}
-                      </Badge>) : <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      </Badge> : <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <AlertCircle className="w-4 h-4" />
                       No roles assigned
                     </div>}
@@ -85,8 +84,8 @@ export function AdminPanel() {
               </div>
 
               <div>
-                <p className="text-sm text-muted-foreground">Highest Role</p>
-                <p className="font-medium">{highestRole || 'None'}</p>
+                <p className="text-sm text-muted-foreground">Current Role</p>
+                <p className="font-medium">{role || 'None'}</p>
               </div>
               
               <div>
@@ -97,20 +96,22 @@ export function AdminPanel() {
             
             {isAdmin && <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-green-800 text-sm font-medium">
-                  ✅ You have admin access - Staff management is available below
+                  ✅ You have admin access - Printer management is available below
                 </p>
               </div>}
 
-            {(!roles || !roles.length) && <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            {!role && <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <p className="text-amber-800 text-sm">
-                  <strong>Note:</strong> You don't have any roles assigned yet. Contact an administrator to assign you a role.
+                  <strong>Note:</strong> You don't have a role assigned yet. Contact an administrator to assign you a role.
                 </p>
               </div>}
           </div>
         </CardContent>
       </Card>
 
-      {/* Staff Management - Show for admins */}
-      {isAdmin && <StaffManagement />}
+      {/* Printer Management - Show for admins */}
+      {isAdmin && userProfile?.organization_id && (
+        <PrinterManagementPanel organizationId={userProfile.organization_id} />
+      )}
     </div>;
 }

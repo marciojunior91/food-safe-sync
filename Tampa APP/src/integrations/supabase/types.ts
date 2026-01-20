@@ -2841,6 +2841,114 @@ export type Database = {
         }
         Relationships: []
       }
+      zebra_printers: {
+        Row: {
+          connection_type: string
+          created_at: string
+          default_darkness: number | null
+          default_print_speed: number | null
+          enabled: boolean
+          id: string
+          ip_address: string | null
+          is_default: boolean
+          label_height_mm: number | null
+          label_width_mm: number | null
+          last_seen_at: string | null
+          model: string
+          name: string
+          organization_id: string
+          port: number | null
+          print_density_dpi: number | null
+          serial_number: string
+          status: string
+          updated_at: string
+          websocket_port: number | null
+        }
+        Insert: {
+          connection_type?: string
+          created_at?: string
+          default_darkness?: number | null
+          default_print_speed?: number | null
+          enabled?: boolean
+          id?: string
+          ip_address?: string | null
+          is_default?: boolean
+          label_height_mm?: number | null
+          label_width_mm?: number | null
+          last_seen_at?: string | null
+          model: string
+          name: string
+          organization_id: string
+          port?: number | null
+          print_density_dpi?: number | null
+          serial_number: string
+          status?: string
+          updated_at?: string
+          websocket_port?: number | null
+        }
+        Update: {
+          connection_type?: string
+          created_at?: string
+          default_darkness?: number | null
+          default_print_speed?: number | null
+          enabled?: boolean
+          id?: string
+          ip_address?: string | null
+          is_default?: boolean
+          label_height_mm?: number | null
+          label_width_mm?: number | null
+          last_seen_at?: string | null
+          model?: string
+          name?: string
+          organization_id?: string
+          port?: number | null
+          print_density_dpi?: number | null
+          serial_number?: string
+          status?: string
+          updated_at?: string
+          websocket_port?: number | null
+        }
+        Relationships: []
+      }
+      zebra_print_jobs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          job_id: string
+          label_data: Json | null
+          latency_ms: number | null
+          organization_id: string
+          printed_at: string
+          printer_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          job_id: string
+          label_data?: Json | null
+          latency_ms?: number | null
+          organization_id: string
+          printed_at?: string
+          printer_id: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          job_id?: string
+          label_data?: Json | null
+          latency_ms?: number | null
+          organization_id?: string
+          printed_at?: string
+          printer_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       compliance_summary: {
