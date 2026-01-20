@@ -1,0 +1,9 @@
+# Force Vercel to rebuild from scratch
+node_modules/.vite
+.vite
+dist
+.cache
+.vercel/cache
+
+# Don't cache build artifacts
+*.tsbuildinfo

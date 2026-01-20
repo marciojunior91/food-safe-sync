@@ -20,15 +20,29 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Force new bundle hash by using contenthash with longer format
+    // Force new bundle hash - AGGRESSIVE CACHE BUSTING
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name]-[hash:12].js`,
-        chunkFileNames: `assets/[name]-[hash:12].js`,
-        assetFileNames: `assets/[name]-[hash:12].[ext]`
+        // Use timestamp + hash to force unique filenames
+        entryFileNames: () => {
+          const timestamp = Date.now().toString(36);
+          return `assets/[name]-[hash]-${timestamp}.js`;
+        },
+        chunkFileNames: () => {
+          const timestamp = Date.now().toString(36);
+          return `assets/[name]-[hash]-${timestamp}.js`;
+        },
+        assetFileNames: () => {
+          const timestamp = Date.now().toString(36);
+          return `assets/[name]-[hash]-${timestamp}.[ext]`;
+        }
       }
     },
     // Clear output directory to ensure clean build
-    emptyOutDir: true
+    emptyOutDir: true,
+    // Disable CSS code splitting to force new CSS hash
+    cssCodeSplit: true,
+    // Force rebuild by clearing cache
+    manifest: true
   }
 }));
