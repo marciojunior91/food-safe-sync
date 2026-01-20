@@ -20,12 +20,23 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    // Force new bundle hash on every build
+    // Force cache busting - use dynamic hash with manual chunks
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
-        assetFileNames: `assets/[name]-[hash]-${Date.now()}.[ext]`
+        // Use function to generate unique hash per chunk
+        entryFileNames: (chunkInfo) => {
+          const hash = Date.now().toString(36);
+          return `assets/[name]-${hash}-[hash].js`;
+        },
+        chunkFileNames: (chunkInfo) => {
+          const hash = Date.now().toString(36);
+          return `assets/[name]-${hash}-[hash].js`;
+        },
+        assetFileNames: (assetInfo) => {
+          const hash = Date.now().toString(36);
+          const ext = assetInfo.name?.split('.').pop() || 'asset';
+          return `assets/[name]-${hash}-[hash].${ext}`;
+        }
       }
     }
   }
