@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // Force bundle rebuild - version 2.0.0 with multi-port support
+// Build timestamp: 2026-01-19T05:00:00Z - FORCE REBUILD #2
 export interface OrganizationDetails {
   name: string;
   address?: string;
