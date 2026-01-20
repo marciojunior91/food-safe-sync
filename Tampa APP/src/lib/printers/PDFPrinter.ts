@@ -1,6 +1,6 @@
 // PDFPrinter - Export labels to PDF using canvas renderer
 // Updated to use unified BOPP design with labelId tracking
-import { jsPDF } from 'jspdf';
+// DYNAMIC IMPORT - jsPDF loaded only when needed
 import { PrinterDriver, PrinterCapabilities, PrinterSettings, PrinterStatus } from '@/types/printer';
 import { renderPdfLabel } from '@/utils/labelRenderers/pdfRenderer';
 import { saveLabelToDatabase, type LabelPrintData } from '@/utils/zebraPrinter';
@@ -103,7 +103,10 @@ export class PDFPrinter implements PrinterDriver {
     };
   }
 
-  private async createPDF(labels: IncomingLabelData[]): Promise<jsPDF> {
+  private async createPDF(labels: IncomingLabelData[]): Promise<any> {
+    // DYNAMIC IMPORT - Load jsPDF only when PDF is needed
+    const { jsPDF } = await import('jspdf');
+    
     // A4 dimensions for PDF output
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -122,7 +125,7 @@ export class PDFPrinter implements PrinterDriver {
     return pdf;
   }
 
-  private async renderLabel(pdf: jsPDF, incomingData: IncomingLabelData): Promise<void> {
+  private async renderLabel(pdf: any, incomingData: IncomingLabelData): Promise<void> {
     try {
       // Step 1: Convert incoming data to LabelPrintData and save to database
       const printData = await this.convertToLabelPrintData(incomingData);
