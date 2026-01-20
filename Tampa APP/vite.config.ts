@@ -54,17 +54,7 @@ export default defineConfig(({ mode }) => ({
             return 'supabase';
           }
           
-          // React ecosystem - separate chunk
-          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-            return 'react-vendor';
-          }
-          
-          // UI libraries - separate chunk
-          if (id.includes('radix-ui') || id.includes('lucide-react')) {
-            return 'ui-vendor';
-          }
-          
-          // Node modules general
+          // React ecosystem - keep together in vendor to avoid circular deps
           if (id.includes('node_modules')) {
             return 'vendor';
           }
