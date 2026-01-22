@@ -23,7 +23,8 @@ import { TeamMemberEditDialog } from "@/components/people/TeamMemberEditDialog";
 import CreateUserDialog from "@/components/people/CreateUserDialog";
 import CreateTeamMemberDialog from "@/components/people/CreateTeamMemberDialog";
 import { UpgradeModal } from "@/components/billing/UpgradeModal";
-import { Plus, RefreshCw, Users, Briefcase } from "lucide-react";
+import { Plus, RefreshCw, Users, Briefcase, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 export default function People() {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ export default function People() {
   const [activeTab, setActiveTab] = useState<"users" | "team">("team");
   const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
   const [createTeamMemberDialogOpen, setCreateTeamMemberDialogOpen] = useState(false);
+  const [teamSearchQuery, setTeamSearchQuery] = useState<string>("");  // BUG-008 FIX
   
   const {
     users,
@@ -165,6 +167,19 @@ export default function People() {
     setCreateTeamMemberDialogOpen(true);
   };
 
+  // BUG-008 FIX: Filter team members by search query
+  const filteredTeamMembers = teamMembers.filter((member) => {
+    if (!teamSearchQuery) return true;
+    
+    const searchLower = teamSearchQuery.toLowerCase();
+    return (
+      member.display_name.toLowerCase().includes(searchLower) ||
+      member.position?.toLowerCase().includes(searchLower) ||
+      member.email?.toLowerCase().includes(searchLower) ||
+      member.role_type.toLowerCase().includes(searchLower)
+    );
+  });
+
   if (contextLoading) {
     return (
       <div className="container mx-auto p-4 sm:p-6 space-y-6">
@@ -177,8 +192,10 @@ export default function People() {
     );
   }
 
-  // Debug: Log context to help troubleshoot
-  console.log('[PeopleModule] User context:', context);
+  // BUG-006 FIX: Only log in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[PeopleModule] User context:', context);
+  }
 
   if (!context?.organization_id) {
     return (
@@ -260,6 +277,24 @@ export default function People() {
                 Operational team members with PIN-based access for daily work (cooking, serving, cleaning, etc.)
               </p>
               
+              {/* BUG-008 FIX: Search Input */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search team members by name, role, position, or email..."
+                    value={teamSearchQuery}
+                    onChange={(e) => setTeamSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                {teamSearchQuery && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Showing {filteredTeamMembers.length} of {teamMembers.length} team members
+                  </p>
+                )}
+              </div>
+              
               {/* Error State */}
               {teamError && (
                 <div className="p-4 border border-destructive rounded-md mb-4">
@@ -288,11 +323,15 @@ export default function People() {
               {/* Team Members List */}
               {!teamLoading && !teamError && (
                 <div className="space-y-3">
-                  {teamMembers.length === 0 ? (
+                  {filteredTeamMembers.length === 0 ? (
                     <div className="text-center py-12">
                       <Briefcase className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">No team members found</p>
-                      {canManageTeamMembers && (
+                      <p className="text-muted-foreground">
+                        {teamSearchQuery 
+                          ? 'No team members match your search'
+                          : 'No team members found'}
+                      </p>
+                      {canManageTeamMembers && !teamSearchQuery && (
                         <Button
                           onClick={() => setCreateTeamMemberDialogOpen(true)}
                           className="mt-4"
@@ -303,7 +342,7 @@ export default function People() {
                       )}
                     </div>
                   ) : (
-                    teamMembers.map((member) => (
+                    filteredTeamMembers.map((member) => (
                       <Card key={member.id} className="p-4 hover:bg-accent/50 transition-colors">
                         <div className="flex items-center justify-between">
                           <div className="flex-1">

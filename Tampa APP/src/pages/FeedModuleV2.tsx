@@ -12,6 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useFeed } from '@/lib/feed/feedHooks';
 import { useUserContext } from '@/hooks/useUserContext';
+import { supabase } from '@/integrations/supabase/client';
 import PostComposer from '@/components/feed/PostComposer';
 import PostCard from '@/components/feed/PostCard';
 import EmptyFeedState from '@/components/feed/EmptyFeedState';
@@ -54,6 +55,46 @@ export default function FeedModuleV2() {
     setSelectedUser(user);
     toast.success(`Viewing feed as ${user.display_name}`);
   };
+
+  // BUG-007 FIX: Real-time subscriptions for feed updates
+  useEffect(() => {
+    if (!organizationId) return;
+
+    console.log('[FeedModuleV2] Setting up real-time subscription for org:', organizationId);
+
+    const channel = supabase
+      .channel('feed_posts_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'feed_posts',
+          filter: `organization_id=eq.${organizationId}`
+        },
+        (payload) => {
+          console.log('[FeedModuleV2] Real-time update:', payload.eventType);
+          // Refresh feed on any change (insert, update, delete)
+          refresh();
+          
+          // Show toast notification for new posts
+          if (payload.eventType === 'INSERT') {
+            toast.info('New post available', {
+              description: 'The feed has been updated',
+              duration: 3000
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[FeedModuleV2] Subscription status:', status);
+      });
+
+    return () => {
+      console.log('[FeedModuleV2] Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [organizationId, refresh]);
 
   // Show loading while context is loading
   if (contextLoading || !organizationId) {
