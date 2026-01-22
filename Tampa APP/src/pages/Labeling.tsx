@@ -163,31 +163,44 @@ export default function Labeling() {
 
   const fetchDashboardStats = async () => {
     try {
+      // Get user's organization_id first
+      if (!user?.id) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!profile?.organization_id) return;
+
       // Get today's date range
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Get labels printed today
+      // Get labels printed today - WITH ORG FILTER (BUG-004 FIX)
       const { count: todayCount, error: todayError } = await supabase
         .from("printed_labels")
         .select("*", { count: "exact", head: true })
+        .eq("organization_id", profile.organization_id)
         .gte("created_at", today.toISOString())
         .lt("created_at", tomorrow.toISOString());
 
       if (todayError) throw todayError;
       setLabelsToday(todayCount || 0);
 
-      // Get total labels
+      // Get total labels - WITH ORG FILTER (BUG-004 FIX)
       const { count: totalCount, error: totalError } = await supabase
         .from("printed_labels")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", profile.organization_id);
 
       if (totalError) throw totalError;
       setTotalLabels(totalCount || 0);
 
-      // Get labels expiring in next 24 hours
+      // Get labels expiring in next 24 hours - WITH ORG FILTER (BUG-004 FIX)
       const now = new Date();
       const next24Hours = new Date();
       next24Hours.setHours(next24Hours.getHours() + 24);
@@ -195,6 +208,7 @@ export default function Labeling() {
       const { count: expiringCountData, error: expiringError } = await supabase
         .from("printed_labels")
         .select("*", { count: "exact", head: true })
+        .eq("organization_id", profile.organization_id)
         .gte("expiry_date", now.toISOString().split('T')[0])
         .lte("expiry_date", next24Hours.toISOString().split('T')[0]);
 
