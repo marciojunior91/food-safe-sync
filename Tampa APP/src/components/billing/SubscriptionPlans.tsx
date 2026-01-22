@@ -16,6 +16,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { FEATURES } from '@/lib/featureFlags';
 
 interface SubscriptionPlansProps {
   organizationId?: string;
@@ -26,6 +27,24 @@ export function SubscriptionPlans({ organizationId: propOrgId, onPlanSelected }:
   const [loading, setLoading] = useState<string | null>(null);
   const [organizationId, setOrganizationId] = useState<string | null>(propOrgId || null);
   const { user } = useAuth();
+
+  // Feature Flag: Show message if Stripe disabled (MVP mode)
+  if (!FEATURES.STRIPE_ENABLED) {
+    return (
+      <div className="container mx-auto py-16 text-center max-w-2xl">
+        <div className="bg-muted/50 border border-border rounded-lg p-8">
+          <h2 className="text-2xl font-bold mb-4">Payments Temporarily Disabled</h2>
+          <p className="text-muted-foreground mb-6">
+            Self-service payments are currently disabled during our MVP launch phase.
+            Your account will be manually configured by our team.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Please contact <strong>support@tampaapp.com</strong> to activate your subscription.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // Get organization ID from user profile if not provided
   useEffect(() => {

@@ -22,6 +22,7 @@ import {
   TeamMembersData,
   InviteUsersData,
 } from "@/types/onboarding";
+import { FEATURES } from "@/lib/featureFlags";
 
 export default function Onboarding() {
   const { toast } = useToast();
@@ -40,6 +41,18 @@ export default function Onboarding() {
   const [completedSteps, setCompletedSteps] = useState<OnboardingStep[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubscription, setHasSubscription] = useState(false);
+  
+  // Feature Flag: Redirect if onboarding disabled (MVP mode)
+  useEffect(() => {
+    if (!FEATURES.ONBOARDING_ENABLED) {
+      navigate('/dashboard');
+      toast({
+        title: "Self-Service Onboarding Disabled",
+        description: "Please contact support to set up your account.",
+        variant: "destructive",
+      });
+    }
+  }, [navigate, toast]);
   
   // Check if user came from Stripe checkout
   useEffect(() => {

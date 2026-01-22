@@ -8,9 +8,11 @@
  * - Webhook handling
  * 
  * Created: January 14, 2026
+ * Updated: January 20, 2026 - Added feature flag support
  */
 
 import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { FEATURES } from './featureFlags';
 
 // =====================================================
 // CONFIGURATION
@@ -18,8 +20,11 @@ import { loadStripe, Stripe } from '@stripe/stripe-js';
 
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
 
-if (!STRIPE_PUBLISHABLE_KEY) {
-  console.warn('⚠️ Stripe publishable key not configured. Payment features will be disabled.');
+// Feature flag check
+if (!FEATURES.STRIPE_ENABLED) {
+  console.info('ℹ️ Stripe is DISABLED via feature flag. MVP mode: manual org/user creation.');
+} else if (!STRIPE_PUBLISHABLE_KEY) {
+  console.warn('⚠️ Stripe is ENABLED but publishable key not configured. Payment features will fail.');
 }
 
 // Singleton instance
@@ -27,8 +32,14 @@ let stripePromise: Promise<Stripe | null> | null = null;
 
 /**
  * Get or create Stripe instance
+ * Returns null if Stripe is disabled via feature flag
  */
 export const getStripe = () => {
+  // Feature flag check
+  if (!FEATURES.STRIPE_ENABLED) {
+    return null;
+  }
+  
   if (!stripePromise && STRIPE_PUBLISHABLE_KEY) {
     stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
   }
@@ -195,6 +206,12 @@ export async function createCheckoutSession(params: CreateCheckoutSessionParams)
  * User must be authenticated - subscription links to user automatically
  */
 export async function startCheckout(planId: string) {
+  // Feature Flag: Guard against payments when Stripe disabled
+  if (!FEATURES.STRIPE_ENABLED) {
+    console.info('[MVP] Stripe payments disabled - blocking checkout');
+    throw new Error('Payments are currently disabled. Please contact support to activate your subscription.');
+  }
+
   const plan = SUBSCRIPTION_PLANS[planId];
   
   if (!plan) {
