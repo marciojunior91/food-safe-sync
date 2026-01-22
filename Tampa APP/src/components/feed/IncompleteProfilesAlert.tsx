@@ -92,12 +92,12 @@ export function IncompleteProfilesAlert({
   };
 
   return (
-    <Card className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+    <Card className="border-orange-500 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/20">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Users className="h-5 w-5 text-blue-600" />
-            <CardTitle className="text-lg">
+            <Users className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+            <CardTitle className="text-lg text-gray-900 dark:text-white">
               Incomplete Team Profiles
             </CardTitle>
             <Badge variant="secondary" className="ml-2">
@@ -120,9 +120,9 @@ export function IncompleteProfilesAlert({
 
       {expanded && (
         <CardContent>
-          <Alert className="mb-4 bg-blue-100 border-blue-300 dark:bg-blue-900/30">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-900 dark:text-blue-100">
+          <Alert className="mb-4 bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700">
+            <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <AlertDescription className="text-orange-900 dark:text-orange-100">
               The following team members have incomplete profiles. Please follow up to ensure all required information is provided.
             </AlertDescription>
           </Alert>

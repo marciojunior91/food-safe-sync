@@ -94,7 +94,7 @@ export default function FeedStats({ items, currentUserId }: FeedStatsProps) {
                   </Badge>
                 )}
                 {criticalCount === 0 && highCount === 0 && (
-                  <p className="text-3xl font-bold text-green-600">0</p>
+                  <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">0</p>
                 )}
               </div>
             </div>
@@ -140,8 +140,8 @@ export default function FeedStats({ items, currentUserId }: FeedStatsProps) {
                 )}
               </div>
             </div>
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Bell className="w-6 h-6 text-blue-600" />
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+              <Bell className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
         </CardContent>
@@ -160,13 +160,13 @@ export default function FeedStats({ items, currentUserId }: FeedStatsProps) {
               </div>
               <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-green-600 transition-all duration-300"
+                  className="h-full bg-orange-600 dark:bg-orange-500 transition-all duration-300"
                   style={{ width: `${readPercentage}%` }}
                 />
               </div>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-green-600" />
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
         </CardContent>

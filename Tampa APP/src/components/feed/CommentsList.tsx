@@ -116,7 +116,7 @@ export function CommentsList({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <Loader2 className="h-6 w-6 animate-spin text-orange-600 dark:text-orange-400" />
       </div>
     );
   }
@@ -134,7 +134,7 @@ export function CommentsList({
 
       {/* Comments list */}
       {topLevelComments.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
+        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
           <p>No comments yet. Be the first to comment!</p>
         </div>
       ) : (
@@ -165,7 +165,7 @@ export function CommentsList({
 
               {/* Nested replies */}
               {getReplies(comment.id).length > 0 && (
-                <div className="ml-12 mt-3 space-y-3 border-l-2 border-muted pl-4">
+                <div className="ml-12 mt-3 space-y-3 border-l-2 border-orange-200 dark:border-orange-800 pl-4">
                   {getReplies(comment.id).map((reply) => (
                     <CommentItem
                       key={reply.id}

@@ -92,15 +92,15 @@ export function Layout() {
       description: "You have been successfully signed out."
     });
   };
-  return <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-muted/40">
+  return <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white dark:from-gray-900 dark:to-black">
       {/* Mobile sidebar */}
       <div className={cn("fixed inset-0 z-50 lg:hidden", sidebarOpen ? "block" : "hidden")}>
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-        <div className="fixed inset-y-0 left-0 w-64 bg-card border-r shadow-modal">
+        <div className="fixed inset-0 bg-gray-900/80 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 border-r shadow-modal">
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-2">
               <TampaIcon className="w-8 h-8" />
-              <h1 className="font-bold text-lg">Tampa APP</h1>
+              <h1 className="font-bold text-lg text-gray-900 dark:text-white">Tampa APP</h1>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
               <X className="w-5 h-5" />
@@ -109,7 +109,7 @@ export function Layout() {
           <nav className="p-4 space-y-2">
             {navigation.map(item => {
             const isActive = location.pathname === item.href;
-            return <a key={item.name} href={item.href} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-accent")}>
+            return <a key={item.name} href={item.href} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-orange-600 text-white shadow-md" : "text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20")}>
                   <item.icon className="w-5 h-5" />
                   {item.name}
                 </a>;
@@ -120,15 +120,15 @@ export function Layout() {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:w-64 lg:flex lg:flex-col">
-        <div className="flex flex-col flex-1 bg-card border-r shadow-card">
+        <div className="flex flex-col flex-1 bg-white dark:bg-gray-800 border-r shadow-card">
           <div className="flex items-center gap-2 p-6 border-b">
             <TampaIcon className="w-8 h-8" />
-            <h1 className="font-bold text-lg">Tampa APP</h1>
+            <h1 className="font-bold text-lg text-gray-900 dark:text-white">Tampa APP</h1>
           </div>
           <nav className="flex-1 p-4 space-y-2">
             {navigation.map(item => {
             const isActive = location.pathname === item.href;
-            return <a key={item.name} href={item.href} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-primary text-primary-foreground shadow-card" : "text-muted-foreground hover:text-foreground hover:bg-accent")}>
+            return <a key={item.name} href={item.href} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-orange-600 text-white shadow-md" : "text-gray-600 dark:text-gray-300 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20")}>
                   <item.icon className="w-5 h-5" />
                   {item.name}
                 </a>;
@@ -139,7 +139,7 @@ export function Layout() {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-card/80 backdrop-blur-sm px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
+        <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8">
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="w-5 h-5" />
           </Button>
@@ -151,21 +151,21 @@ export function Layout() {
                   <>
                     {organization && (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Organization:</span>
-                        <span className="font-medium">{organization.name}</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Organization:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{organization.name}</span>
                       </div>
                     )}
                     {department && (
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">Department:</span>
-                        <span className="font-medium">{department.name}</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Department:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">{department.name}</span>
                       </div>
                     )}
                   </>
                 )}
                 {contextLoading && (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Loading...</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Loading...</span>
                   </div>
                 )}
               </div>

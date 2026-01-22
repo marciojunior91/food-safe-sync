@@ -67,12 +67,12 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
     }
   };
 
-  // Post type styling
+  // Post type styling - Orange/Black Theme
   const postTypeStyles = {
-    text: 'bg-white',
-    announcement: 'bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500',
-    alert: 'bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500',
-    celebration: 'bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500',
+    text: 'bg-white dark:bg-gray-800',
+    announcement: 'bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border-l-4 border-orange-500',
+    alert: 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950 dark:to-red-900 border-l-4 border-red-500',
+    celebration: 'bg-gradient-to-br from-orange-50 to-yellow-100 dark:from-orange-950 dark:to-yellow-900 border-l-4 border-yellow-500',
   };
 
   const postTypeIcons = {
@@ -89,12 +89,12 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
   }, {} as Record<string, number>);
 
   return (
-    <div className={`rounded-lg shadow-sm border p-6 transition-shadow hover:shadow-md ${postTypeStyles[post.content_type]}`}>
+    <div className={`rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-lg hover:border-orange-300 ${postTypeStyles[post.content_type]}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          {/* Author Avatar */}
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+          {/* Author Avatar - Orange Gradient */}
+          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-700 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
             <span className="text-lg font-semibold text-white">
               {post.author?.display_name?.charAt(0) || '?'}
             </span>
@@ -103,15 +103,15 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
           {/* Author Info */}
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold">{post.author?.display_name || 'Unknown'}</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{post.author?.display_name || 'Unknown'}</span>
               {postTypeIcons[post.content_type] && (
                 <span className="text-sm">{postTypeIcons[post.content_type]}</span>
               )}
               {post.is_pinned && (
-                <Pin className="w-4 h-4 text-blue-600 fill-blue-600" />
+                <Pin className="w-4 h-4 text-orange-600 fill-orange-600" />
               )}
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-gray-500 dark:text-gray-400">
               {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
               {post.edited_at && ' • Edited'}
             </div>
@@ -141,7 +141,7 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
       </div>
 
       {/* Content */}
-      <div className="mb-4 whitespace-pre-wrap text-gray-800">
+      <div className="mb-4 whitespace-pre-wrap text-gray-900 dark:text-gray-100">
         {post.content}
       </div>
 
@@ -169,19 +169,19 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
 
       {/* Reactions Summary */}
       {(post.reaction_count > 0 || commentCount > 0) && (
-        <div className="flex items-center justify-between py-3 border-t border-gray-200 text-sm text-gray-600">
+        <div className="flex items-center justify-between py-3 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center gap-2">
             {reactionGroups && Object.entries(reactionGroups).map(([type, count]) => (
-              <div key={type} className="flex items-center gap-1">
+              <div key={type} className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300">
                 <span>{getReactionEmoji(type)}</span>
-                <span>{count}</span>
+                <span className="font-medium">{count}</span>
               </div>
             ))}
           </div>
           {commentCount > 0 && (
             <button
               onClick={() => setShowComments(!showComments)}
-              className="hover:underline"
+              className="hover:underline hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
             >
               {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
             </button>
@@ -190,13 +190,13 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
       )}
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-2 py-3 border-t border-gray-200">
+      <div className="flex items-center gap-2 py-3 border-t border-gray-200 dark:border-gray-700">
         <div className="relative">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowReactionPicker(!showReactionPicker)}
-            className={userReaction ? 'text-blue-600' : ''}
+            className={`transition-colors ${userReaction ? 'text-orange-600 hover:text-orange-700 hover:bg-orange-50' : 'text-gray-700 dark:text-gray-300 hover:text-orange-600 hover:bg-orange-50'}`}
             disabled={reacting}
           >
             <ThumbsUp className={`w-4 h-4 mr-2 ${userReaction ? 'fill-current' : ''}`} />
@@ -204,7 +204,7 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
           </Button>
           
           {showReactionPicker && (
-            <div className="absolute bottom-full left-0 mb-2">
+            <div className="absolute bottom-full left-0 mb-2 z-10">
               <ReactionPicker
                 onSelect={handleReaction}
                 onClose={() => setShowReactionPicker(false)}
@@ -217,6 +217,7 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
           variant="ghost"
           size="sm"
           onClick={() => setShowComments(!showComments)}
+          className="text-gray-700 dark:text-gray-300 hover:text-orange-600 hover:bg-orange-50 transition-colors"
         >
           <MessageCircle className="w-4 h-4 mr-2" />
           Comment
@@ -225,7 +226,7 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
 
       {/* Comments Section */}
       {showComments && (
-        <div className="border-t border-gray-200 pt-4 mt-2">
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
           <CommentsList
             postId={post.id}
             organizationId={organizationId}

@@ -114,38 +114,38 @@ export default function PostComposer({ selectedUser, onClose, onSuccess }: PostC
   const postTypeConfig = {
     text: {
       label: '📝 Text',
-      bg: 'bg-gray-100 hover:bg-gray-200',
-      activeBg: 'bg-gray-200',
-      activeText: 'text-gray-800',
+      bg: 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700',
+      activeBg: 'bg-orange-100 dark:bg-orange-900/20',
+      activeText: 'text-orange-800 dark:text-orange-300',
     },
     announcement: {
       label: '📢 Announcement',
-      bg: 'bg-blue-100 hover:bg-blue-200',
-      activeBg: 'bg-blue-200',
-      activeText: 'text-blue-800',
+      bg: 'bg-orange-50 hover:bg-orange-100 dark:bg-orange-900/10 dark:hover:bg-orange-900/20',
+      activeBg: 'bg-orange-200 dark:bg-orange-900/30',
+      activeText: 'text-orange-900 dark:text-orange-200',
     },
     alert: {
       label: '🚨 Alert',
-      bg: 'bg-red-100 hover:bg-red-200',
-      activeBg: 'bg-red-200',
-      activeText: 'text-red-800',
+      bg: 'bg-red-50 hover:bg-red-100 dark:bg-red-900/10 dark:hover:bg-red-900/20',
+      activeBg: 'bg-red-200 dark:bg-red-900/30',
+      activeText: 'text-red-900 dark:text-red-200',
     },
     celebration: {
       label: '🎉 Celebration',
-      bg: 'bg-green-100 hover:bg-green-200',
-      activeBg: 'bg-green-200',
-      activeText: 'text-green-800',
+      bg: 'bg-yellow-50 hover:bg-yellow-100 dark:bg-yellow-900/10 dark:hover:bg-yellow-900/20',
+      activeBg: 'bg-yellow-200 dark:bg-yellow-900/30',
+      activeText: 'text-yellow-900 dark:text-yellow-200',
     },
   };
 
   return (
-    <div className="bg-white border-2 border-gray-200 rounded-lg p-6 mb-6 shadow-sm">
+    <div className="bg-white dark:bg-gray-800 border-2 border-orange-200 dark:border-orange-900 rounded-lg p-6 mb-6 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Create Post</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create Post</h3>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
+          className="text-gray-400 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
           disabled={uploading}
         >
           <X className="w-5 h-5" />
@@ -181,7 +181,7 @@ export default function PostComposer({ selectedUser, onClose, onSuccess }: PostC
 
       {/* Character Counter */}
       <div className={`text-sm text-right mt-2 mb-4 ${
-        remaining < 100 ? 'text-orange-600 font-semibold' : 'text-gray-500'
+        remaining < 100 ? 'text-orange-600 dark:text-orange-400 font-semibold' : 'text-gray-500 dark:text-gray-400'
       }`}>
         {remaining.toLocaleString()} characters remaining
       </div>
@@ -189,20 +189,20 @@ export default function PostComposer({ selectedUser, onClose, onSuccess }: PostC
       {/* Attachments Preview */}
       {attachments.length > 0 && (
         <div className="mb-4 space-y-2">
-          <p className="text-sm font-medium text-gray-700">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Attachments ({attachments.length}/5)
           </p>
           <div className="grid grid-cols-2 gap-2">
             {attachments.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-2 p-2 bg-gray-50 rounded border"
+                className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/10 rounded border border-orange-200 dark:border-orange-800"
               >
-                <ImageIcon className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                <span className="text-sm truncate flex-1">{file.name}</span>
+                <ImageIcon className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                <span className="text-sm truncate flex-1 text-gray-900 dark:text-gray-100">{file.name}</span>
                 <button
                   onClick={() => removeAttachment(index)}
-                  className="text-red-500 hover:text-red-700 flex-shrink-0"
+                  className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 flex-shrink-0"
                   disabled={uploading}
                 >
                   <X className="w-4 h-4" />
@@ -238,6 +238,7 @@ export default function PostComposer({ selectedUser, onClose, onSuccess }: PostC
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading || attachments.length >= 5}
+            className="hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400"
           >
             <ImageIcon className="w-4 h-4 mr-2" />
             Add Photo
@@ -249,12 +250,14 @@ export default function PostComposer({ selectedUser, onClose, onSuccess }: PostC
             variant="outline"
             onClick={onClose}
             disabled={uploading}
+            className="border-orange-600 text-orange-600 hover:bg-orange-50 dark:border-orange-500 dark:text-orange-400 dark:hover:bg-orange-900/20"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={!content.trim() || uploading || remaining < 0}
+            className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-600"
           >
             {uploading ? (
               <>

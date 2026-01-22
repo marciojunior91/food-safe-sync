@@ -51,19 +51,19 @@ export default function ReactionPicker({ onSelect, onClose }: ReactionPickerProp
   return (
     <div
       ref={pickerRef}
-      className="bg-white rounded-lg shadow-lg border border-gray-200 p-2 flex gap-1 z-50"
+      className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 p-2 flex gap-1 z-50"
     >
       {reactions.map((reaction) => (
         <button
           key={reaction.type}
           onClick={() => onSelect(reaction.type)}
-          className="group relative p-2 hover:bg-gray-100 rounded transition-colors"
+          className="group relative p-2 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded transition-colors"
           title={reaction.label}
         >
           <span className="text-2xl">{reaction.emoji}</span>
           
           {/* Tooltip */}
-          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
             {reaction.label}
           </span>
         </button>

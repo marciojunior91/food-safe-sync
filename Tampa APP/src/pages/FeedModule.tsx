@@ -221,8 +221,8 @@ export default function FeedModule() {
             onClick={() => setFilter('all')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               filter === 'all'
-                ? 'bg-orange-600 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-orange-50 border border-gray-200'
+                ? 'bg-orange-600 text-white shadow-md dark:bg-orange-700'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-gray-700'
             }`}
           >
             All Posts
@@ -231,8 +231,8 @@ export default function FeedModule() {
             onClick={() => setFilter('pinned')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               filter === 'pinned'
-                ? 'bg-orange-600 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-orange-50 border border-gray-200'
+                ? 'bg-orange-600 text-white shadow-md dark:bg-orange-700'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-gray-700'
             }`}
           >
             📌 Pinned
@@ -241,8 +241,8 @@ export default function FeedModule() {
             onClick={() => setFilter('mentions')}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${
               filter === 'mentions'
-                ? 'bg-orange-600 text-white shadow-md'
-                : 'bg-white text-gray-600 hover:bg-orange-50 border border-gray-200'
+                ? 'bg-orange-600 text-white shadow-md dark:bg-orange-700'
+                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-gray-200 dark:border-gray-700'
             }`}
           >
             @ Mentions
@@ -269,17 +269,17 @@ export default function FeedModule() {
           // Loading skeletons
           <div className="space-y-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="bg-white rounded-lg p-6 animate-pulse">
+              <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 animate-pulse border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full" />
                   <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-32 mb-2" />
-                    <div className="h-3 bg-gray-200 rounded w-24" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32 mb-2" />
+                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-24" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <div className="h-4 bg-gray-200 rounded" />
-                  <div className="h-4 bg-gray-200 rounded w-5/6" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6" />
                 </div>
               </div>
             ))}

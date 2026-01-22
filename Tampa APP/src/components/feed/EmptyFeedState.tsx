@@ -38,20 +38,23 @@ export default function EmptyFeedState({ filter = 'all', onCreatePost }: EmptyFe
 
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4">
-      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-        <Icon className="w-8 h-8 text-gray-400" />
+      <div className="w-16 h-16 bg-gradient-to-br from-orange-100 to-orange-200 dark:from-orange-900/20 dark:to-orange-800/20 rounded-full flex items-center justify-center mb-4 shadow-md">
+        <Icon className="w-8 h-8 text-orange-600 dark:text-orange-400" />
       </div>
       
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
         {config.title}
       </h3>
       
-      <p className="text-gray-500 text-center max-w-sm mb-6">
+      <p className="text-gray-500 dark:text-gray-400 text-center max-w-sm mb-6">
         {config.description}
       </p>
 
       {config.showButton && onCreatePost && (
-        <Button onClick={onCreatePost}>
+        <Button 
+          onClick={onCreatePost}
+          className="bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-600"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Create Post
         </Button>

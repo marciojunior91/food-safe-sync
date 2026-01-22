@@ -57,54 +57,54 @@ export default function FeedCard({
         return {
           icon: ClipboardList,
           label: "Task Assigned",
-          bgColor: "bg-blue-50",
-          borderColor: "border-blue-200",
-          iconColor: "text-blue-600",
+          bgColor: "bg-orange-50 dark:bg-orange-900/20",
+          borderColor: "border-orange-200 dark:border-orange-800",
+          iconColor: "text-orange-600 dark:text-orange-400",
           badgeVariant: "default" as const,
         };
       case "pending_docs":
         return {
           icon: FileWarning,
           label: "Document Alert",
-          bgColor: "bg-amber-50",
-          borderColor: "border-amber-200",
-          iconColor: "text-amber-600",
+          bgColor: "bg-amber-50 dark:bg-amber-900/20",
+          borderColor: "border-amber-200 dark:border-amber-800",
+          iconColor: "text-amber-600 dark:text-amber-400",
           badgeVariant: "secondary" as const,
         };
       case "custom_note":
         return {
           icon: Bell,
           label: "Announcement",
-          bgColor: "bg-purple-50",
-          borderColor: "border-purple-200",
-          iconColor: "text-purple-600",
+          bgColor: "bg-orange-50 dark:bg-orange-900/20",
+          borderColor: "border-orange-200 dark:border-orange-800",
+          iconColor: "text-orange-600 dark:text-orange-400",
           badgeVariant: "outline" as const,
         };
       case "maintenance":
         return {
           icon: Wrench,
           label: "Maintenance",
-          bgColor: "bg-orange-50",
-          borderColor: "border-orange-200",
-          iconColor: "text-orange-600",
+          bgColor: "bg-orange-50 dark:bg-orange-900/20",
+          borderColor: "border-orange-200 dark:border-orange-800",
+          iconColor: "text-orange-600 dark:text-orange-400",
           badgeVariant: "secondary" as const,
         };
       case "system":
         return {
           icon: Settings,
           label: "System",
-          bgColor: "bg-gray-50",
-          borderColor: "border-gray-200",
-          iconColor: "text-gray-600",
+          bgColor: "bg-gray-50 dark:bg-gray-800",
+          borderColor: "border-gray-200 dark:border-gray-700",
+          iconColor: "text-gray-600 dark:text-gray-400",
           badgeVariant: "outline" as const,
         };
       default:
         return {
           icon: Bell,
           label: "Info",
-          bgColor: "bg-blue-50",
-          borderColor: "border-blue-200",
-          iconColor: "text-blue-600",
+          bgColor: "bg-orange-50 dark:bg-orange-900/20",
+          borderColor: "border-orange-200 dark:border-orange-800",
+          iconColor: "text-orange-600 dark:text-orange-400",
           badgeVariant: "default" as const,
         };
     }
