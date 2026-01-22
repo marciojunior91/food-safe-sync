@@ -206,7 +206,16 @@ export async function getFeedPosts(
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
 
+  console.log('[getFeedPosts] 🎯 Final query executing for filter:', filter);
+  console.log('[getFeedPosts] 🎯 Organization:', organizationId);
+  console.log('[getFeedPosts] 🎯 User:', currentUserId);
+
   const { data, error } = await query;
+  
+  console.log('[getFeedPosts] 📦 Query returned:', data?.length || 0, 'posts');
+  if (error) {
+    console.error('[getFeedPosts] ❌ Query error:', error);
+  }
 
   if (error) throw error;
   return data as FeedPost[];

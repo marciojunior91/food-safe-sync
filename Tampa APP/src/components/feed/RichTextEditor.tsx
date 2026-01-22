@@ -141,9 +141,9 @@ export function RichTextEditor({
   }, [maxLength, onChange]);
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-white">
+    <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700">
       {/* Toolbar */}
-      <div className="flex items-center gap-1 p-2 border-b bg-gray-50">
+      <div className="flex items-center gap-1 p-2 border-b bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700">
         <Button
           type="button"
           variant="ghost"
@@ -239,8 +239,8 @@ export function RichTextEditor({
         contentEditable={!disabled}
         onInput={handleInput}
         onPaste={handlePaste}
-        className={`min-h-[128px] max-h-[400px] overflow-y-auto p-4 focus:outline-none ${
-          disabled ? 'bg-gray-50 cursor-not-allowed' : ''
+        className={`min-h-[128px] max-h-[400px] overflow-y-auto p-4 focus:outline-none text-gray-900 dark:text-gray-100 ${
+          disabled ? 'bg-gray-50 dark:bg-gray-800 cursor-not-allowed' : 'bg-white dark:bg-gray-900'
         }`}
         data-placeholder={placeholder}
       />
@@ -251,6 +251,10 @@ export function RichTextEditor({
           content: attr(data-placeholder);
           color: #9ca3af;
           pointer-events: none;
+        }
+        
+        .dark [contenteditable][data-placeholder]:empty:before {
+          color: #6b7280;
         }
         
         /* Mention styling - Instagram/Slack style */

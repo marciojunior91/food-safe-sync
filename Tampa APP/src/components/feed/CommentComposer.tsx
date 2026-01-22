@@ -25,6 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useToast } from '@/hooks/use-toast';
 import { createComment, createMentions } from '@/lib/feed/feedService';
 import { supabase } from '@/integrations/supabase/client';
+import { renderMentionsInText } from '@/lib/feed/mentionUtils';
 
 interface TeamMember {
   id: string;
@@ -56,6 +57,7 @@ export function CommentComposer({
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
 
@@ -103,11 +105,13 @@ export function CommentComposer({
       if (textAfterAt.length < 20 && !textAfterAt.includes(' ')) {
         setMentionSearch(textAfterAt);
         setShowMentions(true);
+        setSelectedMentionIndex(0); // Reset selection
         return;
       }
     }
 
     setShowMentions(false);
+    setSelectedMentionIndex(0);
   };
 
   // Insert mention
@@ -165,6 +169,7 @@ export function CommentComposer({
       });
 
       // Extract and create mentions
+      // Note: postId is passed but createMentions will set it to null since commentId exists
       await createMentions(content, postId, comment.id, authorId);
 
       setContent('');
@@ -184,10 +189,46 @@ export function CommentComposer({
 
   // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Handle mentions dropdown navigation
+    if (showMentions && filteredMembers.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => 
+          prev < filteredMembers.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+      
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => 
+          prev > 0 ? prev - 1 : filteredMembers.length - 1
+        );
+        return;
+      }
+      
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const selectedMember = filteredMembers[selectedMentionIndex];
+        if (selectedMember) {
+          insertMention(selectedMember);
+        }
+        return;
+      }
+      
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowMentions(false);
+        setSelectedMentionIndex(0);
+        return;
+      }
+    }
+
     // Submit on Ctrl/Cmd + Enter
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       handleSubmit();
+      return;
     }
 
     // Cancel on Escape (for replies)
@@ -203,14 +244,32 @@ export function CommentComposer({
   return (
     <div className="space-y-2">
       <div className="relative">
+        {/* Preview overlay with styled mentions (overlays textarea text) */}
+        <div 
+          className="absolute inset-0 pointer-events-none overflow-hidden rounded-md border border-transparent z-20"
+          style={{
+            padding: '0.5rem 0.75rem',
+            lineHeight: '1.5',
+            fontSize: '0.875rem',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+          }}
+        >
+          {renderMentionsInText(content)}
+        </div>
+
         <Textarea
           ref={textareaRef}
           value={content}
           onChange={(e) => handleContentChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="min-h-[80px] resize-none pr-10"
+          className="min-h-[80px] resize-none pr-10 relative z-10"
           maxLength={maxLength}
+          style={{
+            color: 'transparent',
+            caretColor: 'currentColor',
+          }}
         />
 
         {/* @ Mention button */}
@@ -218,7 +277,7 @@ export function CommentComposer({
           type="button"
           variant="ghost"
           size="sm"
-          className="absolute right-2 top-2 h-6 w-6 p-0"
+          className="absolute right-2 top-2 h-6 w-6 p-0 z-20"
           onClick={() => {
             const textarea = textareaRef.current;
             if (!textarea) return;
@@ -243,14 +302,23 @@ export function CommentComposer({
             <Command>
               <CommandList>
                 <CommandGroup heading="Mention team member">
-                  {filteredMembers.slice(0, 5).map((member) => (
+                  {filteredMembers.slice(0, 5).map((member, index) => (
                     <CommandItem
                       key={member.id}
                       onSelect={() => insertMention(member)}
-                      className="cursor-pointer"
+                      className={`cursor-pointer ${
+                        index === selectedMentionIndex 
+                          ? 'bg-accent text-accent-foreground' 
+                          : ''
+                      }`}
                     >
                       <AtSign className="h-4 w-4 mr-2" />
                       {member.display_name}
+                      {index === selectedMentionIndex && (
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          ↵ or Tab
+                        </span>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -295,7 +363,10 @@ export function CommentComposer({
 
       {/* Hint */}
       <p className="text-xs text-muted-foreground">
-        Tip: Press Ctrl+Enter to post, @ to mention someone
+        Tip: Press <kbd className="px-1 py-0.5 bg-muted rounded text-xs">Ctrl+Enter</kbd> to post, 
+        <kbd className="px-1 py-0.5 bg-muted rounded text-xs ml-1">@</kbd> to mention, 
+        <kbd className="px-1 py-0.5 bg-muted rounded text-xs ml-1">↑↓</kbd> to navigate mentions, 
+        <kbd className="px-1 py-0.5 bg-muted rounded text-xs ml-1">Enter/Tab</kbd> to select
       </p>
     </div>
   );

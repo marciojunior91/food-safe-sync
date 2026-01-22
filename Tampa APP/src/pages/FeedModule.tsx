@@ -35,6 +35,7 @@ export default function FeedModule() {
   console.log('[FeedModule] 🔍 Current filter:', filter);
   console.log('[FeedModule] 👤 Selected user ID:', selectedUser?.id);
   console.log('[FeedModule] 👤 Selected user name:', selectedUser?.display_name);
+  console.log('[FeedModule] 📞 Calling useFeed with:', { organizationId, filter, userId: selectedUser?.id });
 
   const {
     posts,

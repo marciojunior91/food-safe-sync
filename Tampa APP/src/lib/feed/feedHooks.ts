@@ -44,6 +44,14 @@ export function useFeed(
   // Load posts
   const loadPosts = useCallback(
     async (reset = false) => {
+      console.log('[useFeed.loadPosts] 📞 Called with:', { 
+        organizationId, 
+        filter, 
+        currentUserId, 
+        reset, 
+        offset: reset ? 0 : offset 
+      });
+
       // Don't load if no organization ID
       if (!organizationId) {
         setLoading(false);
@@ -80,7 +88,7 @@ export function useFeed(
   // Initial load
   useEffect(() => {
     loadPosts(true);
-  }, [organizationId, filter]);
+  }, [organizationId, filter, currentUserId]);
 
   // Real-time subscription
   useEffect(() => {
