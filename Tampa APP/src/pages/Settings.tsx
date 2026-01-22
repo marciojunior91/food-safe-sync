@@ -1,4 +1,6 @@
 import { AdminPanel } from "@/components/admin/AdminPanel";
+import { ProfileTabContent } from "@/components/settings/ProfileTabContent";
+import { NotificationsTabContent } from "@/components/settings/NotificationsTabContent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Settings, User, Bell, Shield, CreditCard } from "lucide-react";
@@ -45,41 +47,12 @@ export default function SettingsPage() {
 
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
-              <CardDescription>
-                View and update your profile information
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-medium">{user?.email}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">User ID</p>
-                <p className="font-mono text-xs">{user?.id}</p>
-              </div>
-            </CardContent>
-          </Card>
+          <ProfileTabContent />
         </TabsContent>
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Manage how you receive notifications
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Notification settings coming soon...
-              </p>
-            </CardContent>
-          </Card>
+          <NotificationsTabContent />
         </TabsContent>
 
         {/* Admin Tab */}

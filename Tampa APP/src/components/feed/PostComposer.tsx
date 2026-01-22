@@ -7,7 +7,7 @@
 import { useState, useRef } from 'react';
 import { X, Image as ImageIcon, Send, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/feed/RichTextEditor';
 import { toast } from 'sonner';
 import { createPost, uploadAttachment, createMentions } from '@/lib/feed/feedService';
 import { useUserContext } from '@/hooks/useUserContext';
@@ -171,20 +171,19 @@ export default function PostComposer({ selectedUser, onClose, onSuccess }: PostC
       </div>
 
       {/* Content Input */}
-      <Textarea
+      <RichTextEditor
         value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Share updates, ask questions, or celebrate wins with your team..."
-        className="min-h-32 mb-2 resize-none"
+        onChange={setContent}
+        placeholder="Share updates, ask questions, or celebrate wins with your team... Use the toolbar for formatting!"
         maxLength={maxLength}
         disabled={uploading}
       />
 
       {/* Character Counter */}
-      <div className={`text-sm text-right mb-4 ${
+      <div className={`text-sm text-right mt-2 mb-4 ${
         remaining < 100 ? 'text-orange-600 font-semibold' : 'text-gray-500'
       }`}>
-        {remaining.toLocaleString()} / {maxLength.toLocaleString()}
+        {remaining.toLocaleString()} characters remaining
       </div>
 
       {/* Attachments Preview */}
