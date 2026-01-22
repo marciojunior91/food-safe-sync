@@ -136,24 +136,26 @@ export default function Labeling() {
           .filter(Boolean) || []
       }));
       
-      // Fetch latest printed label for each product to enable expiry warnings
-      const productsWithLabels = await Promise.all(
-        productsWithAllergens.map(async (product) => {
-          const { data: latestLabel } = await supabase
-            .from('printed_labels')
-            .select('id, expiry_date, condition')
-            .eq('product_id', product.id)
-            .eq('organization_id', profile.organization_id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          
-          return {
-            ...product,
-            latestLabel
-          };
-        })
-      );
+      // BUG-005 FIX: Fetch ALL latest labels in 1 query instead of N queries
+      const { data: allLabels } = await supabase
+        .from('printed_labels')
+        .select('product_id, id, expiry_date, condition, created_at')
+        .eq('organization_id', profile.organization_id)
+        .order('created_at', { ascending: false });
+      
+      // Group labels by product_id and keep only the latest
+      const latestLabelsByProduct = (allLabels || []).reduce((acc: any, label: any) => {
+        if (!acc[label.product_id]) {
+          acc[label.product_id] = label;
+        }
+        return acc;
+      }, {});
+      
+      // Attach latest label to each product
+      const productsWithLabels = productsWithAllergens.map(product => ({
+        ...product,
+        latestLabel: latestLabelsByProduct[product.id] || null
+      }));
       
       setProducts(productsWithLabels);
     } catch (error) {

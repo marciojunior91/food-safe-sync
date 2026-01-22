@@ -21,14 +21,14 @@ import RoutineTasks from "./pages/RoutineTasks";
 import Training from "./pages/Training";
 import People from "./pages/People";
 import Feed from "./pages/Feed";
-import ProductTrafficLight from "./pages/ProductTrafficLight";
-import DraftManagement from "./pages/DraftManagement";
 import LabelCategories from "./pages/LabelCategories";
 import UserProfile from "./components/people/UserProfile";
 import PricingPage from "./pages/PricingPage";
 import Billing from "./pages/Billing";
 import FeedModuleV2 from "./pages/FeedModuleV2";
 import Settings from "./pages/Settings";
+import ExpiringSoon from "./pages/ExpiringSoon";
+import KnowledgeBase from "./pages/KnowledgeBase";
 
 const queryClient = new QueryClient();
 
@@ -49,18 +49,18 @@ const App = () => (
                 </ProtectedRoute>
               }>
                 <Route index element={<Dashboard />} />
-                <Route path="recipes" element={<Recipes />} />
                 <Route path="labeling" element={<Labeling />} />
+                <Route path="expiring-soon" element={<ExpiringSoon />} />
                 <Route path="inventory" element={<Inventory />} />
+                <Route path="recipes" element={<Recipes />} />
                 <Route path="routine-tasks" element={<RoutineTasks />} />
-                <Route path="training" element={<Training />} />
                 <Route path="people" element={<People />} />
                 <Route path="people/:userId" element={<UserProfile />} />
                 <Route path="feed" element={<FeedModuleV2 />} />
                 <Route path="feed-old" element={<Feed />} />
+                <Route path="knowledge-base" element={<KnowledgeBase />} />
+                <Route path="training" element={<Training />} />
               <Route path="analytics" element={<Analytics />} />
-              <Route path="traffic-light" element={<ProductTrafficLight />} />
-              <Route path="drafts" element={<DraftManagement />} />
               <Route path="label-categories" element={<LabelCategories />} />
               
               {/* Settings */}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useLocation, Link } from "react-router-dom";
-import { BarChart3, ClipboardList, Package, Tags, Settings, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, Lightbulb, FileText, User } from "lucide-react";
+import { BarChart3, ClipboardList, Package, Tags, Settings, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, AlertTriangle, BookOpen, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,29 +22,25 @@ const navigation = [{
   href: "/",
   icon: BarChart3
 }, {
-  name: "Recipes",
-  href: "/recipes",
-  icon: ClipboardList
-}, {
   name: "Labeling",
   href: "/labeling",
   icon: Tags
 }, {
-  name: "Drafts",
-  href: "/drafts",
-  icon: FileText
+  name: "Expiring Soon",
+  href: "/expiring-soon",
+  icon: AlertTriangle
 }, {
   name: "Inventory",
   href: "/inventory",
   icon: Package
 }, {
+  name: "Recipes",
+  href: "/recipes",
+  icon: ClipboardList
+}, {
   name: "Routine Tasks",
   href: "/routine-tasks",
   icon: Calendar
-}, {
-  name: "Training",
-  href: "/training",
-  icon: GraduationCap
 }, {
   name: "People",
   href: "/people",
@@ -54,9 +50,13 @@ const navigation = [{
   href: "/feed",
   icon: Bell
 }, {
-  name: "Product Traffic Light",
-  href: "/traffic-light",
-  icon: Lightbulb
+  name: "Knowledge Base",
+  href: "/knowledge-base",
+  icon: BookOpen
+}, {
+  name: "Training Center",
+  href: "/training",
+  icon: GraduationCap
 }, {
   name: "Analytics",
   href: "/analytics",
