@@ -3,7 +3,7 @@
  * Theme: Orange & Black professional design
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, RefreshCw, User, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,10 +32,13 @@ export default function FeedModule() {
   const organizationId = context?.organization_id || '';
   const shouldLoadFeed = !!organizationId;
 
+  // Memoize selectedUserId to prevent unnecessary re-renders
+  const selectedUserId = useMemo(() => selectedUser?.id, [selectedUser?.id]);
+
   console.log('[FeedModule] 🔍 Current filter:', filter);
-  console.log('[FeedModule] 👤 Selected user ID:', selectedUser?.id);
+  console.log('[FeedModule] 👤 Selected user ID:', selectedUserId);
   console.log('[FeedModule] 👤 Selected user name:', selectedUser?.display_name);
-  console.log('[FeedModule] 📞 Calling useFeed with:', { organizationId, filter, userId: selectedUser?.id });
+  console.log('[FeedModule] 📞 Calling useFeed with:', { organizationId, filter, userId: selectedUserId });
 
   const {
     posts,
@@ -44,7 +47,7 @@ export default function FeedModule() {
     loadMore,
     hasMore,
     refresh,
-  } = useFeed(organizationId, filter, selectedUser?.id);
+  } = useFeed(organizationId, filter, selectedUserId);
 
   // ALWAYS open user selection dialog if no user selected (FIX)
   useEffect(() => {
@@ -310,7 +313,7 @@ export default function FeedModule() {
                 <PostCard
                   key={post.id}
                   post={post}
-                  currentUserId={selectedUser?.id || context?.user_id || ''}
+                  currentUserId={selectedUserId || context?.user_id || ''}
                   organizationId={context?.organization_id || ''}
                   onUpdate={refresh}
                 />

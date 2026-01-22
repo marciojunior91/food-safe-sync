@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -43,6 +43,8 @@ import { TaskForm } from "@/components/routine-tasks/TaskForm";
 import { TaskCard } from "@/components/routine-tasks/TaskCard";
 import { TaskDetailView } from "@/components/routine-tasks/TaskDetailView";
 import { TaskTimeline } from "@/components/routine-tasks/TaskTimeline";
+import { BulkActionsToolbar } from "@/components/routine-tasks/BulkActionsToolbar";
+import { TemplatesManagement } from "@/components/routine-tasks/TemplatesManagement";
 import { useRoutineTasks } from "@/hooks/useRoutineTasks";
 import { usePeople } from "@/hooks/usePeople";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
@@ -65,15 +67,20 @@ export default function TasksOverview() {
   const [selectedTask, setSelectedTask] = useState<RoutineTask | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<RoutineTask | null>(null);
   
-  // View mode state: 'list' or 'timeline'
-  const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
+  // Bulk selection state
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  
+  // View mode state: 'list', 'timeline', or 'templates'
+  const [viewMode, setViewMode] = useState<'list' | 'timeline' | 'templates'>('list');
   
   // Selected date for timeline view
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Debug logging
-  console.log('TasksOverview - context:', context);
-  console.log('TasksOverview - contextLoading:', contextLoading);
+  // Debug logging (development only)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('TasksOverview - context:', context);
+    console.log('TasksOverview - contextLoading:', contextLoading);
+  }
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
@@ -98,6 +105,7 @@ export default function TasksOverview() {
   // Use the routine tasks hook
   const {
     tasks,
+    templates,
     loading,
     error,
     createTask,
@@ -107,6 +115,7 @@ export default function TasksOverview() {
     getTodayTasks,
     getOverdueTasks,
     getTasksByStatus,
+    createFromTemplate,
   } = useRoutineTasks(context?.organization_id);
 
   // Filter tasks based on search and filters
@@ -138,9 +147,12 @@ export default function TasksOverview() {
       filtered = filtered.filter((task) => task.priority === filterPriority);
     }
 
-    // Assigned user filter
+    // Assigned user filter (now using team_member_id instead of assigned_to)
     if (filterAssignedUser !== "all") {
-      filtered = filtered.filter((task) => task.assigned_to === filterAssignedUser);
+      filtered = filtered.filter((task) => 
+        task.team_member_id === filterAssignedUser || 
+        task.assigned_to === filterAssignedUser // Fallback for legacy tasks
+      );
     }
 
     return filtered;
@@ -194,8 +206,10 @@ export default function TasksOverview() {
 
   // Handle task creation
   const handleCreateTask = async (data: CreateTaskInput) => {
-    console.log('Creating task with data:', data);
-    console.log('Organization ID:', context?.organization_id);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Creating task with data:', data);
+      console.log('Organization ID:', context?.organization_id);
+    }
     
     if (!context?.organization_id) {
       toast({
@@ -359,6 +373,123 @@ export default function TasksOverview() {
     setIsEditDialogOpen(true);
   };
 
+  // Bulk Actions Handlers
+  const handleSelectTask = (taskId: string, selected: boolean) => {
+    setSelectedTaskIds(prev =>
+      selected
+        ? [...prev, taskId]
+        : prev.filter(id => id !== taskId)
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedTaskIds(
+      selectedTaskIds.length === filteredTasks.length
+        ? []
+        : filteredTasks.map(t => t.id)
+    );
+  };
+
+  const handleBulkComplete = async () => {
+    let successCount = 0;
+    for (const taskId of selectedTaskIds) {
+      const success = await updateTaskStatus(taskId, "completed", context?.user_id);
+      if (success) successCount++;
+    }
+    setSelectedTaskIds([]);
+    toast({
+      title: "Tasks Completed!",
+      description: `${successCount} ${successCount === 1 ? 'task' : 'tasks'} marked as complete`,
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    let successCount = 0;
+    for (const taskId of selectedTaskIds) {
+      const success = await deleteTask(taskId);
+      if (success) successCount++;
+    }
+    setSelectedTaskIds([]);
+    toast({
+      title: "Tasks Deleted",
+      description: `${successCount} ${successCount === 1 ? 'task' : 'tasks'} removed`,
+    });
+  };
+
+  const handleBulkReassign = async (teamMemberId: string) => {
+    let successCount = 0;
+    for (const taskId of selectedTaskIds) {
+      const success = await updateTask(taskId, {
+        team_member_id: teamMemberId === "unassigned" ? null : teamMemberId
+      });
+      if (success) successCount++;
+    }
+    setSelectedTaskIds([]);
+    toast({
+      title: "Tasks Reassigned",
+      description: `${successCount} ${successCount === 1 ? 'task' : 'tasks'} reassigned`,
+    });
+  };
+
+  const handleBulkChangePriority = async (priority: TaskPriority) => {
+    let successCount = 0;
+    for (const taskId of selectedTaskIds) {
+      const success = await updateTask(taskId, { priority });
+      if (success) successCount++;
+    }
+    setSelectedTaskIds([]);
+    toast({
+      title: "Priority Updated",
+      description: `${successCount} ${successCount === 1 ? 'task' : 'tasks'} updated`,
+    });
+  };
+
+  const handleBulkChangeStatus = async (status: TaskStatus) => {
+    let successCount = 0;
+    for (const taskId of selectedTaskIds) {
+      const success = await updateTaskStatus(taskId, status, context?.user_id);
+      if (success) successCount++;
+    }
+    setSelectedTaskIds([]);
+    toast({
+      title: "Status Updated",
+      description: `${successCount} ${successCount === 1 ? 'task' : 'tasks'} updated`,
+    });
+  };
+
+  // Template Management Handlers
+  const handleCreateTemplate = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Template creation form will be available soon",
+    });
+  };
+
+  const handleEditTemplate = (template: any) => {
+    toast({
+      title: "Coming Soon",
+      description: `Editing "${template.name}" will be available soon`,
+    });
+  };
+
+  const handleDeleteTemplate = async (templateId: string): Promise<boolean> => {
+    // TODO: Implement template deletion
+    // For now, just show error since templates are managed in the database
+    toast({
+      title: "Cannot Delete",
+      description: "Template deletion requires backend implementation",
+      variant: "destructive",
+    });
+    return false;
+  };
+
+  const handleDuplicateTemplate = async (template: any) => {
+    toast({
+      title: "Coming Soon",
+      description: `Duplicating "${template.name}" will be available soon`,
+    });
+  };
+
   // Loading state
   if (loading || contextLoading) {
     return (
@@ -424,7 +555,7 @@ export default function TasksOverview() {
           <ToggleGroup 
             type="single" 
             value={viewMode} 
-            onValueChange={(value) => value && setViewMode(value as 'list' | 'timeline')}
+            onValueChange={(value) => value && setViewMode(value as 'list' | 'timeline' | 'templates')}
             className="justify-start sm:justify-center"
           >
             <ToggleGroupItem value="list" aria-label="List view" className="gap-2">
@@ -435,10 +566,16 @@ export default function TasksOverview() {
               <Clock className="w-4 h-4" />
               <span className="hidden sm:inline">Timeline</span>
             </ToggleGroupItem>
+            <ToggleGroupItem value="templates" aria-label="Templates view" className="gap-2">
+              <FileText className="w-4 h-4" />
+              <span className="hidden sm:inline">Templates</span>
+            </ToggleGroupItem>
           </ToggleGroup>
 
-          {/* Create Task Button */}
-          {isCreateDialogOpen && (
+          {/* Create Task Button (hidden in templates view) */}
+          {viewMode !== 'templates' && (
+            <>
+              {isCreateDialogOpen && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
@@ -464,8 +601,22 @@ export default function TasksOverview() {
             <Plus className="w-5 h-5" />
             <span>New Task</span>
           </Button>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Templates View */}
+      {viewMode === 'templates' && (
+        <TemplatesManagement
+          templates={templates}
+          loading={loading}
+          onCreateTemplate={handleCreateTemplate}
+          onEditTemplate={handleEditTemplate}
+          onDeleteTemplate={handleDeleteTemplate}
+          onDuplicateTemplate={handleDuplicateTemplate}
+        />
+      )}
 
       {/* Timeline Date Navigation (only shown in timeline view) */}
       {viewMode === 'timeline' && (
@@ -760,9 +911,32 @@ export default function TasksOverview() {
             )}
 
             {/* Results Count */}
-            <div className="text-sm text-muted-foreground">
-              Showing {filteredTasks.length} of {tasks.length} tasks
-              {hasActiveFilters && " (filtered)"}
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Showing {filteredTasks.length} of {tasks.length} tasks
+                {hasActiveFilters && " (filtered)"}
+              </div>
+              
+              {/* Select All Checkbox (only in list view) */}
+              {viewMode === 'list' && filteredTasks.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="select-all"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                    checked={selectedTaskIds.length === filteredTasks.length && filteredTasks.length > 0}
+                    onChange={handleSelectAll}
+                  />
+                  <label htmlFor="select-all" className="text-sm font-medium cursor-pointer">
+                    Select All
+                  </label>
+                  {selectedTaskIds.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {selectedTaskIds.length} selected
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -887,6 +1061,9 @@ export default function TasksOverview() {
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
                   onDelete={handleDeleteTask}
+                  selectable={true}
+                  selected={selectedTaskIds.includes(task.id)}
+                  onSelect={handleSelectTask}
                 />
               ))}
             </div>
@@ -914,6 +1091,9 @@ export default function TasksOverview() {
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
                   onDelete={handleDeleteTask}
+                  selectable={true}
+                  selected={selectedTaskIds.includes(task.id)}
+                  onSelect={handleSelectTask}
                 />
               ))}
             </div>
@@ -943,6 +1123,9 @@ export default function TasksOverview() {
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
                   onDelete={handleDeleteTask}
+                  selectable={true}
+                  selected={selectedTaskIds.includes(task.id)}
+                  onSelect={handleSelectTask}
                 />
               ))}
             </div>
@@ -990,6 +1173,9 @@ export default function TasksOverview() {
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
                   onDelete={handleDeleteTask}
+                  selectable={true}
+                  selected={selectedTaskIds.includes(task.id)}
+                  onSelect={handleSelectTask}
                 />
               ))}
             </div>
@@ -1045,6 +1231,19 @@ export default function TasksOverview() {
           onAddNote={handleAddNote}
         />
       )}
+
+      {/* Bulk Actions Toolbar (floating) */}
+      <BulkActionsToolbar
+        selectedCount={selectedTaskIds.length}
+        onCompleteSelected={handleBulkComplete}
+        onDeleteSelected={handleBulkDelete}
+        onReassignSelected={handleBulkReassign}
+        onChangePrioritySelected={handleBulkChangePriority}
+        onChangeStatusSelected={handleBulkChangeStatus}
+        onClearSelection={() => setSelectedTaskIds([])}
+        teamMembers={uniqueUsers}
+        loading={loading}
+      />
     </div>
   );
 }

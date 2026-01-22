@@ -168,9 +168,24 @@ export function CommentComposer({
         parent_comment_id: parentCommentId,
       });
 
+      console.log('[CommentComposer] ✅ Comment created:', comment.id);
+      console.log('[CommentComposer] 📝 Comment content:', content);
+      console.log('[CommentComposer] 🔍 Calling createMentions with:', {
+        content,
+        postId,
+        commentId: comment.id,
+        authorId
+      });
+
       // Extract and create mentions
       // Note: postId is passed but createMentions will set it to null since commentId exists
-      await createMentions(content, postId, comment.id, authorId);
+      try {
+        await createMentions(content, postId, comment.id, authorId);
+        console.log('[CommentComposer] ✅ createMentions completed successfully');
+      } catch (mentionError) {
+        console.error('[CommentComposer] ❌ createMentions failed:', mentionError);
+        // Don't throw - comment was created successfully
+      }
 
       setContent('');
       toast({ title: isReply ? 'Reply posted' : 'Comment posted' });

@@ -4,6 +4,7 @@ import { Clock, User, Check, Eye, Trash2, MoreVertical } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +26,9 @@ interface TaskCardProps {
   onComplete?: (task: RoutineTask) => void;
   onDelete?: (task: RoutineTask) => void;
   showActions?: boolean;
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (taskId: string, selected: boolean) => void;
 }
 
 // Task type icons
@@ -60,6 +64,9 @@ export function TaskCard({
   onComplete,
   onDelete,
   showActions = true,
+  selectable = false,
+  selected = false,
+  onSelect,
 }: TaskCardProps) {
   const taskIcon = TASK_TYPE_ICONS[task.task_type] || "📋";
   const statusColor = STATUS_COLORS[task.status];
@@ -72,11 +79,24 @@ export function TaskCard({
     <Card
       className={cn(
         "transition-all hover:shadow-md",
-        isCompleted && "opacity-75"
+        isCompleted && "opacity-75",
+        selected && "ring-2 ring-primary shadow-lg",
+        isOverdue && "border-red-500 border-2 bg-red-50/30 shadow-red-100"
       )}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
+          {/* Selection Checkbox (if selectable) */}
+          {selectable && (
+            <div className="pt-1">
+              <Checkbox
+                checked={selected}
+                onCheckedChange={(checked) => onSelect?.(task.id, checked as boolean)}
+                className="h-5 w-5"
+              />
+            </div>
+          )}
+          
           {/* Left side - Icon and Info */}
           <div className="flex items-start gap-3 flex-1 min-w-0">
             {/* Task Icon */}
@@ -199,8 +219,13 @@ export function TaskCard({
         <div className="mt-3 pt-3 border-t">
           <Badge
             variant="outline"
-            className={cn("font-medium", statusColor)}
+            className={cn(
+              "font-medium",
+              statusColor,
+              isOverdue && "animate-pulse border-red-600 bg-red-100 text-red-800 font-bold"
+            )}
           >
+            {isOverdue && "⚠️ "}
             {task.status.replace("_", " ").toUpperCase()}
           </Badge>
 
@@ -208,6 +233,13 @@ export function TaskCard({
           {isCompleted && task.completed_at && (
             <span className="ml-2 text-xs text-muted-foreground">
               Completed {format(new Date(task.completed_at), "MMM d 'at' h:mm a")}
+            </span>
+          )}
+          
+          {/* Overdue Warning */}
+          {isOverdue && task.scheduled_date && (
+            <span className="ml-2 text-xs text-red-600 font-semibold">
+              Overdue since {format(new Date(task.scheduled_date), "MMM d")}
             </span>
           )}
         </div>

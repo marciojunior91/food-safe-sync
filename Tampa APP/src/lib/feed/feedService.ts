@@ -150,9 +150,11 @@ export async function getFeedPosts(
     
     console.log('[getFeedPosts] 📋 Found mentions:', mentions?.length || 0);
     console.log('[getFeedPosts] 📋 Mentions data:', mentions);
+    console.log('[getFeedPosts] 🔍 Mentions error:', mentionsError);
     
     if (mentionsError) {
       console.error('[getFeedPosts] ❌ Error fetching mentions:', mentionsError);
+      console.error('[getFeedPosts] ❌ Error details:', JSON.stringify(mentionsError, null, 2));
     }
     
     if (mentions && mentions.length > 0) {
