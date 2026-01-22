@@ -20,12 +20,11 @@ import NotFound from "./pages/NotFound";
 import RoutineTasks from "./pages/RoutineTasks";
 import Training from "./pages/Training";
 import People from "./pages/People";
-import Feed from "./pages/Feed";
 import LabelCategories from "./pages/LabelCategories";
 import UserProfile from "./components/people/UserProfile";
 import PricingPage from "./pages/PricingPage";
 import Billing from "./pages/Billing";
-import FeedModuleV2 from "./pages/FeedModuleV2";
+import FeedModule from "./pages/FeedModule";
 import Settings from "./pages/Settings";
 import ExpiringSoon from "./pages/ExpiringSoon";
 import KnowledgeBase from "./pages/KnowledgeBase";
@@ -56,8 +55,7 @@ const App = () => (
                 <Route path="routine-tasks" element={<RoutineTasks />} />
                 <Route path="people" element={<People />} />
                 <Route path="people/:userId" element={<UserProfile />} />
-                <Route path="feed" element={<FeedModuleV2 />} />
-                <Route path="feed-old" element={<Feed />} />
+                <Route path="feed" element={<FeedModule />} />
                 <Route path="knowledge-base" element={<KnowledgeBase />} />
                 <Route path="training" element={<Training />} />
               <Route path="analytics" element={<Analytics />} />

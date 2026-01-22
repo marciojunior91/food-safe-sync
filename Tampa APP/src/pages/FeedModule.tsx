@@ -1,302 +1,348 @@
-// Feed Module - Iteration 13
-// Activity feed, notifications, and real-time updates
-// Team member selection allows staff to identify themselves on shared accounts
+/**
+ * FeedModule - Social collaboration feed with posts, reactions, and comments
+ * Theme: Orange & Black professional design
+ */
 
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { useFeed } from "@/hooks/useFeed";
-import { useUserContext } from "@/hooks/useUserContext";
-import { FeedFilters as FeedFiltersType } from "@/types/feed";
-import FeedList from "@/components/feed/FeedList";
-import FeedStats from "@/components/feed/FeedStats";
-import FeedFilters from "@/components/feed/FeedFilters";
-import { IncompleteProfilesAlert } from "@/components/feed/IncompleteProfilesAlert";
-import { UserSelectionDialog } from "@/components/labels/UserSelectionDialog";
-import { Plus, RefreshCw, User, AlertCircle } from "lucide-react";
-import type { TeamMember } from "@/types/teamMembers";
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, RefreshCw, User, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
+import { useFeed } from '@/lib/feed/feedHooks';
+import { useUserContext } from '@/hooks/useUserContext';
+import { supabase } from '@/integrations/supabase/client';
+import PostComposer from '@/components/feed/PostComposer';
+import PostCard from '@/components/feed/PostCard';
+import EmptyFeedState from '@/components/feed/EmptyFeedState';
+import { IncompleteProfilesAlert } from '@/components/feed/IncompleteProfilesAlert';
+import { UserSelectionDialog } from '@/components/labels/UserSelectionDialog';
+import type { TeamMember } from '@/types/teamMembers';
 
 export default function FeedModule() {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { context, loading: contextLoading } = useUserContext();
-  const [filters, setFilters] = useState<FeedFiltersType>({});
+  const [showComposer, setShowComposer] = useState(false);
   const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const [hasAutoOpened, setHasAutoOpened] = useState(false);
-  
+  const [filter, setFilter] = useState<'all' | 'pinned' | 'mentions'>('all');
+
+  // Don't load feed until we have an organization_id
+  const organizationId = context?.organization_id || '';
+  const shouldLoadFeed = !!organizationId;
+
   const {
-    feedItems,
+    posts,
     loading,
     error,
-    unreadCount,
-    fetchFeed,
-    markAsRead,
-    deleteFeedItem,
-  } = useFeed(context?.user_id, context?.organization_id);
+    loadMore,
+    hasMore,
+    refresh,
+  } = useFeed(organizationId, filter);
 
-  // Auto-open user selection dialog on first mount if no user selected
+  // ALWAYS open user selection dialog if no user selected (FIX)
   useEffect(() => {
-    if (!contextLoading && context?.organization_id && !selectedUser && !hasAutoOpened) {
+    if (!contextLoading && organizationId && !selectedUser) {
       setUserDialogOpen(true);
-      setHasAutoOpened(true);
     }
-  }, [contextLoading, context?.organization_id, selectedUser, hasAutoOpened]);
-
-  // Fetch feed on mount and when filters change
-  useEffect(() => {
-    if (context?.organization_id) {
-      fetchFeed(filters);
-    }
-  }, [context?.organization_id, filters, fetchFeed]);
+  }, [contextLoading, organizationId, selectedUser]);
 
   // Handle user selection
   const handleUserSelected = (user: TeamMember) => {
     setSelectedUser(user);
-    toast({
-      title: "Team Member Selected",
-      description: `Viewing feed as ${user.display_name}`,
-    });
+    toast.success(`Viewing feed as ${user.display_name}`);
   };
 
-  // Handle mark as read
-  const handleMarkAsRead = async (itemId: string) => {
-    // Use selected team member's auth_role_id if available, otherwise use logged-in user
-    const userId = selectedUser?.auth_role_id || context?.user_id;
-    
-    if (!userId) return;
-    
-    const success = await markAsRead(itemId);
-    if (success) {
-      toast({
-        title: "Marked as read",
-        description: "Feed item has been marked as read.",
+  // BUG-007 FIX: Real-time subscriptions for feed updates
+  useEffect(() => {
+    if (!organizationId) return;
+
+    console.log('[FeedModuleV2] Setting up real-time subscription for org:', organizationId);
+
+    const channel = supabase
+      .channel('feed_posts_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'feed_posts',
+          filter: `organization_id=eq.${organizationId}`
+        },
+        (payload) => {
+          console.log('[FeedModuleV2] Real-time update:', payload.eventType);
+          // Refresh feed on any change (insert, update, delete)
+          refresh();
+          
+          // Show toast notification for new posts
+          if (payload.eventType === 'INSERT') {
+            toast.info('New post available', {
+              description: 'The feed has been updated',
+              duration: 3000
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[FeedModuleV2] Subscription status:', status);
       });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to mark item as read.",
-        variant: "destructive",
-      });
-    }
-  };
 
-  // Handle mark as unread (not supported yet - would need to delete read record)
-  const handleMarkAsUnread = async (itemId: string) => {
-    toast({
-      title: "Coming soon",
-      description: "Mark as unread functionality will be added.",
-    });
-  };
+    return () => {
+      console.log('[FeedModuleV2] Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [organizationId, refresh]);
 
-  // Handle delete
-  const handleDelete = async (itemId: string) => {
-    const success = await deleteFeedItem(itemId);
-    if (success) {
-      toast({
-        title: "Deleted",
-        description: "Feed item has been deleted.",
-      });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to delete feed item.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Handle refresh
-  const handleRefresh = () => {
-    fetchFeed(filters);
-    toast({
-      title: "Refreshed",
-      description: "Feed has been refreshed.",
-    });
-  };
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    setFilters({});
-  };
-
-  // Handle item click (could open detail modal in future)
-  const handleItemClick = (item: any) => {
-    // Use selected team member's auth_role_id if available, otherwise use logged-in user
-    const userId = selectedUser?.auth_role_id || context?.user_id;
-    
-    // For now, just mark as read if not already read by this user
-    if (!item.feed_reads?.some((read: any) => read.user_id === userId)) {
-      handleMarkAsRead(item.id);
-    }
-  };
-
-  if (contextLoading) {
+  // Show loading while context is loading
+  if (contextLoading || !organizationId) {
     return (
-      <div className="container mx-auto p-4 sm:p-6 space-y-6">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground">Loading...</p>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  if (!context?.organization_id) {
+  if (error) {
     return (
-      <div className="container mx-auto p-4 sm:p-6 space-y-6">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground">
-              Please log in to view your feed.
-            </p>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading feed</p>
+          <Button onClick={refresh} className="bg-orange-600 hover:bg-orange-700">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 space-y-6">
-      {/* Team Member Selection Dialog */}
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white dark:from-gray-900 dark:to-black">
+      <div className="max-w-4xl mx-auto py-6 px-4">
+        {/* Incomplete Profile Alert for Selected User */}
+        {selectedUser && !selectedUser.profile_complete && (
+          <Card className="border-orange-500 bg-orange-50 dark:bg-orange-950/20 mb-6">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-orange-900 dark:text-orange-100">
+                    Profile Incomplete
+                  </h3>
+                  <p className="text-sm text-orange-800 dark:text-orange-200 mt-1">
+                    {selectedUser.display_name}'s profile is not complete. Please update personal information, emergency contacts, and required certificates.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 border-orange-600 text-orange-600 hover:bg-orange-50"
+                  onClick={() => navigate(`/people/${selectedUser.id}`)}
+                >
+                  Complete Profile
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Manager Alert for All Incomplete Profiles */}
+        {(context?.user_role === 'admin' || context?.user_role === 'manager' || context?.user_role === 'owner') && (
+          <IncompleteProfilesAlert 
+            organizationId={organizationId} 
+            userRole={context?.user_role}
+          />
+        )}
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Team Feed</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Share updates and collaborate with your team
+              </p>
+            </div>
+            {/* Selected User Badge */}
+            {selectedUser && (
+              <Badge variant="secondary" className="h-fit bg-orange-100 text-orange-900 border-orange-300">
+                <User className="w-3 h-3 mr-1" />
+                {selectedUser.display_name}
+              </Badge>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {/* User Selection Button */}
+            <Button
+              variant="outline"
+              onClick={() => setUserDialogOpen(true)}
+              className="border-orange-600 text-orange-600 hover:bg-orange-50"
+            >
+              <User className="w-4 h-4 mr-2" />
+              {selectedUser ? 'Change User' : 'Select User'}
+            </Button>
+
+            {/* Refresh Button */}
+            <Button 
+              onClick={() => {
+                refresh();
+                toast.success('Feed refreshed');
+              }} 
+              variant="outline" 
+              size="icon"
+              disabled={loading}
+              className="border-gray-300 hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+
+            {/* Create Post Button - Only for admin/manager/leader_chef */}
+            {selectedUser && (
+              selectedUser.role_type === 'admin' || 
+              selectedUser.role_type === 'manager' || 
+              selectedUser.role_type === 'leader_chef'
+            ) && (
+              <Button onClick={() => setShowComposer(true)} className="bg-orange-600 hover:bg-orange-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Post
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filter === 'all'
+                ? 'bg-orange-600 text-white shadow-md'
+                : 'bg-white text-gray-600 hover:bg-orange-50 border border-gray-200'
+            }`}
+          >
+            All Posts
+          </button>
+          <button
+            onClick={() => setFilter('pinned')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filter === 'pinned'
+                ? 'bg-orange-600 text-white shadow-md'
+                : 'bg-white text-gray-600 hover:bg-orange-50 border border-gray-200'
+            }`}
+          >
+            📌 Pinned
+          </button>
+          <button
+            onClick={() => setFilter('mentions')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filter === 'mentions'
+                ? 'bg-orange-600 text-white shadow-md'
+                : 'bg-white text-gray-600 hover:bg-orange-50 border border-gray-200'
+            }`}
+          >
+            @ Mentions
+          </button>
+        </div>
+
+        {/* Post Composer Dialog */}
+        {showComposer && selectedUser && (
+          <div className="mb-6">
+            <PostComposer
+              selectedUser={selectedUser}
+              onClose={() => setShowComposer(false)}
+              onSuccess={() => {
+                setShowComposer(false);
+                refresh();
+                toast.success('Post created successfully!');
+              }}
+            />
+          </div>
+        )}
+
+        {/* Feed Content */}
+        {loading && posts.length === 0 ? (
+          // Loading skeletons
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white rounded-lg p-6 animate-pulse">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full" />
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-32 mb-2" />
+                    <div className="h-3 bg-gray-200 rounded w-24" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded" />
+                  <div className="h-4 bg-gray-200 rounded w-5/6" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : posts.length === 0 ? (
+          // Empty state
+          <EmptyFeedState 
+            filter={filter}
+            // Only show create button if user has permission
+            onCreatePost={
+              selectedUser && (
+                selectedUser.role_type === 'admin' || 
+                selectedUser.role_type === 'manager' || 
+                selectedUser.role_type === 'leader_chef'
+              ) ? () => setShowComposer(true) : undefined
+            }
+          />
+        ) : (
+          // Posts list
+          <>
+            <div className="space-y-4">
+              {posts.map(post => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={selectedUser?.id || context?.user_id || ''}
+                  organizationId={context?.organization_id || ''}
+                  onUpdate={refresh}
+                />
+              ))}
+            </div>
+
+            {/* Load More */}
+            {hasMore && (
+              <div className="text-center mt-6">
+                <Button
+                  onClick={loadMore}
+                  disabled={loading}
+                  variant="outline"
+                  size="lg"
+                  className="border-orange-600 text-orange-600 hover:bg-orange-50"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More Posts'
+                  )}
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* User Selection Dialog */}
       <UserSelectionDialog
         open={userDialogOpen}
         onOpenChange={setUserDialogOpen}
         onSelectUser={handleUserSelected}
-        organizationId={context?.organization_id}
-        title="Select Team Member"
-        description="Choose who is viewing the feed"
       />
-
-      {/* Incomplete Profile Warning */}
-      {selectedUser && !selectedUser.profile_complete && (
-        <Card className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-amber-900 dark:text-amber-100">
-                  Profile Incomplete
-                </h3>
-                <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                  {selectedUser.display_name}'s profile is not complete. Please update personal information, emergency contacts, and required certificates in the People module.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => {
-                  // Navigate to People module with this member ID
-                  // For admins: go directly, for staff: will require PIN verification
-                  navigate(`/people/${selectedUser.id}`);
-                }}
-              >
-                Complete Profile
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Manager Alert for Incomplete Profiles */}
-      <IncompleteProfilesAlert 
-        organizationId={context?.organization_id || ''} 
-        userRole={context?.user_role}
-      />
-
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Feed</h1>
-            <p className="text-muted-foreground">
-              Stay updated with notifications and activity feed
-            </p>
-          </div>
-          {/* Selected User Badge */}
-          {selectedUser && (
-            <Badge variant="secondary" className="h-fit">
-              <User className="w-3 h-3 mr-1" />
-              {selectedUser.display_name}
-            </Badge>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Select Team Member Button */}
-          <Button
-            variant="outline"
-            onClick={() => setUserDialogOpen(true)}
-          >
-            <User className="w-4 h-4 mr-2" />
-            {selectedUser ? 'Change User' : 'Select User'}
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-          {/* Create Feed Item button - Only for admins/managers */}
-          {(context?.user_role === "admin" ||
-            context?.user_role === "manager" ||
-            context?.user_role === "owner") && (
-            <Button onClick={() => toast({ title: "Coming soon!", description: "Create feed item functionality will be added." })}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Statistics */}
-      <FeedStats 
-        items={feedItems} 
-        currentUserId={selectedUser?.auth_role_id || context?.user_id} 
-      />
-
-      <Separator />
-
-      {/* Filters */}
-      <FeedFilters
-        filters={filters}
-        onFilterChange={setFilters}
-        onClearFilters={handleClearFilters}
-      />
-
-      <Separator />
-
-      {/* Error State */}
-      {error && (
-        <Card className="border-destructive">
-          <CardContent className="p-6 text-center">
-            <p className="text-destructive">Error loading feed: {error.message}</p>
-            <Button onClick={handleRefresh} variant="outline" className="mt-4">
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Feed List */}
-      {!error && (
-        <FeedList
-          items={feedItems}
-          loading={loading}
-          currentUserId={selectedUser?.auth_role_id || context?.user_id}
-          onMarkAsRead={handleMarkAsRead}
-          onMarkAsUnread={handleMarkAsUnread}
-          onDelete={handleDelete}
-          onItemClick={handleItemClick}
-        />
-      )}
     </div>
   );
 }

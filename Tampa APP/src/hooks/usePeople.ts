@@ -42,8 +42,9 @@ export function usePeople(organizationId?: string) {
           query = query.eq('department_id', filters.department_id);
         }
         if (filters.search) {
+          // Only search by text fields to avoid UUID parse errors
           query = query.or(
-            `display_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,user_id.eq.${filters.search}`
+            `display_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%`
           );
         }
       }

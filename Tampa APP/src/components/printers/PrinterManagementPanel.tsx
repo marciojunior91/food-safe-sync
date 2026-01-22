@@ -59,8 +59,8 @@ export function PrinterManagementPanel({
     } catch (error) {
       console.error('Failed to load printers:', error);
       toast({
-        title: 'Erro ao carregar impressoras',
-        description: 'Não foi possível carregar a lista de impressoras.',
+        title: 'error loading printers',
+        description: 'Could not load the printer list.',
         variant: 'destructive'
       });
     } finally {
@@ -76,29 +76,29 @@ export function PrinterManagementPanel({
   const handleTestConnection = async (printer: ZebraPrinterConfig) => {
     try {
       toast({
-        title: 'Testando conexão...',
-        description: `Conectando à impressora ${printer.name}`
+        title: 'Testing connection...',
+        description: `Connecting to printer ${printer.name}`
       });
 
       const result = await manager.testConnection(printer);
       
       if (result.success) {
         toast({
-          title: '✅ Conexão bem-sucedida',
-          description: `Conectado via ${result.method} na porta ${result.port} (${result.latencyMs}ms)`,
+          title: '✅ Connection successful',
+          description: `Connected via ${result.method} on port ${result.port} (${result.latencyMs}ms)`,
         });
       } else {
         toast({
-          title: '❌ Falha na conexão',
-          description: result.error || 'Não foi possível conectar à impressora',
+          title: '❌ Connection failed',
+          description: result.error || 'Could not connect to printer',
           variant: 'destructive'
         });
       }
     } catch (error) {
       console.error('Connection test failed:', error);
       toast({
-        title: 'Erro no teste',
-        description: 'Ocorreu um erro ao testar a conexão',
+        title: 'Test error',
+        description: 'An error occurred while testing the connection',
         variant: 'destructive'
       });
     }
@@ -114,13 +114,13 @@ export function PrinterManagementPanel({
       await loadPrinters();
 
       toast({
-        title: 'Impressora padrão definida',
-        description: `${printer.name} agora é a impressora padrão`
+        title: 'Default printer set',
+        description: `${printer.name} is now the default printer`
       });
     } catch (error) {
       console.error('Failed to set default printer:', error);
       toast({
-        title: 'Erro',
+        title: 'Error',
         description: 'Não foi possível definir impressora padrão',
         variant: 'destructive'
       });
@@ -129,21 +129,21 @@ export function PrinterManagementPanel({
 
   // Delete printer
   const handleDeletePrinter = async (printerId: string) => {
-    if (!confirm('Tem certeza que deseja remover esta impressora?')) return;
+    if (!confirm('Are you sure you want to remove this printer?')) return;
 
     try {
       await manager.removePrinter(printerId);
       await loadPrinters();
 
       toast({
-        title: 'Impressora removida',
-        description: 'A impressora foi removida com sucesso'
+        title: 'Printer removed',
+        description: 'The printer was successfully removed'
       });
     } catch (error) {
       console.error('Failed to delete printer:', error);
       toast({
-        title: 'Erro',
-        description: 'Não foi possível remover a impressora',
+        title: 'Error',
+        description: 'Não foi possível remove the printer',
         variant: 'destructive'
       });
     }
@@ -155,8 +155,8 @@ export function PrinterManagementPanel({
     
     if (discovered.length === 0) {
       toast({
-        title: 'Nenhuma impressora encontrada',
-        description: 'Certifique-se de que as impressoras estão ligadas e conectadas à rede'
+        title: 'No printers found',
+        description: 'Certifique-se de que as Printers estão ligadas e conectadas à rede'
       });
       return;
     }
@@ -187,8 +187,8 @@ export function PrinterManagementPanel({
     await loadPrinters();
 
     toast({
-      title: `${discovered.length} impressora(s) encontrada(s)`,
-      description: 'As impressoras foram adicionadas ao sistema'
+      title: `${discovered.length} printer(s) found`,
+      description: 'As Printers foram adicionadas ao sistema'
     });
   };
 
@@ -210,7 +210,7 @@ export function PrinterManagementPanel({
       ready: { icon: CheckCircle2, color: 'bg-green-500', text: 'Pronta' },
       busy: { icon: Activity, color: 'bg-blue-500', text: 'Em uso' },
       offline: { icon: XCircle, color: 'bg-gray-500', text: 'Offline' },
-      error: { icon: AlertTriangle, color: 'bg-red-500', text: 'Erro' },
+      error: { icon: AlertTriangle, color: 'bg-red-500', text: 'Error' },
       paused: { icon: AlertTriangle, color: 'bg-yellow-500', text: 'Pausada' }
     };
 
@@ -240,10 +240,10 @@ export function PrinterManagementPanel({
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Printer className="w-6 h-6" />
-            Gerenciamento de Impressoras
+            Printer Management
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Configure e monitore impressoras Zebra ZD411
+            Configure and monitor printers Zebra ZD411
           </p>
         </div>
         <div className="flex gap-2">
@@ -252,18 +252,18 @@ export function PrinterManagementPanel({
             variant="outline"
           >
             <Search className="w-4 h-4 mr-2" />
-            Descobrir Impressoras
+            Discover Printers
           </Button>
           <Button onClick={() => setShowConfigDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Adicionar Impressora
+            Add Printer
           </Button>
         </div>
       </div>
 
       <Tabs defaultValue="printers" className="w-full">
         <TabsList>
-          <TabsTrigger value="printers">Impressoras ({printers.length})</TabsTrigger>
+          <TabsTrigger value="printers">Printers ({printers.length})</TabsTrigger>
           <TabsTrigger value="statistics">Estatísticas</TabsTrigger>
         </TabsList>
 
@@ -273,13 +273,13 @@ export function PrinterManagementPanel({
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Printer className="w-12 h-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium mb-2">Nenhuma impressora cadastrada</p>
+                <p className="text-lg font-medium mb-2">No printers registered</p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Adicione uma impressora manualmente ou use a busca automática
+                  Add a printer manually ou use a busca automática
                 </p>
                 <Button onClick={() => setShowDiscovery(true)}>
                   <Search className="w-4 h-4 mr-2" />
-                  Descobrir Impressoras
+                  Discover Printers
                 </Button>
               </CardContent>
             </Card>
@@ -465,7 +465,7 @@ export function PrinterManagementPanel({
             } catch (error) {
               console.error('Failed to save printer:', error);
               toast({
-                title: 'Erro',
+                title: 'Error',
                 description: 'Não foi possível salvar as configurações',
                 variant: 'destructive'
               });

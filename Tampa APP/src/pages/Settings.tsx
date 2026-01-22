@@ -46,24 +46,24 @@ export default function SettingsPage() {
         </TabsList>
 
         {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-4">
+        <TabsContent value="profile" className="space-y-4 mt-6">
           <ProfileTabContent />
         </TabsContent>
 
         {/* Notifications Tab */}
-        <TabsContent value="notifications" className="space-y-4">
+        <TabsContent value="notifications" className="space-y-4 mt-6">
           <NotificationsTabContent />
         </TabsContent>
 
         {/* Admin Tab */}
         {isAdmin && (
-          <TabsContent value="admin" className="space-y-4">
+          <TabsContent value="admin" className="space-y-4 mt-6">
             <AdminPanel />
           </TabsContent>
         )}
 
         {/* Billing Tab */}
-        <TabsContent value="billing" className="space-y-4">
+        <TabsContent value="billing" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Billing & Subscription</CardTitle>
