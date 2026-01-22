@@ -103,7 +103,7 @@ export const TeamMemberSelector = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background via-muted/20 to-muted/40">
         <Card className="w-full max-w-2xl">
           <CardContent className="p-8 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
@@ -116,7 +116,7 @@ export const TeamMemberSelector = ({
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background via-muted/20 to-muted/40">
         <Card className="w-full max-w-2xl">
           <CardContent className="p-8">
             <Alert variant="destructive">
@@ -136,7 +136,7 @@ export const TeamMemberSelector = ({
 
   return (
     <>
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background via-muted/20 to-muted/40 p-4">
         <Card className="w-full max-w-4xl">
           <CardHeader>
             <CardTitle className="text-2xl">Who are you?</CardTitle>

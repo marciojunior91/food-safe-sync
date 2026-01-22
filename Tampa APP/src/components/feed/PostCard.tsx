@@ -20,6 +20,21 @@ import type { FeedPost } from '@/lib/feed/feedService';
 import ReactionPicker from './ReactionPicker';
 import { CommentsList } from './CommentsList';
 
+// Helper: Get emoji for reaction type
+const getReactionEmoji = (type: string): string => {
+  const emojiMap: Record<string, string> = {
+    like: '👍',
+    love: '❤️',
+    celebrate: '🎉',
+    support: '🙌',
+    fire: '🔥',
+    clap: '👏',
+    check: '✅',
+    eyes: '👀',
+  };
+  return emojiMap[type] || '👍';
+};
+
 interface PostCardProps {
   post: FeedPost;
   currentUserId: string;
@@ -171,12 +186,49 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
       {(post.reaction_count > 0 || commentCount > 0) && (
         <div className="flex items-center justify-between py-3 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
           <div className="flex items-center gap-2">
-            {reactionGroups && Object.entries(reactionGroups).map(([type, count]) => (
-              <div key={type} className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300">
-                <span>{getReactionEmoji(type)}</span>
-                <span className="font-medium">{count}</span>
-              </div>
-            ))}
+            {reactionGroups && Object.entries(reactionGroups).map(([type, count]) => {
+              // Get users who reacted with this type (Instagram-style)
+              const usersWithReaction = post.reactions
+                ?.filter(r => r.reaction_type === type)
+                .map(r => r.user?.display_name || 'Someone')
+                .slice(0, 3); // Show max 3 names
+              
+              const remainingCount = (count as number) - (usersWithReaction?.length || 0);
+              
+              // Build tooltip text
+              let tooltipText = '';
+              if (usersWithReaction && usersWithReaction.length > 0) {
+                if (usersWithReaction.length === 1) {
+                  tooltipText = usersWithReaction[0];
+                } else if (usersWithReaction.length === 2) {
+                  tooltipText = `${usersWithReaction[0]} and ${usersWithReaction[1]}`;
+                } else {
+                  tooltipText = `${usersWithReaction.slice(0, -1).join(', ')} and ${usersWithReaction[usersWithReaction.length - 1]}`;
+                }
+                
+                if (remainingCount > 0) {
+                  tooltipText += ` and ${remainingCount} other${remainingCount > 1 ? 's' : ''}`;
+                }
+              }
+              
+              return (
+                <div 
+                  key={type} 
+                  className="flex items-center gap-1 px-2 py-1 rounded-full bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 group relative cursor-help"
+                  title={tooltipText}
+                >
+                  <span>{getReactionEmoji(type)}</span>
+                  <span className="font-medium">{count}</span>
+                  
+                  {/* Hover tooltip (Instagram-style) */}
+                  {tooltipText && (
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10 shadow-lg">
+                      {tooltipText}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {commentCount > 0 && (
             <button
@@ -237,21 +289,4 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
       )}
     </div>
   );
-}
-
-// Helper function to get emoji for reaction type
-function getReactionEmoji(type: string): string {
-  const emojiMap: Record<string, string> = {
-    like: '👍',
-    love: '❤️',
-    celebrate: '🎉',
-    support: '🙌',
-    fire: '🔥',
-    thumbs_up: '👍',
-    clap: '👏',
-    check: '✅',
-    eyes: '👀',
-    heart: '❤️',
-  };
-  return emojiMap[type] || '👍';
 }

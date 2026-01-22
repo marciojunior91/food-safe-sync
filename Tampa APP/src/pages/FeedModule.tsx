@@ -39,7 +39,7 @@ export default function FeedModule() {
     loadMore,
     hasMore,
     refresh,
-  } = useFeed(organizationId, filter);
+  } = useFeed(organizationId, filter, selectedUser?.id);
 
   // ALWAYS open user selection dialog if no user selected (FIX)
   useEffect(() => {
@@ -121,7 +121,7 @@ export default function FeedModule() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-white dark:from-gray-900 dark:to-black">
+    <>
       <div className="max-w-4xl mx-auto py-6 px-4">
         {/* Incomplete Profile Alert for Selected User */}
         {selectedUser && !selectedUser.profile_complete && (
@@ -343,6 +343,6 @@ export default function FeedModule() {
         onOpenChange={setUserDialogOpen}
         onSelectUser={handleUserSelected}
       />
-    </div>
+    </>
   );
 }

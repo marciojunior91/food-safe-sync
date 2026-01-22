@@ -30,7 +30,8 @@ import {
 
 export function useFeed(
   organizationId: string,
-  filter: 'all' | 'pinned' | 'mentions' = 'all'
+  filter: 'all' | 'pinned' | 'mentions' = 'all',
+  currentUserId?: string
 ) {
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +55,7 @@ export function useFeed(
         setError(null);
 
         const currentOffset = reset ? 0 : offset;
-        const data = await getFeedPosts(organizationId, limit, currentOffset, filter);
+        const data = await getFeedPosts(organizationId, limit, currentOffset, filter, currentUserId);
 
         if (reset) {
           setPosts(data);
@@ -73,7 +74,7 @@ export function useFeed(
         setLoading(false);
       }
     },
-    [organizationId, filter, offset]
+    [organizationId, filter, currentUserId, offset]
   );
 
   // Initial load

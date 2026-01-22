@@ -118,7 +118,8 @@ export async function getFeedPosts(
   organizationId: string,
   limit = 20,
   offset = 0,
-  filter?: 'all' | 'pinned' | 'mentions'
+  filter?: 'all' | 'pinned' | 'mentions',
+  currentUserId?: string
 ) {
   let query = supabase
     .from('feed_posts')
@@ -138,6 +139,44 @@ export async function getFeedPosts(
   // Apply filters
   if (filter === 'pinned') {
     query = query.eq('is_pinned', true);
+  } else if (filter === 'mentions' && currentUserId) {
+    // Get post IDs where user is mentioned (in post or comments)
+    const { data: mentions } = await supabase
+      .from('feed_mentions')
+      .select('post_id, comment_id')
+      .eq('mentioned_user_id', currentUserId);
+    
+    if (mentions && mentions.length > 0) {
+      // Extract unique post IDs (from direct mentions or comment mentions)
+      const postIds = new Set<string>();
+      
+      for (const mention of mentions) {
+        if (mention.post_id) {
+          postIds.add(mention.post_id);
+        } else if (mention.comment_id) {
+          // Get post_id from comment
+          const { data: comment } = await supabase
+            .from('feed_comments')
+            .select('post_id')
+            .eq('id', mention.comment_id)
+            .single();
+          
+          if (comment?.post_id) {
+            postIds.add(comment.post_id);
+          }
+        }
+      }
+      
+      if (postIds.size > 0) {
+        query = query.in('id', Array.from(postIds));
+      } else {
+        // No mentions found, return empty
+        return [];
+      }
+    } else {
+      // No mentions found, return empty
+      return [];
+    }
   }
 
   // Order: pinned first, then by creation date
@@ -505,8 +544,9 @@ export async function createMentions(
   if (mentions.length === 0) return;
 
   // Create mention records
+  // CRITICAL FIX: Either post_id OR comment_id, NOT BOTH (constraint: mention_target_check)
   const mentionRecords = mentions.map(userId => ({
-    post_id: postId,
+    post_id: commentId ? null : postId, // If comment exists, set post_id to null
     comment_id: commentId,
     mentioned_user_id: userId,
     mentioned_by_id: mentionedById,
@@ -516,7 +556,13 @@ export async function createMentions(
     .from('feed_mentions')
     .insert(mentionRecords);
 
-  if (error) throw error;
+  if (error) {
+    console.error('[createMentions] Error inserting mentions:', error);
+    console.error('[createMentions] Mention records:', mentionRecords);
+    throw error;
+  }
+  
+  console.log(`[createMentions] Created ${mentions.length} mention(s) successfully`);
 }
 
 /**
