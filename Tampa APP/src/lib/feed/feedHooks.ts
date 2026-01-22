@@ -82,7 +82,7 @@ export function useFeed(
         setLoading(false);
       }
     },
-    [organizationId, filter, currentUserId, offset]
+    [organizationId, filter, currentUserId]
   );
 
   // Initial load
