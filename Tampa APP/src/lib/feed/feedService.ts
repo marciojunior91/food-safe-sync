@@ -140,11 +140,20 @@ export async function getFeedPosts(
   if (filter === 'pinned') {
     query = query.eq('is_pinned', true);
   } else if (filter === 'mentions' && currentUserId) {
+    console.log('[getFeedPosts] 🔍 Mentions filter activated for user:', currentUserId);
+    
     // Get post IDs where user is mentioned (in post or comments)
-    const { data: mentions } = await supabase
+    const { data: mentions, error: mentionsError } = await supabase
       .from('feed_mentions')
       .select('post_id, comment_id')
       .eq('mentioned_user_id', currentUserId);
+    
+    console.log('[getFeedPosts] 📋 Found mentions:', mentions?.length || 0);
+    console.log('[getFeedPosts] 📋 Mentions data:', mentions);
+    
+    if (mentionsError) {
+      console.error('[getFeedPosts] ❌ Error fetching mentions:', mentionsError);
+    }
     
     if (mentions && mentions.length > 0) {
       // Extract unique post IDs (from direct mentions or comment mentions)
@@ -152,29 +161,41 @@ export async function getFeedPosts(
       
       for (const mention of mentions) {
         if (mention.post_id) {
+          console.log('[getFeedPosts] ➕ Adding post from direct mention:', mention.post_id);
           postIds.add(mention.post_id);
         } else if (mention.comment_id) {
+          console.log('[getFeedPosts] 🔍 Getting post from comment:', mention.comment_id);
           // Get post_id from comment
-          const { data: comment } = await supabase
+          const { data: comment, error: commentError } = await supabase
             .from('feed_comments')
             .select('post_id')
             .eq('id', mention.comment_id)
             .single();
           
+          if (commentError) {
+            console.error('[getFeedPosts] ❌ Error fetching comment:', commentError);
+          }
+          
           if (comment?.post_id) {
+            console.log('[getFeedPosts] ➕ Adding post from comment mention:', comment.post_id);
             postIds.add(comment.post_id);
           }
         }
       }
       
+      console.log('[getFeedPosts] 📦 Total unique post IDs:', postIds.size);
+      console.log('[getFeedPosts] 📦 Post IDs:', Array.from(postIds));
+      
       if (postIds.size > 0) {
         query = query.in('id', Array.from(postIds));
       } else {
         // No mentions found, return empty
+        console.log('[getFeedPosts] ⚠️ No valid post IDs found, returning empty');
         return [];
       }
     } else {
       // No mentions found, return empty
+      console.log('[getFeedPosts] ⚠️ No mentions found for user, returning empty');
       return [];
     }
   }
@@ -532,16 +553,27 @@ export async function createMentions(
   commentId: string | null,
   mentionedById: string
 ) {
+  console.log('[createMentions] 📝 Content:', content);
+  console.log('[createMentions] 📌 Post ID:', postId);
+  console.log('[createMentions] 💬 Comment ID:', commentId);
+  console.log('[createMentions] 👤 Mentioned by ID:', mentionedById);
+  
   // Extract @mentions using regex: @[Name](id)
   const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
   const mentions: string[] = [];
   let match;
 
   while ((match = mentionRegex.exec(content)) !== null) {
+    console.log('[createMentions] 🎯 Found mention:', match[1], '→ ID:', match[2]);
     mentions.push(match[2]); // Extract user_id
   }
 
-  if (mentions.length === 0) return;
+  console.log('[createMentions] 📋 Total mentions extracted:', mentions.length);
+
+  if (mentions.length === 0) {
+    console.log('[createMentions] ⚠️ No mentions found in content');
+    return;
+  }
 
   // Create mention records
   // CRITICAL FIX: Either post_id OR comment_id, NOT BOTH (constraint: mention_target_check)
@@ -552,17 +584,19 @@ export async function createMentions(
     mentioned_by_id: mentionedById,
   }));
 
+  console.log('[createMentions] 💾 Inserting records:', mentionRecords);
+
   const { error } = await supabase
     .from('feed_mentions')
     .insert(mentionRecords);
 
   if (error) {
-    console.error('[createMentions] Error inserting mentions:', error);
-    console.error('[createMentions] Mention records:', mentionRecords);
+    console.error('[createMentions] ❌ Error inserting mentions:', error);
+    console.error('[createMentions] ❌ Mention records:', mentionRecords);
     throw error;
   }
   
-  console.log(`[createMentions] Created ${mentions.length} mention(s) successfully`);
+  console.log(`[createMentions] ✅ Created ${mentions.length} mention(s) successfully`);
 }
 
 /**

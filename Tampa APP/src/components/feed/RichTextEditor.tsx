@@ -82,14 +82,48 @@ export function RichTextEditor({
 
   // Handle content change
   const handleInput = useCallback(() => {
-    const text = editorRef.current?.innerText || '';
+    const editor = editorRef.current;
+    if (!editor) return;
+    
+    const text = editor.innerText || '';
     if (text.length <= maxLength) {
+      // Process mentions to add visual styling
+      const html = editor.innerHTML;
+      const processedHtml = html.replace(
+        /@\[([^\]]+)\]\(([^)]+)\)/g,
+        '<span class="mention-tag">@$1</span>'
+      );
+      
+      // Only update if changed to avoid cursor jumps
+      if (html !== processedHtml) {
+        const selection = window.getSelection();
+        const range = selection?.getRangeAt(0);
+        const cursorOffset = range?.startOffset || 0;
+        
+        editor.innerHTML = processedHtml;
+        
+        // Restore cursor position
+        if (selection && range) {
+          try {
+            const textNode = editor.childNodes[0];
+            if (textNode) {
+              range.setStart(textNode, Math.min(cursorOffset, textNode.textContent?.length || 0));
+              range.collapse(true);
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+          } catch (e) {
+            // Cursor restoration failed, continue
+          }
+        }
+      }
+      
       onChange(text);
     } else {
       // Truncate if exceeded
       const truncated = text.substring(0, maxLength);
-      if (editorRef.current) {
-        editorRef.current.innerText = truncated;
+      if (editor) {
+        editor.innerText = truncated;
       }
       onChange(truncated);
     }
@@ -211,12 +245,28 @@ export function RichTextEditor({
         data-placeholder={placeholder}
       />
 
-      {/* CSS for placeholder */}
+      {/* CSS for placeholder and mentions */}
       <style>{`
         [contenteditable][data-placeholder]:empty:before {
           content: attr(data-placeholder);
           color: #9ca3af;
           pointer-events: none;
+        }
+        
+        /* Mention styling - Instagram/Slack style */
+        .mention-tag {
+          color: #ea580c;
+          font-weight: 600;
+          background-color: rgba(234, 88, 12, 0.1);
+          padding: 2px 4px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        
+        /* Dark mode mention styling */
+        .dark .mention-tag {
+          color: #fb923c;
+          background-color: rgba(251, 146, 60, 0.15);
         }
       `}</style>
     </div>

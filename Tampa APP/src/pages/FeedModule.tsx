@@ -32,6 +32,10 @@ export default function FeedModule() {
   const organizationId = context?.organization_id || '';
   const shouldLoadFeed = !!organizationId;
 
+  console.log('[FeedModule] 🔍 Current filter:', filter);
+  console.log('[FeedModule] 👤 Selected user ID:', selectedUser?.id);
+  console.log('[FeedModule] 👤 Selected user name:', selectedUser?.display_name);
+
   const {
     posts,
     loading,

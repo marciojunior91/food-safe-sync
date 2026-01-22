@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { deleteComment } from '@/lib/feed/feedService';
 import type { FeedComment } from '@/lib/feed/feedService';
 import { cn } from '@/lib/utils';
+import { renderMentionsInText } from '@/lib/feed/mentionUtils';
 
 interface CommentItemProps {
   comment: FeedComment;
@@ -56,37 +57,6 @@ export function CommentItem({ comment, onReply, onDelete, isReply }: CommentItem
     } finally {
       setDeleting(false);
     }
-  };
-
-  // Highlight mentions in content
-  const renderContent = (content: string) => {
-    const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = mentionRegex.exec(content)) !== null) {
-      // Add text before mention
-      if (match.index > lastIndex) {
-        parts.push(content.substring(lastIndex, match.index));
-      }
-
-      // Add mention (highlighted)
-      parts.push(
-        <span key={match.index} className="text-primary font-medium">
-          @{match[1]}
-        </span>
-      );
-
-      lastIndex = match.index + match[0].length;
-    }
-
-    // Add remaining text
-    if (lastIndex < content.length) {
-      parts.push(content.substring(lastIndex));
-    }
-
-    return parts.length > 0 ? parts : content;
   };
 
   const authorName = comment.author?.display_name || 'Unknown User';
@@ -122,7 +92,7 @@ export function CommentItem({ comment, onReply, onDelete, isReply }: CommentItem
 
           {/* Comment text */}
           <div className="text-sm leading-relaxed break-words">
-            {renderContent(comment.content)}
+            {renderMentionsInText(comment.content)}
           </div>
         </div>
 

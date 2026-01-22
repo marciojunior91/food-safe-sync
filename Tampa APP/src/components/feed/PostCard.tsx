@@ -19,6 +19,7 @@ import { useReactions } from '@/lib/feed/feedHooks';
 import type { FeedPost } from '@/lib/feed/feedService';
 import ReactionPicker from './ReactionPicker';
 import { CommentsList } from './CommentsList';
+import { renderMentionsInText } from '@/lib/feed/mentionUtils';
 
 // Helper: Get emoji for reaction type
 const getReactionEmoji = (type: string): string => {
@@ -157,7 +158,7 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
 
       {/* Content */}
       <div className="mb-4 whitespace-pre-wrap text-gray-900 dark:text-gray-100">
-        {post.content}
+        {renderMentionsInText(post.content)}
       </div>
 
       {/* Attachments */}
