@@ -14,6 +14,7 @@ import { CreateRecipeDialog } from "@/components/recipes/CreateRecipeDialog";
 import { PrepareRecipeDialog } from "@/components/recipes/PrepareRecipeDialog";
 import { RecipePrintButton } from "@/components/recipes/RecipePrintButton";
 import { UpgradeModal } from "@/components/billing/UpgradeModal";
+import { RecipeDetailDialog } from "@/components/recipes/RecipeDetailDialog";
 import { format } from "date-fns";
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ interface Recipe {
   created_by: string;
   updated_at: string;
   updated_by: string | null;
+  organization_id: string;
   creator?: {
     display_name: string;
   } | null;
@@ -64,6 +66,8 @@ export default function Recipes() {
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
   const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
+  const [selectedRecipeDetail, setSelectedRecipeDetail] = useState<Recipe | null>(null);
+  const [sortBy, setSortBy] = useState<string>("name-asc");
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { role, isAdmin, isLeaderChef, loading: rolesLoading } = useUserRole();
@@ -73,16 +77,18 @@ export default function Recipes() {
   // Check if user can manage recipes (admin or leader_chef)
   const canManageRecipes = isAdmin || isLeaderChef;
 
-  // Debug logging
+  // Debug logging (development only)
   useEffect(() => {
-    console.log('🔍 Recipe Permissions Debug:', {
-      userId: user?.id,
-      role: role,
-      rolesLoading: rolesLoading,
-      isAdmin: isAdmin,
-      isLeaderChef: isLeaderChef,
-      canManageRecipes: canManageRecipes
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 Recipe Permissions Debug:', {
+        userId: user?.id,
+        role: role,
+        rolesLoading: rolesLoading,
+        isAdmin: isAdmin,
+        isLeaderChef: isLeaderChef,
+        canManageRecipes: canManageRecipes
+      });
+    }
   }, [user, role, rolesLoading, isAdmin, isLeaderChef, canManageRecipes]);
 
   // Handle create recipe button click with limit check
@@ -181,24 +187,91 @@ export default function Recipes() {
     setIsCreateDialogOpen(true);
   };
 
+  const handleDuplicateRecipe = async (recipe: Recipe) => {
+    // ENHANCEMENT 8: Recipe duplicate feature
+    try {
+      const { data, error } = await supabase
+        .from('recipes')
+        .insert([{
+          name: `${recipe.name} (Copy)`,
+          category: recipe.category,
+          ingredients: recipe.ingredients,
+          prep_steps: recipe.prep_steps,
+          yield_amount: recipe.yield_amount,
+          yield_unit: recipe.yield_unit,
+          estimated_prep_minutes: recipe.estimated_prep_minutes,
+          service_gap_minutes: recipe.service_gap_minutes,
+          hold_time_days: recipe.hold_time_days,
+          allergens: recipe.allergens,
+          dietary_requirements: recipe.dietary_requirements,
+          created_by: user?.id,
+          updated_by: user?.id,
+          organization_id: recipe.organization_id,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Recipe duplicated successfully",
+      });
+
+      fetchRecipes();
+      
+      // Open the detail dialog for the new recipe
+      if (data) {
+        setSelectedRecipeDetail(data);
+      }
+    } catch (error) {
+      console.error('Error duplicating recipe:', error);
+      toast({
+        title: "Error",
+        description: "Failed to duplicate recipe",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handlePrepareRecipe = (recipe: Recipe) => {
     setSelectedRecipe(recipe);
     setIsPrepareDialogOpen(true);
   };
 
-  const filteredRecipes = recipes.filter(recipe => {
-    const matchesSearch = recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (recipe.allergens || []).some(allergen => 
-        allergen.toLowerCase().includes(searchTerm.toLowerCase())
-      ) ||
-      (recipe.dietary_requirements || []).some(dietary => 
-        dietary.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    
-    const matchesCategory = selectedCategory === "All Categories" || recipe.category === selectedCategory;
-    
-    return matchesSearch && matchesCategory;
-  });
+  const filteredRecipes = recipes
+    .filter(recipe => {
+      const matchesSearch = recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (recipe.allergens || []).some(allergen => 
+          allergen.toLowerCase().includes(searchTerm.toLowerCase())
+        ) ||
+        (recipe.dietary_requirements || []).some(dietary => 
+          dietary.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      
+      const matchesCategory = selectedCategory === "All Categories" || recipe.category === selectedCategory;
+      
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      // BUG-017: Add sorting logic
+      switch (sortBy) {
+        case "name-asc":
+          return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
+        case "created-desc":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "created-asc":
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case "prep-asc":
+          return (a.estimated_prep_minutes || 0) - (b.estimated_prep_minutes || 0);
+        case "prep-desc":
+          return (b.estimated_prep_minutes || 0) - (a.estimated_prep_minutes || 0);
+        default:
+          return 0;
+      }
+    });
 
   if (loading) {
     return (
@@ -282,6 +355,20 @@ export default function Recipes() {
             </SelectContent>
           </Select>
         </div>
+        {/* ENHANCEMENT 9: Sort dropdown */}
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent className="bg-background opacity-100">
+            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+            <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+            <SelectItem value="created-desc">Newest First</SelectItem>
+            <SelectItem value="created-asc">Oldest First</SelectItem>
+            <SelectItem value="prep-asc">Prep Time (Low to High)</SelectItem>
+            <SelectItem value="prep-desc">Prep Time (High to Low)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {filteredRecipes.length === 0 ? (
@@ -294,12 +381,26 @@ export default function Recipes() {
               <div>
                 <h3 className="font-semibold text-lg">No recipes found</h3>
                 <p className="text-muted-foreground">
-                  {searchTerm ? "Try adjusting your search terms" : 
-                   canManageRecipes ? "Get started by creating your first recipe" : 
-                   "No recipes available yet"}
+                  {/* BUG-014: Better empty state messages */}
+                  {searchTerm || selectedCategory !== "All Categories" 
+                    ? "No recipes match your current filters" 
+                    : canManageRecipes 
+                      ? "Get started by creating your first recipe" 
+                      : "No recipes available yet"}
                 </p>
               </div>
-              {!searchTerm && canManageRecipes && (
+              {/* BUG-014: Show clear filters if filters are active, else show create button */}
+              {searchTerm || selectedCategory !== "All Categories" ? (
+                <Button 
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedCategory("All Categories");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              ) : !searchTerm && canManageRecipes && (
                 <Button onClick={() => {
                   setRecipeToEdit(null);
                   setIsCreateDialogOpen(true);
@@ -314,7 +415,11 @@ export default function Recipes() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredRecipes.map((recipe) => (
-            <Card key={recipe.id} className="hover:shadow-card transition-shadow cursor-pointer">
+            <Card 
+              key={recipe.id} 
+              className="hover:shadow-card transition-shadow cursor-pointer"
+              onClick={() => setSelectedRecipeDetail(recipe)}
+            >
               <CardHeader>
                 <CardTitle className="flex items-start justify-between">
                   <span className="line-clamp-2">{recipe.name}</span>
@@ -363,9 +468,10 @@ export default function Recipes() {
                   <div>
                     <h4 className="font-medium text-sm mb-2 text-red-600">Allergens</h4>
                     <div className="flex flex-wrap gap-1">
+                      {/* BUG-017: Add allergen warning icons */}
                       {(recipe.allergens || []).map((allergen) => (
                         <Badge key={allergen} variant="destructive" className="text-xs font-bold">
-                          {allergen}
+                          ⚠️ {allergen}
                         </Badge>
                       ))}
                     </div>
@@ -507,6 +613,35 @@ export default function Recipes() {
         open={isPrepareDialogOpen}
         onOpenChange={setIsPrepareDialogOpen}
         recipe={selectedRecipe}
+      />
+
+      {/* Recipe Detail Dialog - ENHANCEMENT 7 */}
+      <RecipeDetailDialog
+        recipe={selectedRecipeDetail}
+        open={!!selectedRecipeDetail}
+        onOpenChange={(open) => {
+          if (!open) setSelectedRecipeDetail(null);
+        }}
+        onEdit={(recipe) => {
+          setSelectedRecipeDetail(null);
+          handleEditRecipe(recipe);
+        }}
+        onDelete={(recipe) => {
+          setSelectedRecipeDetail(null);
+          setRecipeToDelete(recipe);
+        }}
+        onPrint={(recipe) => {
+          // Print handled by RecipePrintButton in the dialog
+          toast({
+            title: "Print Label",
+            description: "Opening print dialog...",
+          });
+        }}
+        onDuplicate={(recipe) => {
+          setSelectedRecipeDetail(null);
+          handleDuplicateRecipe(recipe);
+        }}
+        canManageRecipes={canManageRecipes}
       />
 
       {/* Delete Confirmation Dialog */}

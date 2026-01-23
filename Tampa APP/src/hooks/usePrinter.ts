@@ -16,18 +16,10 @@ export function usePrinter() {
   useEffect(() => {
     const loadSettings = () => {
       try {
-        // In production, force Zebra printer
-        const isProduction = import.meta.env.PROD;
+        // ✅ REMOVED PRODUCTION LOCK - Allow testing all printer methods
+        console.log('🖨️ Loading printer settings (all methods available)');
         
-        if (isProduction) {
-          console.log('🏭 Production mode: Forcing Zebra printer');
-          const zebraSettings = PrinterFactory.getDefaultSettings('zebra');
-          setSettings(zebraSettings);
-          setPrinter(PrinterFactory.createPrinter('zebra', zebraSettings));
-          return;
-        }
-        
-        // In development, allow user preference
+        // Load user preference from localStorage
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
           const parsedSettings = JSON.parse(stored) as PrinterSettings;
@@ -37,25 +29,23 @@ export function usePrinter() {
           const printerInstance = PrinterFactory.createPrinter(parsedSettings.type, parsedSettings);
           setPrinter(printerInstance);
         } else {
-          // Default to generic printer in dev
-          const defaultSettings = PrinterFactory.getDefaultSettings('generic');
+          // Default to Zebra printer (recommended for production)
+          const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
           setSettings(defaultSettings);
-          setPrinter(PrinterFactory.createPrinter('generic', defaultSettings));
+          setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
         }
       } catch (error) {
         console.error('Failed to load printer settings:', error);
         toast({
           title: 'Settings Error',
-          description: 'Failed to load printer settings. Using default.',
+          description: 'Failed to load printer settings. Using default Zebra printer.',
           variant: 'destructive'
         });
         
-        // Fallback based on environment
-        const isProduction = import.meta.env.PROD;
-        const fallbackType = isProduction ? 'zebra' : 'generic';
-        const defaultSettings = PrinterFactory.getDefaultSettings(fallbackType);
+        // Fallback to Zebra
+        const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
         setSettings(defaultSettings);
-        setPrinter(PrinterFactory.createPrinter(fallbackType, defaultSettings));
+        setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
       }
     };
 
@@ -88,23 +78,12 @@ export function usePrinter() {
 
   // Change printer type
   const changePrinter = useCallback((type: PrinterType) => {
-    const isProduction = import.meta.env.PROD;
+    // ✅ REMOVED PRODUCTION LOCK - Allow switching printer methods for testing
+    console.log(`🖨️ Switching to ${type} printer`);
     
-    // In production, prevent changing from Zebra
-    if (isProduction) {
-      console.warn('⚠️ Cannot change printer in production. Zebra is the only supported printer.');
-      toast({
-        title: 'Printer Locked',
-        description: 'Zebra printer is required in production environment.',
-        variant: 'default'
-      });
-      return;
-    }
-    
-    // In development, allow changing
     const newSettings = PrinterFactory.getDefaultSettings(type);
     saveSettings(newSettings);
-  }, [saveSettings, toast]);
+  }, [saveSettings]);
 
   // Print single label
   const print = useCallback(async (labelData: any): Promise<boolean> => {

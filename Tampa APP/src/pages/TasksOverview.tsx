@@ -45,6 +45,7 @@ import { TaskDetailView } from "@/components/routine-tasks/TaskDetailView";
 import { TaskTimeline } from "@/components/routine-tasks/TaskTimeline";
 import { BulkActionsToolbar } from "@/components/routine-tasks/BulkActionsToolbar";
 import { TemplatesManagement } from "@/components/routine-tasks/TemplatesManagement";
+import { ComingSoonBadge } from "@/components/ui/ComingSoonBadge";
 import { useRoutineTasks } from "@/hooks/useRoutineTasks";
 import { usePeople } from "@/hooks/usePeople";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
@@ -566,10 +567,13 @@ export default function TasksOverview() {
               <Clock className="w-4 h-4" />
               <span className="hidden sm:inline">Timeline</span>
             </ToggleGroupItem>
-            <ToggleGroupItem value="templates" aria-label="Templates view" className="gap-2">
-              <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">Templates</span>
-            </ToggleGroupItem>
+            {/* Templates view - Coming Soon */}
+            {false && (
+              <ToggleGroupItem value="templates" aria-label="Templates view" className="gap-2">
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Templates</span>
+              </ToggleGroupItem>
+            )}
           </ToggleGroup>
 
           {/* Create Task Button (hidden in templates view) */}
@@ -606,16 +610,29 @@ export default function TasksOverview() {
         </div>
       </div>
 
-      {/* Templates View */}
-      {viewMode === 'templates' && (
-        <TemplatesManagement
-          templates={templates}
-          loading={loading}
-          onCreateTemplate={handleCreateTemplate}
-          onEditTemplate={handleEditTemplate}
-          onDeleteTemplate={handleDeleteTemplate}
-          onDuplicateTemplate={handleDuplicateTemplate}
-        />
+      {/* Templates View - Coming Soon */}
+      {false && viewMode === 'templates' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Task Templates</CardTitle>
+                  <CardDescription>Create and manage reusable task templates</CardDescription>
+                </div>
+                <ComingSoonBadge />
+              </div>
+            </CardHeader>
+          </Card>
+          <TemplatesManagement
+            templates={templates}
+            loading={loading}
+            onCreateTemplate={handleCreateTemplate}
+            onEditTemplate={handleEditTemplate}
+            onDeleteTemplate={handleDeleteTemplate}
+            onDuplicateTemplate={handleDuplicateTemplate}
+          />
+        </div>
       )}
 
       {/* Timeline Date Navigation (only shown in timeline view) */}

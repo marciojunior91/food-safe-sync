@@ -54,7 +54,6 @@ export function AllergenSelectorEnhanced({
   productId,
 }: AllergenSelectorEnhancedProps) {
   const { allergens, loading, getProductAllergens } = useAllergens();
-  const [showAll, setShowAll] = useState(false);
   const [loadingProduct, setLoadingProduct] = useState(false);
 
   // Load existing allergens if productId is provided
@@ -94,27 +93,24 @@ export function AllergenSelectorEnhanced({
     onChange([]);
   };
 
-  const selectCommon = () => {
-    if (disabled) return;
-    const commonIds = allergens
-      .filter(a => a.is_common)
-      .map(a => a.id);
-    onChange(commonIds);
-  };
-
-  const filteredAllergens = showCommonOnly || !showAll
-    ? allergens.filter(a => a.is_common)
-    : allergens;
+  // Show all allergens together (no filtering by common)
+  const displayedAllergens = allergens;
 
   const selectedAllergens = allergens.filter(a => 
     selectedAllergenIds.includes(a.id)
   );
 
-  const groupedAllergens = {
-    critical: filteredAllergens.filter(a => a.severity === 'critical'),
-    warning: filteredAllergens.filter(a => a.severity === 'warning'),
-    info: filteredAllergens.filter(a => a.severity === 'info'),
-  };
+  // Debug logging
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 AllergenSelector Debug:', {
+        allergensCount: allergens.length,
+        loading,
+        selectedCount: selectedAllergenIds.length,
+        displayedCount: displayedAllergens.length
+      });
+    }
+  }, [allergens, loading, selectedAllergenIds, displayedAllergens]);
 
   if (loading || loadingProduct) {
     return (
@@ -138,30 +134,17 @@ export function AllergenSelectorEnhanced({
           <AlertCircle className="h-5 w-5" />
           Allergens
         </Label>
-        <div className="flex gap-2">
-          {selectedAllergenIds.length > 0 && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={clearAll}
-              disabled={disabled}
-            >
-              Clear All
-            </Button>
-          )}
-          {!showCommonOnly && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAll(!showAll)}
-              disabled={disabled}
-            >
-              {showAll ? 'Common Only' : 'Show All'}
-            </Button>
-          )}
-        </div>
+        {selectedAllergenIds.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clearAll}
+            disabled={disabled}
+          >
+            Clear All
+          </Button>
+        )}
       </div>
 
       {/* Selected Allergens Display */}
@@ -197,87 +180,30 @@ export function AllergenSelectorEnhanced({
         </Card>
       )}
 
-      {/* Allergen Selection */}
+      {/* Allergen Selection - All together in one grid */}
       <ScrollArea className="h-[300px] rounded-md border p-4">
-        <div className="space-y-4">
-          {/* Critical Allergens */}
-          {groupedAllergens.critical.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <AlertCircle className="h-4 w-4 text-red-500" />
-                <h4 className="text-sm font-semibold text-red-700">
-                  Critical Allergens
-                </h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {groupedAllergens.critical.map(allergen => (
-                  <AllergenCheckbox
-                    key={allergen.id}
-                    allergen={allergen}
-                    checked={selectedAllergenIds.includes(allergen.id)}
-                    onCheckedChange={() => toggleAllergen(allergen.id)}
-                    disabled={disabled}
-                  />
-                ))}
-              </div>
-              <Separator className="mt-4" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {displayedAllergens.length === 0 ? (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              No allergens available
             </div>
-          )}
-
-          {/* Warning Level Allergens */}
-          {groupedAllergens.warning.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                <h4 className="text-sm font-semibold text-yellow-700">
-                  Common Allergens
-                </h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {groupedAllergens.warning.map(allergen => (
-                  <AllergenCheckbox
-                    key={allergen.id}
-                    allergen={allergen}
-                    checked={selectedAllergenIds.includes(allergen.id)}
-                    onCheckedChange={() => toggleAllergen(allergen.id)}
-                    disabled={disabled}
-                  />
-                ))}
-              </div>
-              <Separator className="mt-4" />
-            </div>
-          )}
-
-          {/* Info Level Allergens */}
-          {groupedAllergens.info.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="h-4 w-4 text-blue-500" />
-                <h4 className="text-sm font-semibold text-blue-700">
-                  Other Allergens
-                </h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {groupedAllergens.info.map(allergen => (
-                  <AllergenCheckbox
-                    key={allergen.id}
-                    allergen={allergen}
-                    checked={selectedAllergenIds.includes(allergen.id)}
-                    onCheckedChange={() => toggleAllergen(allergen.id)}
-                    disabled={disabled}
-                  />
-                ))}
-              </div>
-            </div>
+          ) : (
+            displayedAllergens.map(allergen => (
+              <AllergenCheckbox
+                key={allergen.id}
+                allergen={allergen}
+                checked={selectedAllergenIds.includes(allergen.id)}
+                onCheckedChange={() => toggleAllergen(allergen.id)}
+                disabled={disabled}
+              />
+            ))
           )}
         </div>
       </ScrollArea>
 
       {/* Info Text */}
       <p className="text-xs text-muted-foreground">
-        {showCommonOnly || !showAll
-          ? "Showing FDA/EU recognized major allergens (Top 14)"
-          : "Showing all allergens including less common ones"}
+        Select all allergens present in this product. Click on any allergen to add or remove it.
       </p>
     </div>
   );

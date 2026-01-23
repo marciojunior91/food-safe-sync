@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ComingSoonBadge } from "@/components/ui/ComingSoonBadge";
 import { StatsCard } from "@/components/StatsCard";
 import ExpiryAlerts from "@/components/ExpiryAlerts";
 import { usePlanEnforcement } from "@/hooks/usePlanEnforcement";
@@ -88,11 +89,14 @@ export default function Inventory() {
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Track stock levels, manage suppliers, and automate reorders
-          </p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
+            <p className="text-muted-foreground mt-2">
+              Track stock levels, manage suppliers, and automate reorders
+            </p>
+          </div>
+          <ComingSoonBadge size="lg" />
         </div>
         <div className="flex gap-3">
           <Button variant="outline">

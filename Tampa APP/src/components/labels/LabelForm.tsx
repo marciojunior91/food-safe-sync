@@ -124,7 +124,7 @@ const CONDITIONS = [
 
 export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelFormProps) {
   const { toast } = useToast();
-  const { updateProductAllergens } = useAllergens();
+  const { updateProductAllergens, allergens: allAllergens } = useAllergens();
   const { user } = useAuth();
   const { print, printer, settings, changePrinter, availablePrinters, isLoading: isPrinting } = usePrinter();
   const { addToQueue } = usePrintQueue();
@@ -149,6 +149,17 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   
   // Allergen state
   const [selectedAllergenIds, setSelectedAllergenIds] = useState<string[]>([]);
+  
+  // Convert selected allergen IDs to full allergen objects for preview
+  const selectedAllergensForPreview = selectedAllergenIds
+    .map(id => allAllergens.find(a => a.id === id))
+    .filter((a): a is NonNullable<typeof a> => a !== undefined)
+    .map(a => ({
+      id: a.id,
+      name: a.name,
+      icon: a.icon,
+      severity: a.severity
+    }));
   
   // New category creation states
   const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
@@ -1508,6 +1519,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
             <LabelPreviewCanvas
               labelData={{
                 ...labelData,
+                allergens: selectedAllergensForPreview, // Add selected allergens to preview
                 organizationDetails, // Add organization details for preview
               }}
               format={(settings?.type as LabelFormat) || 'generic'}

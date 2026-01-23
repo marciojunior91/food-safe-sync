@@ -3,6 +3,7 @@ import { PrinterDriver, PrinterType, PrinterSettings } from '@/types/printer';
 import { GenericPrinter } from './GenericPrinter';
 import { PDFPrinter } from './PDFPrinter';
 import { ZebraPrinter } from './ZebraPrinter';
+import { BluetoothZebraPrinter } from './BluetoothZebraPrinter';
 
 export class PrinterFactory {
   static createPrinter(type: PrinterType, settings?: Partial<PrinterSettings>): PrinterDriver {
@@ -16,6 +17,9 @@ export class PrinterFactory {
       case 'zebra':
         return new ZebraPrinter(settings?.name || 'Zebra Thermal', settings);
       
+      case 'bluetooth':
+        return new BluetoothZebraPrinter(settings?.name || 'Bluetooth Zebra', settings);
+      
       default:
         throw new Error(`Unknown printer type: ${type}`);
     }
@@ -24,19 +28,24 @@ export class PrinterFactory {
   static getAvailablePrinters(): Array<{ type: PrinterType; name: string; description: string }> {
     return [
       {
-        type: 'generic',
-        name: 'Browser Print',
-        description: 'Use your browser\'s print dialog to print labels'
+        type: 'bluetooth',
+        name: 'Bluetooth Zebra (Android)',
+        description: '🔵 Direct Bluetooth connection to Zebra D411 (Recommended for Android tablet)'
+      },
+      {
+        type: 'zebra',
+        name: 'Zebra Network',
+        description: '🌐 Network connection to Zebra printer via IP address'
       },
       {
         type: 'pdf',
         name: 'PDF Export',
-        description: 'Generate PDF files for labels'
+        description: '📄 Generate PDF files for labels (for testing or manual printing)'
       },
       {
-        type: 'zebra',
-        name: 'Zebra Thermal',
-        description: 'Direct printing to Zebra thermal printers (ZPL format)'
+        type: 'generic',
+        name: 'Browser Print',
+        description: '🖨️ Use your browser\'s print dialog (fallback option)'
       }
     ];
   }
@@ -46,7 +55,7 @@ export class PrinterFactory {
       type,
       name: '',
       paperWidth: 102,
-      paperHeight: 180, // Increased from 152 to 180mm to accommodate full label content
+      paperHeight: 180,
       defaultQuantity: 1
     };
 
@@ -66,9 +75,17 @@ export class PrinterFactory {
       case 'zebra':
         return {
           ...baseSettings,
-          name: 'Zebra Thermal',
+          name: 'Zebra Network',
           ipAddress: '192.168.1.100',
           port: 9100,
+          darkness: 20,
+          speed: 4
+        };
+      
+      case 'bluetooth':
+        return {
+          ...baseSettings,
+          name: 'Bluetooth Zebra',
           darkness: 20,
           speed: 4
         };
@@ -78,3 +95,4 @@ export class PrinterFactory {
     }
   }
 }
+

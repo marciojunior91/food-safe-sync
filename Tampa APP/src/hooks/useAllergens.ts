@@ -32,6 +32,8 @@ export function useAllergens() {
   const fetchAllergens = async () => {
     try {
       setLoading(true);
+      console.log("🔍 Fetching allergens from database...");
+      
       const { data, error } = await supabase
         .from("allergens")
         .select("*")
@@ -39,13 +41,23 @@ export function useAllergens() {
         .order("severity")
         .order("name");
 
-      if (error) throw error;
+      console.log("🔍 Allergens query result:", { data, error, count: data?.length });
+
+      if (error) {
+        console.error("❌ Allergens query error:", error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        console.warn("⚠️ No allergens found in database! Table might be empty.");
+      }
+      
       setAllergens(data || []);
     } catch (error) {
-      console.error("Error fetching allergens:", error);
+      console.error("❌ Error fetching allergens:", error);
       toast({
         title: "Error",
-        description: "Failed to load allergens",
+        description: "Failed to load allergens. Check console for details.",
         variant: "destructive",
       });
     } finally {

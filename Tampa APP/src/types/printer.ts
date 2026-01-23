@@ -1,7 +1,7 @@
 // Printer type definitions for Tampa APP
-// Supports Zebra thermal printers, PDF export, and generic browser printing
+// Supports Zebra thermal printers, PDF export, Bluetooth, and generic browser printing
 
-export type PrinterType = 'zebra' | 'pdf' | 'generic';
+export type PrinterType = 'zebra' | 'pdf' | 'generic' | 'bluetooth';
 
 export interface PrinterCapabilities {
   supportsZPL: boolean;
