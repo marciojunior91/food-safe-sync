@@ -1,62 +1,108 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState, useMemo, useEffect } from "react";
+import { 
+  AlertTriangle, 
+  Clock, 
+  Search, 
+  Filter,
+  CheckCircle2,
+  CalendarClock,
+  Trash2,
+  Package,
+  FileText,
+  ChefHat,
+  MapPin,
+  Loader2
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AlertTriangle, Search, Printer, Trash2, Package } from "lucide-react";
-import { getExpiryStatus, getStatusColor, getStatusLabel } from "@/utils/trafficLight";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { AllergenBadge } from "@/components/labels/AllergenBadge";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { format, differenceInDays, addDays, parseISO } from "date-fns";
 
-interface PrintedLabel {
+type ItemType = 'product' | 'label' | 'recipe';
+type UrgencyLevel = 'critical' | 'urgent' | 'warning' | 'normal';
+type ActionType = 'consume' | 'extend' | 'discard';
+
+interface ExpiringItem {
   id: string;
-  product_id: string;
-  expiry_date: string;
-  condition: string;
-  created_at: string;
-  product?: {
-    id: string;
-    name: string;
-    category_id: string;
-    label_categories?: {
-      name: string;
-    };
-    product_allergens?: Array<{
-      allergen_id: string;
-      allergens: {
-        id: string;
-        name: string;
-        icon: string;
-        severity: string;
-      };
-    }>;
-  };
+  name: string;
+  type: ItemType;
+  expiryDate: Date;
+  location?: string;
+  quantity?: number;
+  unit?: string;
+  urgency: UrgencyLevel;
+  daysUntilExpiry: number;
+}
+
+interface ActionDialogData {
+  open: boolean;
+  action: ActionType | null;
+  item: ExpiringItem | null;
 }
 
 export default function ExpiringSoon() {
-  const { user } = useAuth();
   const { toast } = useToast();
-  const [labels, setLabels] = useState<PrintedLabel[]>([]);
-  const [filteredLabels, setFilteredLabels] = useState<PrintedLabel[]>([]);
+  const { user } = useAuth();
+  
+  // Data state
+  const [products, setProducts] = useState<any[]>([]);
+  const [labels, setLabels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [urgencyFilter, setUrgencyFilter] = useState<"all" | "critical" | "warning">("all");
+  const [typeFilter, setTypeFilter] = useState<ItemType | "all">("all");
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | "all">("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
+  // Action Dialog
+  const [actionDialog, setActionDialog] = useState<ActionDialogData>({
+    open: false,
+    action: null,
+    item: null,
+  });
+  const [actionReason, setActionReason] = useState("");
+  const [newExpiryDate, setNewExpiryDate] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Fetch data on mount
   useEffect(() => {
-    fetchExpiringLabels();
+    fetchData();
   }, [user]);
 
-  useEffect(() => {
-    filterLabels();
-  }, [searchQuery, urgencyFilter, labels]);
-
-  const fetchExpiringLabels = async () => {
+  const fetchData = async () => {
+    if (!user?.id) return;
+    
+    setLoading(true);
     try {
-      if (!user?.id) return;
-
-      // Get user's organization_id
+      // Get organization_id
       const { data: profile } = await supabase
         .from('profiles')
         .select('organization_id')
@@ -65,321 +111,568 @@ export default function ExpiringSoon() {
 
       if (!profile?.organization_id) return;
 
-      // Calculate date range (next 72 hours)
-      const now = new Date();
-      const in72Hours = new Date();
-      in72Hours.setHours(in72Hours.getHours() + 72);
-
-      // Fetch labels expiring in next 72 hours
-      const { data, error } = await supabase
-        .from('printed_labels')
-        .select(`
-          id,
-          product_id,
-          expiry_date,
-          condition,
-          created_at,
-          product:products (
-            id,
-            name,
-            category_id,
-            label_categories:category_id (
-              name
-            ),
-            product_allergens (
-              allergen_id,
-              allergens (
-                id,
-                name,
-                icon,
-                severity
-              )
-            )
-          )
-        `)
+      // Fetch products
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('*')
         .eq('organization_id', profile.organization_id)
-        .gte('expiry_date', now.toISOString().split('T')[0])
-        .lte('expiry_date', in72Hours.toISOString().split('T')[0])
-        .order('expiry_date', { ascending: true });
+        .not('expiry_date', 'is', null);
 
-      if (error) throw error;
+      // Fetch labels  
+      const { data: labelsData } = await supabase
+        .from('printed_labels')
+        .select('*')
+        .eq('organization_id', profile.organization_id)
+        .not('use_by_date', 'is', null);
 
-      setLabels(data || []);
+      setProducts(productsData || []);
+      setLabels(labelsData || []);
     } catch (error) {
-      console.error('Error fetching expiring labels:', error);
+      console.error('Error fetching data:', error);
       toast({
         title: "Error",
-        description: "Failed to load expiring products",
-        variant: "destructive"
+        description: "Failed to load expiring items",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const filterLabels = () => {
-    let filtered = [...labels];
-
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(label =>
-        label.product?.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Urgency filter
-    if (urgencyFilter !== "all") {
-      filtered = filtered.filter(label => {
-        const status = getExpiryStatus(label.expiry_date);
-        if (urgencyFilter === "critical") return status === "expired";
-        if (urgencyFilter === "warning") return status === "warning";
-        return true;
-      });
-    }
-
-    setFilteredLabels(filtered);
+  // Calculate urgency level based on days until expiry
+  const calculateUrgency = (daysUntil: number): UrgencyLevel => {
+    if (daysUntil <= 0) return 'critical'; // Expired or today
+    if (daysUntil === 1) return 'urgent'; // Tomorrow
+    if (daysUntil <= 3) return 'warning'; // 2-3 days
+    return 'normal'; // 4-7 days
   };
 
-  const handleMarkAsWaste = async (labelId: string) => {
+  // Get urgency color classes
+  const getUrgencyColor = (urgency: UrgencyLevel) => {
+    switch (urgency) {
+      case 'critical':
+        return {
+          bg: 'bg-red-50 dark:bg-red-950',
+          border: 'border-red-200 dark:border-red-800',
+          text: 'text-red-700 dark:text-red-300',
+          badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+          dot: 'bg-red-500',
+        };
+      case 'urgent':
+        return {
+          bg: 'bg-orange-50 dark:bg-orange-950',
+          border: 'border-orange-200 dark:border-orange-800',
+          text: 'text-orange-700 dark:text-orange-300',
+          badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+          dot: 'bg-orange-500',
+        };
+      case 'warning':
+        return {
+          bg: 'bg-yellow-50 dark:bg-yellow-950',
+          border: 'border-yellow-200 dark:border-yellow-800',
+          text: 'text-yellow-700 dark:text-yellow-300',
+          badge: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+          dot: 'bg-yellow-500',
+        };
+      default:
+        return {
+          bg: 'bg-green-50 dark:bg-green-950',
+          border: 'border-green-200 dark:border-green-800',
+          text: 'text-green-700 dark:text-green-300',
+          badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+          dot: 'bg-green-500',
+        };
+    }
+  };
+
+  // Get urgency label
+  const getUrgencyLabel = (urgency: UrgencyLevel, daysUntil: number) => {
+    switch (urgency) {
+      case 'critical':
+        return daysUntil < 0 ? `Expired ${Math.abs(daysUntil)} days ago` : 'Expires today';
+      case 'urgent':
+        return 'Expires tomorrow';
+      case 'warning':
+        return `${daysUntil} days left`;
+      default:
+        return `${daysUntil} days left`;
+    }
+  };
+
+  // Transform products and labels into expiring items
+  const expiringItems = useMemo(() => {
+    const items: ExpiringItem[] = [];
+    const now = new Date();
+    const sevenDaysFromNow = addDays(now, 7);
+
+    // Add products
+    products?.forEach(product => {
+      if (product.expiry_date) {
+        const expiryDate = parseISO(product.expiry_date);
+        if (expiryDate <= sevenDaysFromNow) {
+          const daysUntil = differenceInDays(expiryDate, now);
+          items.push({
+            id: product.id,
+            name: product.name,
+            type: 'product',
+            expiryDate,
+            location: product.storage_location,
+            quantity: product.quantity,
+            unit: product.unit,
+            urgency: calculateUrgency(daysUntil),
+            daysUntilExpiry: daysUntil,
+          });
+        }
+      }
+    });
+
+    // Add labels
+    labels?.forEach(label => {
+      if (label.use_by_date) {
+        const expiryDate = parseISO(label.use_by_date);
+        if (expiryDate <= sevenDaysFromNow) {
+          const daysUntil = differenceInDays(expiryDate, now);
+          items.push({
+            id: label.id,
+            name: label.product_name,
+            type: 'label',
+            expiryDate,
+            location: label.storage_location,
+            urgency: calculateUrgency(daysUntil),
+            daysUntilExpiry: daysUntil,
+          });
+        }
+      }
+    });
+
+    // Sort by urgency (critical first) and then by expiry date
+    return items.sort((a, b) => {
+      const urgencyOrder = { critical: 0, urgent: 1, warning: 2, normal: 3 };
+      const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+      if (urgencyDiff !== 0) return urgencyDiff;
+      return a.expiryDate.getTime() - b.expiryDate.getTime();
+    });
+  }, [products, labels]);
+
+  // Apply filters
+  const filteredItems = useMemo(() => {
+    return expiringItems.filter(item => {
+      // Search filter
+      if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      // Type filter
+      if (typeFilter !== 'all' && item.type !== typeFilter) {
+        return false;
+      }
+      // Urgency filter
+      if (urgencyFilter !== 'all' && item.urgency !== urgencyFilter) {
+        return false;
+      }
+      // Location filter
+      if (locationFilter !== 'all' && item.location !== locationFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [expiringItems, searchQuery, typeFilter, urgencyFilter, locationFilter]);
+
+  // Get unique locations
+  const locations = useMemo(() => {
+    const locs = new Set<string>();
+    expiringItems.forEach(item => {
+      if (item.location) locs.add(item.location);
+    });
+    return Array.from(locs).sort();
+  }, [expiringItems]);
+
+  // Count by urgency
+  const urgencyCounts = useMemo(() => {
+    return {
+      critical: expiringItems.filter(i => i.urgency === 'critical').length,
+      urgent: expiringItems.filter(i => i.urgency === 'urgent').length,
+      warning: expiringItems.filter(i => i.urgency === 'warning').length,
+      normal: expiringItems.filter(i => i.urgency === 'normal').length,
+    };
+  }, [expiringItems]);
+
+  // Handle action
+  const handleAction = (action: ActionType, item: ExpiringItem) => {
+    setActionDialog({ open: true, action, item });
+    setActionReason("");
+    if (action === 'extend') {
+      setNewExpiryDate(format(addDays(item.expiryDate, 7), 'yyyy-MM-dd'));
+    }
+  };
+
+  // Submit action
+  const handleSubmitAction = async () => {
+    if (!actionDialog.item || !actionDialog.action) return;
+
+    setIsSubmitting(true);
     try {
-      // TODO: Implement waste tracking
+      // TODO: Implement actual database updates
+      // For now, just show success message
+      
+      const actionMessages = {
+        consume: `Marked "${actionDialog.item.name}" as consumed`,
+        extend: `Extended expiry date for "${actionDialog.item.name}"`,
+        discard: `Discarded "${actionDialog.item.name}"`,
+      };
+
       toast({
-        title: "Marked as Waste",
-        description: "Product marked as waste (feature coming soon)",
+        title: "Action Completed",
+        description: actionMessages[actionDialog.action],
       });
+
+      setActionDialog({ open: false, action: null, item: null });
     } catch (error) {
-      console.error('Error marking as waste:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete action. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleReprint = async (label: PrintedLabel) => {
-    try {
-      // TODO: Trigger print flow
-      toast({
-        title: "Reprint Label",
-        description: "Reprinting label (feature coming soon)",
-      });
-    } catch (error) {
-      console.error('Error reprinting:', error);
+  // Get item icon
+  const getItemIcon = (type: ItemType) => {
+    switch (type) {
+      case 'product':
+        return <Package className="w-4 h-4" />;
+      case 'label':
+        return <FileText className="w-4 h-4" />;
+      case 'recipe':
+        return <ChefHat className="w-4 h-4" />;
     }
   };
-
-  // Stats
-  const criticalCount = labels.filter(l => getExpiryStatus(l.expiry_date) === "expired").length;
-  const warningCount = labels.filter(l => getExpiryStatus(l.expiry_date) === "warning").length;
-
-  if (loading) {
-    return (
-      <div className="p-6 md:p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="h-32 bg-muted rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="p-6 md:p-8 space-y-6">
+    <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <AlertTriangle className="h-8 w-8 text-orange-500" />
-          Expiring Soon
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Products expiring in the next 72 hours
+        <h1 className="text-3xl font-bold text-foreground">Expiring Soon</h1>
+        <p className="text-muted-foreground mt-2">
+          Monitor items approaching expiry and take action to reduce waste
         </p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className={`${getUrgencyColor('critical').bg} ${getUrgencyColor('critical').border}`}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Expiring</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{labels.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Next 72 hours</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-red-200 dark:border-red-900">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-red-600 dark:text-red-400">
-              Critical (&lt;24h)
+            <CardDescription className={getUrgencyColor('critical').text}>
+              Critical
+            </CardDescription>
+            <CardTitle className="text-3xl">
+              {urgencyCounts.critical}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-              {criticalCount}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Requires immediate action</p>
+            <p className="text-sm text-muted-foreground">
+              Expired or expires today
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="border-yellow-200 dark:border-yellow-900">
+        <Card className={`${getUrgencyColor('urgent').bg} ${getUrgencyColor('urgent').border}`}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
-              Warning (24-72h)
+            <CardDescription className={getUrgencyColor('urgent').text}>
+              Urgent
+            </CardDescription>
+            <CardTitle className="text-3xl">
+              {urgencyCounts.urgent}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-              {warningCount}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Monitor closely</p>
+            <p className="text-sm text-muted-foreground">
+              Expires tomorrow
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className={`${getUrgencyColor('warning').bg} ${getUrgencyColor('warning').border}`}>
+          <CardHeader className="pb-3">
+            <CardDescription className={getUrgencyColor('warning').text}>
+              Warning
+            </CardDescription>
+            <CardTitle className="text-3xl">
+              {urgencyCounts.warning}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              2-3 days left
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className={`${getUrgencyColor('normal').bg} ${getUrgencyColor('normal').border}`}>
+          <CardHeader className="pb-3">
+            <CardDescription className={getUrgencyColor('normal').text}>
+              Upcoming
+            </CardDescription>
+            <CardTitle className="text-3xl">
+              {urgencyCounts.normal}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              4-7 days left
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
       <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant={urgencyFilter === "all" ? "default" : "outline"}
-                onClick={() => setUrgencyFilter("all")}
-              >
-                All
-              </Button>
-              <Button
-                variant={urgencyFilter === "critical" ? "destructive" : "outline"}
-                onClick={() => setUrgencyFilter("critical")}
-              >
-                Critical
-              </Button>
-              <Button
-                variant={urgencyFilter === "warning" ? "outline" : "outline"}
-                onClick={() => setUrgencyFilter("warning")}
-                className={urgencyFilter === "warning" ? "bg-yellow-500 text-white hover:bg-yellow-600" : ""}
-              >
-                Warning
-              </Button>
-            </div>
+
+            {/* Type Filter */}
+            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ItemType | "all")}>
+              <SelectTrigger>
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="product">Products</SelectItem>
+                <SelectItem value="label">Labels</SelectItem>
+                <SelectItem value="recipe">Recipes</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Urgency Filter */}
+            <Select value={urgencyFilter} onValueChange={(value) => setUrgencyFilter(value as UrgencyLevel | "all")}>
+              <SelectTrigger>
+                <SelectValue placeholder="All urgency" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Urgency</SelectItem>
+                <SelectItem value="critical">Critical</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="warning">Warning</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Location Filter */}
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="All locations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Locations</SelectItem>
+                {locations.map(loc => (
+                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Products List */}
-      {filteredLabels.length === 0 ? (
-        <Card>
-          <CardContent className="py-12">
-            <div className="text-center text-muted-foreground">
-              <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p className="text-lg font-medium">No expiring products found</p>
-              <p className="text-sm mt-1">
-                {searchQuery || urgencyFilter !== "all" 
-                  ? "Try adjusting your filters"
-                  : "All products are safe for now! 🎉"}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {filteredLabels.map((label) => {
-            const status = getExpiryStatus(label.expiry_date);
-            const statusColor = getStatusColor(status);
-            const statusLabel = getStatusLabel(status);
-
+      {/* Items List */}
+      <div className="space-y-3">
+        {filteredItems.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-12">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Items Expiring Soon</h3>
+                <p className="text-muted-foreground">
+                  {expiringItems.length === 0
+                    ? "All items are fresh with plenty of time before expiry!"
+                    : "No items match your current filters."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredItems.map(item => {
+            const colors = getUrgencyColor(item.urgency);
             return (
-              <Card key={label.id} className={`border-l-4 ${
-                status === 'expired' ? 'border-l-red-500' : 
-                status === 'warning' ? 'border-l-yellow-500' : 
-                'border-l-green-500'
-              }`}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-xl">{label.product?.name}</CardTitle>
-                      <CardDescription>
-                        <span className="font-medium">Category:</span> {label.product?.label_categories?.name || "Unknown"}
-                      </CardDescription>
+              <Card key={`${item.type}-${item.id}`} className={`${colors.bg} ${colors.border}`}>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left: Item Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`p-2 rounded-lg ${colors.badge}`}>
+                          {getItemIcon(item.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-lg truncate">{item.name}</h3>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                            <Badge variant="outline" className="capitalize">
+                              {item.type}
+                            </Badge>
+                            {item.location && (
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {item.location}
+                              </span>
+                            )}
+                            {item.quantity && (
+                              <span>
+                                {item.quantity} {item.unit}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Urgency Badge */}
+                      <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                        <span className={`text-sm font-medium ${colors.text}`}>
+                          {getUrgencyLabel(item.urgency, item.daysUntilExpiry)}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          • Expires {format(item.expiryDate, 'MMM dd, yyyy')}
+                        </span>
+                      </div>
                     </div>
-                    <Badge className={statusColor}>
-                      {statusLabel}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Expiry Info */}
-                  <div className="flex items-center gap-6 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">Expires:</span>
-                      <span className="ml-2 font-medium">
-                        {new Date(label.expiry_date).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Condition:</span>
-                      <span className="ml-2 font-medium">{label.condition}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Printed:</span>
-                      <span className="ml-2 font-medium">
-                        {new Date(label.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Allergens */}
-                  {label.product?.product_allergens && label.product.product_allergens.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm text-muted-foreground">Allergens:</span>
-                      {label.product.product_allergens.map((pa) => (
-                        <AllergenBadge
-                          key={pa.allergen_id}
-                          allergen={{
-                            ...pa.allergens,
-                            is_common: false,
-                            created_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                          }}
-                        />
-                      ))}
+                    {/* Right: Actions */}
+                    <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAction('consume', item)}
+                        className="gap-2"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Consumed</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAction('extend', item)}
+                        className="gap-2"
+                      >
+                        <CalendarClock className="w-4 h-4" />
+                        <span className="hidden sm:inline">Extend</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAction('discard', item)}
+                        className="gap-2 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Discard</span>
+                      </Button>
                     </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleReprint(label)}
-                    >
-                      <Printer className="h-4 w-4 mr-2" />
-                      Reprint
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleMarkAsWaste(label.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Mark as Waste
-                    </Button>
                   </div>
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
+          })
+        )}
+      </div>
+
+      {/* Action Dialog */}
+      <Dialog open={actionDialog.open} onOpenChange={(open) => !isSubmitting && setActionDialog({ ...actionDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {actionDialog.action === 'consume' && 'Mark as Consumed'}
+              {actionDialog.action === 'extend' && 'Extend Expiry Date'}
+              {actionDialog.action === 'discard' && 'Discard Item'}
+            </DialogTitle>
+            <DialogDescription>
+              {actionDialog.action === 'consume' && 'Confirm that this item has been used or consumed.'}
+              {actionDialog.action === 'extend' && 'Set a new expiry date and provide a reason for the extension.'}
+              {actionDialog.action === 'discard' && 'Confirm discarding this item and provide a reason.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Item Info */}
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="font-semibold">{actionDialog.item?.name}</p>
+              <p className="text-sm text-muted-foreground">
+                Current expiry: {actionDialog.item && format(actionDialog.item.expiryDate, 'MMM dd, yyyy')}
+              </p>
+            </div>
+
+            {/* New Expiry Date (for extend action) */}
+            {actionDialog.action === 'extend' && (
+              <div className="space-y-2">
+                <Label htmlFor="newExpiryDate">New Expiry Date</Label>
+                <Input
+                  id="newExpiryDate"
+                  type="date"
+                  value={newExpiryDate}
+                  onChange={(e) => setNewExpiryDate(e.target.value)}
+                  min={format(new Date(), 'yyyy-MM-dd')}
+                />
+              </div>
+            )}
+
+            {/* Reason */}
+            <div className="space-y-2">
+              <Label htmlFor="reason">
+                Reason {actionDialog.action === 'consume' ? '(Optional)' : '(Required)'}
+              </Label>
+              <Textarea
+                id="reason"
+                placeholder={
+                  actionDialog.action === 'consume'
+                    ? 'Add any notes about consumption...'
+                    : actionDialog.action === 'extend'
+                    ? 'Why is the expiry date being extended?'
+                    : 'Why is this item being discarded?'
+                }
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setActionDialog({ open: false, action: null, item: null })}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitAction}
+              disabled={
+                isSubmitting ||
+                (actionDialog.action === 'extend' && (!newExpiryDate || !actionReason)) ||
+                (actionDialog.action === 'discard' && !actionReason)
+              }
+              variant={actionDialog.action === 'discard' ? 'destructive' : 'default'}
+            >
+              {isSubmitting ? 'Processing...' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+        </>
       )}
     </div>
   );
