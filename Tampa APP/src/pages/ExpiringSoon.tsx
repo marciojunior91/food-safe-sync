@@ -123,7 +123,7 @@ export default function ExpiringSoon() {
         .from('printed_labels')
         .select('*')
         .eq('organization_id', profile.organization_id)
-        .not('use_by_date', 'is', null);
+        .not('expiry_date', 'is', null);
 
       setProducts(productsData || []);
       setLabels(labelsData || []);
@@ -228,8 +228,8 @@ export default function ExpiringSoon() {
 
     // Add labels
     labels?.forEach(label => {
-      if (label.use_by_date) {
-        const expiryDate = parseISO(label.use_by_date);
+      if (label.expiry_date) {
+        const expiryDate = parseISO(label.expiry_date);
         if (expiryDate <= sevenDaysFromNow) {
           const daysUntil = differenceInDays(expiryDate, now);
           items.push({
