@@ -199,6 +199,9 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
       by: preparedByName,
     });
     
+    console.log(`📊 QR Code data: ${qrData}`);
+    console.log(`📏 QR Code length: ${qrData.length} characters`);
+    
     // ESC/POS QR Code commands (Model 2)
     // Select QR code model
     commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // GS ( k - Model 2
@@ -214,11 +217,16 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     const qrLength = qrBytes.length + 3;
     const pL = qrLength % 256;
     const pH = Math.floor(qrLength / 256);
+    
+    console.log(`📦 QR bytes length: ${qrBytes.length}, pL: ${pL}, pH: ${pH}`);
+    
     commands.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30); // GS ( k - Store data
     commands.push(...qrBytes);
     
     // Print QR code
     commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30); // GS ( k - Print
+    
+    console.log(`✅ QR Code commands added (total: ${commands.length} bytes)`);
     
     // Add spacing after QR code
     commands.push(0x0A, 0x0A); // Line feeds
