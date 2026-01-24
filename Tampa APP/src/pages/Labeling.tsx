@@ -361,18 +361,17 @@ export default function Labeling() {
       // Save to database first
       await saveLabelToDatabase(labelData);
       
-      // Print using new printer system - pass complete label data
+      // Print using new printer system - pass complete label data with CORRECT field names
       const success = await print({
         productName: product.name,
         categoryName: product.label_categories?.name || "Quick Print",
-        preparedDate: prepDate,
-        useByDate: expiryDate,
-        preparedByName: selectedUserData.display_name || "Unknown", // ✅ Pass team member name
-        allergens: productAllergens.map((a: any) => a.name),
-        storageInstructions: details?.condition || "REFRIGERATED",
+        prepDate: prepDate,          // ✅ FIXED: was "preparedDate"
+        expiryDate: expiryDate,      // ✅ FIXED: was "useByDate"
+        preparedByName: selectedUserData.display_name || "Unknown",
+        allergens: productAllergens,  // ✅ FIXED: pass full allergen objects, not just names
+        condition: details?.condition || "REFRIGERATED",
         quantity: details?.quantity || "1",
         unit: details?.unit || product.measuring_units?.abbreviation || "Unit",
-        condition: details?.condition || "REFRIGERATED",
       });
       
       if (success) {
