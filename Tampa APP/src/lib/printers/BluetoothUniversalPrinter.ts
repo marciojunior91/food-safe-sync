@@ -211,26 +211,10 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
 
       console.log('🔵 Requesting Bluetooth device (ANY thermal printer)...');
 
-      // Request ANY Bluetooth device (no filters = shows all devices)
-      // This allows selection of MPT-II, Zebra, Xprinter, etc.
+      // SOLUTION: Accept ALL devices (no filters)
+      // This will show EVERY Bluetooth device including MPT-II_309F
       this.device = await navigator.bluetooth.requestDevice({
-        // acceptAllDevices: true, // Show ALL Bluetooth devices
-        // optionalServices: [SPP_SERVICE_UUID, ZEBRA_SERVICE_UUID]
-        
-        // Better approach: Show devices with Serial Port or Zebra service
-        filters: [
-          { services: [SPP_SERVICE_UUID] },           // ESC/POS printers
-          { services: [ZEBRA_SERVICE_UUID] },         // Zebra printers
-          { namePrefix: 'MPT' },                      // MPT-II series
-          { namePrefix: 'Zebra' },                    // Zebra printers
-          { namePrefix: 'Xprinter' },                 // Xprinter
-          { namePrefix: 'Epson' },                    // Epson
-          { namePrefix: 'TM-' },                      // Epson TM
-          { namePrefix: 'RP' },                       // RP80, etc.
-          { namePrefix: 'Thermal' },                  // Generic thermal
-          { namePrefix: 'POS' },                      // POS printers
-          { namePrefix: 'BT-' },                      // Bluetooth printers
-        ],
+        acceptAllDevices: true,
         optionalServices: [SPP_SERVICE_UUID, ZEBRA_SERVICE_UUID]
       });
 
