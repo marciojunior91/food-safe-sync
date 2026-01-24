@@ -188,7 +188,39 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
       commands.push(...this.stringToBytes(`Allergens: ${allergenText}\n`));
     }
     
-    // Add spacing
+    // Add spacing before QR code
+    commands.push(0x0A); // Line feed
+    
+    // Generate QR Code data (JSON with label info)
+    const qrData = JSON.stringify({
+      product: productName,
+      prep: prepDate,
+      exp: expiryDate,
+      by: preparedByName,
+    });
+    
+    // ESC/POS QR Code commands (Model 2)
+    // Select QR code model
+    commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // GS ( k - Model 2
+    
+    // Set QR code size (module size = 6)
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06); // GS ( k - Size 6
+    
+    // Set error correction level (L = 48, M = 49, Q = 50, H = 51)
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31); // GS ( k - Error correction M
+    
+    // Store QR code data
+    const qrBytes = this.stringToBytes(qrData);
+    const qrLength = qrBytes.length + 3;
+    const pL = qrLength % 256;
+    const pH = Math.floor(qrLength / 256);
+    commands.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30); // GS ( k - Store data
+    commands.push(...qrBytes);
+    
+    // Print QR code
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30); // GS ( k - Print
+    
+    // Add spacing after QR code
     commands.push(0x0A, 0x0A); // Line feeds
     
     // Cut paper (if supported)
