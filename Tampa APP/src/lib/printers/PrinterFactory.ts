@@ -3,7 +3,8 @@ import { PrinterDriver, PrinterType, PrinterSettings } from '@/types/printer';
 import { GenericPrinter } from './GenericPrinter';
 import { PDFPrinter } from './PDFPrinter';
 import { ZebraPrinter } from './ZebraPrinter';
-import { BluetoothZebraPrinter } from './BluetoothZebraPrinter';
+import { BluetoothUniversalPrinter } from './BluetoothUniversalPrinter'; // NEW: Universal Bluetooth support
+// import { BluetoothZebraPrinter } from './BluetoothZebraPrinter'; // OLD: Zebra-only
 
 export class PrinterFactory {
   static createPrinter(type: PrinterType, settings?: Partial<PrinterSettings>): PrinterDriver {
@@ -18,7 +19,12 @@ export class PrinterFactory {
         return new ZebraPrinter(settings?.name || 'Zebra Thermal', settings);
       
       case 'bluetooth':
-        return new BluetoothZebraPrinter(settings?.name || 'Bluetooth Zebra', settings);
+        // NEW: Universal Bluetooth support (Zebra, ESC/POS, etc.)
+        return new BluetoothUniversalPrinter(
+          settings?.name || 'Bluetooth Printer', 
+          settings,
+          'auto' // Auto-detect protocol (ZPL or ESC/POS)
+        );
       
       default:
         throw new Error(`Unknown printer type: ${type}`);
@@ -29,8 +35,8 @@ export class PrinterFactory {
     return [
       {
         type: 'bluetooth',
-        name: 'Bluetooth Zebra (Android)',
-        description: '🔵 Direct Bluetooth connection to Zebra D411 (Recommended for Android tablet)'
+        name: 'Bluetooth Printer',
+        description: '🔵 ANY Bluetooth thermal printer (Zebra, MPT-II, Xprinter, ESC/POS, etc.)'
       },
       {
         type: 'zebra',
@@ -85,7 +91,7 @@ export class PrinterFactory {
       case 'bluetooth':
         return {
           ...baseSettings,
-          name: 'Bluetooth Zebra',
+          name: 'Bluetooth Printer',
           darkness: 20,
           speed: 4
         };
