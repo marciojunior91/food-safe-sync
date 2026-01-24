@@ -207,29 +207,50 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     console.log(`📊 QR Code data: ${qrJson}`);
     console.log(`📏 QR Code length: ${qrJson.length} characters`);
     
-    // ESC/POS QR Code commands (Model 2)
-    // Select QR code model
-    commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // GS ( k - Model 2
+    // ========================================
+    // QR CODE METHOD 1: ESC/POS Standard (GS ( k) - Model 2
+    // ========================================
+    try {
+      console.log('🔷 Attempting QR Code Method 1: GS ( k Model 2');
+      
+      // Select QR code model
+      commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // GS ( k - Model 2
+      
+      // Set QR code size (module size = 6)
+      commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06); // GS ( k - Size 6
+      
+      // Set error correction level (L = 48, M = 49, Q = 50, H = 51)
+      commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31); // GS ( k - Error correction M
+      
+      // Store QR code data
+      const qrBytes = this.stringToBytes(qrJson);
+      const qrLength = qrBytes.length + 3;
+      const pL = qrLength % 256;
+      const pH = Math.floor(qrLength / 256);
+      
+      console.log(`📦 QR bytes length: ${qrBytes.length}, pL: ${pL}, pH: ${pH}`);
+      
+      commands.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30); // GS ( k - Store data
+      commands.push(...qrBytes);
+      
+      // Print QR code
+      commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30); // GS ( k - Print
+      
+      console.log(`✅ QR Code Method 1 commands added`);
+      
+    } catch (error) {
+      console.error('❌ QR Code Method 1 failed:', error);
+    }
     
-    // Set QR code size (module size = 6)
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06); // GS ( k - Size 6
-    
-    // Set error correction level (L = 48, M = 49, Q = 50, H = 51)
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31); // GS ( k - Error correction M
-    
-    // Store QR code data
-    const qrBytes = this.stringToBytes(qrJson);
-    const qrLength = qrBytes.length + 3;
-    const pL = qrLength % 256;
-    const pH = Math.floor(qrLength / 256);
-    
-    console.log(`📦 QR bytes length: ${qrBytes.length}, pL: ${pL}, pH: ${pH}`);
-    
-    commands.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30); // GS ( k - Store data
-    commands.push(...qrBytes);
-    
-    // Print QR code
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30); // GS ( k - Print
+    // ========================================
+    // FALLBACK: Print QR data as text (if QR Code not supported)
+    // ========================================
+    commands.push(0x0A); // Line feed
+    commands.push(0x1B, 0x61, 0x01); // ESC a - Center align
+    commands.push(...this.stringToBytes('--- QR DATA ---\n'));
+    commands.push(...this.stringToBytes(qrJson + '\n'));
+    commands.push(...this.stringToBytes('---------------\n'));
+    commands.push(0x1B, 0x61, 0x00); // ESC a - Left align
     
     console.log(`✅ QR Code commands added (total: ${commands.length} bytes)`);
     
