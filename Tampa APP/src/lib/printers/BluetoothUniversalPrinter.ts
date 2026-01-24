@@ -77,9 +77,9 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
       return 'escpos';
     }
     
-    // Default to ESC/POS (more common than ZPL)
-    console.log('⚠️ Unknown printer type → Defaulting to ESC/POS (generic thermal)');
-    return 'escpos';
+    // Default to ZPL (client's main printer is Zebra D411 in Australia)
+    console.log('⚠️ Unknown printer type → Defaulting to ZPL (Zebra protocol)');
+    return 'zpl';
   }
 
   /**
@@ -386,12 +386,21 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
    */
   async print(labelData: LabelPrintData): Promise<boolean> {
     try {
-      console.log(`🖨️ Printing via Bluetooth (${this.protocol.toUpperCase()}):`, labelData.productName);
+      // CRITICAL: Determine protocol based on CURRENT device, not cached value
+      let currentProtocol = this.protocol;
+      
+      // If protocol is 'auto' and we have a device, detect it
+      if (currentProtocol === 'auto' && this.device?.name) {
+        currentProtocol = this.detectProtocol(this.device.name);
+        console.log(`� Re-detected protocol for "${this.device.name}": ${currentProtocol.toUpperCase()}`);
+      }
+      
+      console.log(`�🖨️ Printing via Bluetooth (${currentProtocol.toUpperCase()}):`, labelData.productName);
 
       // Generate appropriate command set based on protocol
       let data: string | Uint8Array;
       
-      if (this.protocol === 'zpl') {
+      if (currentProtocol === 'zpl') {
         data = this.generateZPL(labelData);
         console.log('✅ ZPL generated:', (data as string).substring(0, 100) + '...');
       } else {
