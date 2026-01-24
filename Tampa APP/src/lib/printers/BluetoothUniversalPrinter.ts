@@ -50,7 +50,9 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   private detectProtocol(deviceName: string): PrinterProtocol {
     const name = deviceName.toLowerCase();
     
-    // Zebra printers
+    console.log(`🔍 Detecting protocol for device: "${deviceName}"`);
+    
+    // Zebra printers (specific check)
     if (name.includes('zebra') || name.includes('zd') || name.includes('zt')) {
       console.log('🔵 Detected Zebra printer → Using ZPL protocol');
       return 'zpl';
@@ -66,15 +68,18 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
       name.includes('pos') ||
       name.includes('thermal') ||
       name.includes('rongta') ||
-      name.includes('hprt')
+      name.includes('hprt') ||
+      name.includes('mini') ||      // Mini printers
+      name.includes('_') ||         // MPT-II_309F has underscore
+      name.includes('309')          // MPT-II_309F has 309
     ) {
       console.log('🟢 Detected ESC/POS printer → Using ESC/POS protocol');
       return 'escpos';
     }
     
-    // Default to ZPL if unknown (ZPL is more forgiving)
-    console.log('⚠️ Unknown printer type → Defaulting to ZPL');
-    return 'zpl';
+    // Default to ESC/POS (more common than ZPL)
+    console.log('⚠️ Unknown printer type → Defaulting to ESC/POS (generic thermal)');
+    return 'escpos';
   }
 
   /**
