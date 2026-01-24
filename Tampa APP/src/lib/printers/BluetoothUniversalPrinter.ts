@@ -206,6 +206,7 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     
     console.log(`📊 QR Code data: ${qrJson}`);
     console.log(`📏 QR Code length: ${qrJson.length} characters`);
+    console.log(`🆕 BUILD VERSION: 2.0 - QR Code graphic disabled`); // Force cache bust
     
     // ========================================
     // TEMPORARILY DISABLED: QR Code graphic commands
