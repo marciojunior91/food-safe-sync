@@ -20,5 +20,28 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Mobile Debug Console (Eruda) - Ativa com ?debug=true -->
+    <script>
+      // Check if debug mode is enabled via URL parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const debugMode = urlParams.get('debug') === 'true';
+      
+      if (debugMode || localStorage.getItem('tampa_debug_mode') === 'true') {
+        // Load Eruda for mobile debugging
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+        script.onload = function() {
+          eruda.init();
+          console.log('🔧 Tampa APP Debug Mode Activated');
+          console.log('📱 Device:', navigator.userAgent);
+          console.log('🌐 Location:', window.location.href);
+        };
+        document.head.appendChild(script);
+        
+        // Persist debug mode
+        localStorage.setItem('tampa_debug_mode', 'true');
+      }
+    </script>
   </body>
 </html>
