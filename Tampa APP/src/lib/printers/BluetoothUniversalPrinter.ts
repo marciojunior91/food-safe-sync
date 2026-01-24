@@ -287,14 +287,11 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
       try {
         service = await server.getPrimaryService(ZEBRA_SERVICE_UUID);
         console.log('✅ Using Zebra service');
-        this.protocol = 'zpl'; // Force ZPL for Zebra service
+        // DO NOT override protocol here - trust the device name detection
       } catch {
         try {
           service = await server.getPrimaryService(SPP_SERVICE_UUID);
           console.log('✅ Using SPP service (Serial Port Profile)');
-          if (this.protocol === 'auto') {
-            this.protocol = 'escpos'; // Default to ESC/POS for SPP
-          }
         } catch {
           throw new Error('Could not find compatible Bluetooth service');
         }
