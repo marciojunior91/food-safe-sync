@@ -206,21 +206,16 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     
     console.log(`📊 QR Code data: ${qrJson}`);
     console.log(`📏 QR Code length: ${qrJson.length} characters`);
-    console.log(`🆕 BUILD VERSION: 3.0 - Testing multiple QR methods`); // Force cache bust
     
-    // ========================================
-    // METHOD 1: QR Code Model 1 (older, more compatible)
-    // ========================================
-    console.log('🔷 Attempting QR Code Method 1: GS ( k Model 1');
+    // ESC/POS QR Code commands (Model 2) - ORIGINAL WORKING VERSION
+    // Select QR code model
+    commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // GS ( k - Model 2
     
-    // Select QR code model 1
-    commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x31, 0x00); // GS ( k - Model 1 (was 0x32 for Model 2)
+    // Set QR code size (module size = 6)
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06); // GS ( k - Size 6
     
-    // Set QR code size (module size = 8, larger)
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x08); // GS ( k - Size 8 (was 6)
-    
-    // Set error correction level L (48 = lowest, most compatible)
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30); // GS ( k - Error correction L (was 0x31 for M)
+    // Set error correction level (M = 49)
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31); // GS ( k - Error correction M
     
     // Store QR code data
     const qrBytes = this.stringToBytes(qrJson);
@@ -228,7 +223,7 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     const pL = qrLength % 256;
     const pH = Math.floor(qrLength / 256);
     
-    console.log(`📦 Method 1: QR bytes length: ${qrBytes.length}, pL: ${pL}, pH: ${pH}`);
+    console.log(`📦 QR bytes length: ${qrBytes.length}, pL: ${pL}, pH: ${pH}`);
     
     commands.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30); // GS ( k - Store data
     commands.push(...qrBytes);
@@ -236,45 +231,10 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     // Print QR code
     commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30); // GS ( k - Print
     
-    console.log(`✅ QR Code Method 1 commands added`);
-    
-    // Add spacing
-    commands.push(0x0A, 0x0A);
-    
-    // ========================================
-    // METHOD 2: Alternative QR command (1D 6B for Chinese printers)
-    // ========================================
-    console.log('🔶 Attempting QR Code Method 2: Alternative command');
-    
-    // Some thermal printers use simplified QR command
-    // This is a fallback that might work
-    commands.push(0x1D, 0x6B, 0x51); // GS k Q - QR code type
-    commands.push(qrJson.length);     // Length
-    commands.push(...qrBytes);         // Data
-    
-    console.log(`✅ QR Code Method 2 commands added`);
-    
-    // Add spacing
-    commands.push(0x0A, 0x0A);
-    
-    // ========================================
-    // Print QR data as TEXT ONLY (for now)
-    // ========================================
-    commands.push(0x0A); // Line feed
-    commands.push(0x1B, 0x61, 0x01); // ESC a - Center align
-    commands.push(0x1B, 0x45, 0x01); // ESC E - Bold on
-    commands.push(...this.stringToBytes('[ QR DATA ]\n'));
-    commands.push(0x1B, 0x45, 0x00); // ESC E - Bold off
-    commands.push(...this.stringToBytes(qrJson + '\n'));
-    commands.push(0x1B, 0x61, 0x00); // ESC a - Left align
-    
-    console.log(`✅ QR Code TEXT commands added (total: ${commands.length} bytes)`);
+    console.log(`✅ QR Code commands added (ORIGINAL VERSION)`);
     
     // Add spacing after QR code
-    commands.push(0x0A, 0x0A, 0x0A); // Multiple line feeds
-    
-    // CRITICAL: Force print buffer flush
-    commands.push(0x0C); // FF - Form feed (eject page)
+    commands.push(0x0A, 0x0A); // Line feeds
     
     // Cut paper (if supported)
     commands.push(0x1D, 0x56, 0x00); // GS V - Full cut
