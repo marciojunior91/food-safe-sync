@@ -206,13 +206,56 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     
     console.log(`📊 QR Code data: ${qrJson}`);
     console.log(`📏 QR Code length: ${qrJson.length} characters`);
-    console.log(`🆕 BUILD VERSION: 2.0 - QR Code graphic disabled`); // Force cache bust
+    console.log(`🆕 BUILD VERSION: 3.0 - Testing multiple QR methods`); // Force cache bust
     
     // ========================================
-    // TEMPORARILY DISABLED: QR Code graphic commands
-    // Reason: MPT-II may not support GS ( k commands
+    // METHOD 1: QR Code Model 1 (older, more compatible)
     // ========================================
-    console.log('⚠️ QR Code graphic DISABLED for compatibility testing');
+    console.log('🔷 Attempting QR Code Method 1: GS ( k Model 1');
+    
+    // Select QR code model 1
+    commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x31, 0x00); // GS ( k - Model 1 (was 0x32 for Model 2)
+    
+    // Set QR code size (module size = 8, larger)
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x08); // GS ( k - Size 8 (was 6)
+    
+    // Set error correction level L (48 = lowest, most compatible)
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30); // GS ( k - Error correction L (was 0x31 for M)
+    
+    // Store QR code data
+    const qrBytes = this.stringToBytes(qrJson);
+    const qrLength = qrBytes.length + 3;
+    const pL = qrLength % 256;
+    const pH = Math.floor(qrLength / 256);
+    
+    console.log(`📦 Method 1: QR bytes length: ${qrBytes.length}, pL: ${pL}, pH: ${pH}`);
+    
+    commands.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30); // GS ( k - Store data
+    commands.push(...qrBytes);
+    
+    // Print QR code
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30); // GS ( k - Print
+    
+    console.log(`✅ QR Code Method 1 commands added`);
+    
+    // Add spacing
+    commands.push(0x0A, 0x0A);
+    
+    // ========================================
+    // METHOD 2: Alternative QR command (1D 6B for Chinese printers)
+    // ========================================
+    console.log('🔶 Attempting QR Code Method 2: Alternative command');
+    
+    // Some thermal printers use simplified QR command
+    // This is a fallback that might work
+    commands.push(0x1D, 0x6B, 0x51); // GS k Q - QR code type
+    commands.push(qrJson.length);     // Length
+    commands.push(...qrBytes);         // Data
+    
+    console.log(`✅ QR Code Method 2 commands added`);
+    
+    // Add spacing
+    commands.push(0x0A, 0x0A);
     
     // ========================================
     // Print QR data as TEXT ONLY (for now)
