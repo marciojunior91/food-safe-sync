@@ -292,11 +292,16 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
       try {
         service = await server.getPrimaryService(ZEBRA_SERVICE_UUID);
         console.log('✅ Using Zebra service');
-        // DO NOT override protocol here - trust the device name detection
+        // CRITICAL: MPT-II uses Zebra service BUT processes ESC/POS
+        // Keep protocol as detected by device name, don't force ZPL here
+        console.log(`📌 Zebra service found, but keeping detected protocol: ${this.protocol}`);
       } catch {
         try {
           service = await server.getPrimaryService(SPP_SERVICE_UUID);
           console.log('✅ Using SPP service (Serial Port Profile)');
+          if (this.protocol === 'auto') {
+            this.protocol = 'escpos'; // Default to ESC/POS for SPP
+          }
         } catch {
           throw new Error('Could not find compatible Bluetooth service');
         }
