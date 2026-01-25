@@ -192,20 +192,15 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     commands.push(0x0A); // Line feed
     
     // Generate QR Code data (JSON with label info)
-    // IMPORTANT: Only include fields that have values to prevent QR Code errors
-    const qrData: Record<string, string> = {
-      product: productName || 'Unknown',
-    };
+    const qrData = JSON.stringify({
+      product: productName,
+      prep: prepDate,
+      exp: expiryDate,
+      by: preparedByName,
+    });
     
-    // Add optional fields only if they exist
-    if (prepDate) qrData.prep = prepDate;
-    if (expiryDate) qrData.exp = expiryDate;
-    if (preparedByName) qrData.by = preparedByName;
-    
-    const qrJson = JSON.stringify(qrData);
-    
-    console.log(`📊 QR Code data: ${qrJson}`);
-    console.log(`📏 QR Code length: ${qrJson.length} characters`);
+    console.log(`📊 QR Code data: ${qrData}`);
+    console.log(`📏 QR Code length: ${qrData.length} characters`);
     
     // ESC/POS QR Code commands (Model 2) - ORIGINAL WORKING VERSION
     // Select QR code model
@@ -218,7 +213,7 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31); // GS ( k - Error correction M
     
     // Store QR code data
-    const qrBytes = this.stringToBytes(qrJson);
+    const qrBytes = this.stringToBytes(qrData);
     const qrLength = qrBytes.length + 3;
     const pL = qrLength % 256;
     const pH = Math.floor(qrLength / 256);
