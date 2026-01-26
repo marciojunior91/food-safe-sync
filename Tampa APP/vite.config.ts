@@ -40,9 +40,9 @@ export default defineConfig(({ mode }) => ({
                          Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
           return `assets/[name]-[hash]-${buildId}.[ext]`;
         },
-        // MANUAL CHUNKS - Split libraries to prevent circular dependencies
+        // MANUAL CHUNKS - DON'T split React to prevent initialization errors
         manualChunks: (id) => {
-          // Supabase client - MUST be in its own chunk to prevent circular deps
+          // Supabase client - separate chunk
           if (id.includes('@supabase/supabase-js')) {
             return 'supabase';
           }
@@ -58,14 +58,10 @@ export default defineConfig(({ mode }) => ({
             return 'dompurify';
           }
           
-          // React and core UI libraries
-          if (id.includes('node_modules/react') || 
-              id.includes('node_modules/react-dom') ||
-              id.includes('node_modules/react-router')) {
-            return 'react-vendor';
-          }
+          // DON'T separate React - keep in vendor to ensure proper load order
+          // This prevents "Cannot read properties of undefined (reading 'forwardRef')" error
           
-          // All other node_modules in vendor chunk
+          // All node_modules (including React) in vendor chunk
           if (id.includes('node_modules')) {
             return 'vendor';
           }
