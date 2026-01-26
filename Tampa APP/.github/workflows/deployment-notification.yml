@@ -1,0 +1,33 @@
+name: Deployment Notification
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Get commit info
+        id: commit
+        run: |
+          echo "message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+          echo "sha=$(git log -1 --pretty=%h)" >> $GITHUB_OUTPUT
+          
+      - name: Deployment info
+        run: |
+          echo "🚀 Deployment to Production"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "Commit: ${{ steps.commit.outputs.sha }}"
+          echo "Author: ${{ steps.commit.outputs.author }}"
+          echo "Message: ${{ steps.commit.outputs.message }}"
+          echo ""
+          echo "⚠️  Remember to monitor:"
+          echo "- Vercel deployment status"
+          echo "- Browser console for errors"
+          echo "- Critical user flows"
