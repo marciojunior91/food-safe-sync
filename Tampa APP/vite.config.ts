@@ -23,18 +23,22 @@ export default defineConfig(({ mode }) => ({
     // Force new bundle hash - AGGRESSIVE CACHE BUSTING
     rollupOptions: {
       output: {
-        // Use timestamp + hash to force unique filenames
+        // Use timestamp + random to force unique filenames every build
         entryFileNames: () => {
-          const timestamp = Date.now().toString(36);
-          return `assets/[name]-[hash]-${timestamp}.js`;
+          // Use build timestamp + random to ensure uniqueness in production
+          const buildId = process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 8) || 
+                         Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+          return `assets/[name]-[hash]-${buildId}.js`;
         },
         chunkFileNames: () => {
-          const timestamp = Date.now().toString(36);
-          return `assets/[name]-[hash]-${timestamp}.js`;
+          const buildId = process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 8) || 
+                         Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+          return `assets/[name]-[hash]-${buildId}.js`;
         },
         assetFileNames: () => {
-          const timestamp = Date.now().toString(36);
-          return `assets/[name]-[hash]-${timestamp}.[ext]`;
+          const buildId = process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 8) || 
+                         Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+          return `assets/[name]-[hash]-${buildId}.[ext]`;
         },
         // MANUAL CHUNKS - Split libraries to prevent circular dependencies
         manualChunks: (id) => {
