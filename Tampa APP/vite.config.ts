@@ -36,8 +36,13 @@ export default defineConfig(({ mode }) => ({
           const timestamp = Date.now().toString(36);
           return `assets/[name]-[hash]-${timestamp}.[ext]`;
         },
-        // MANUAL CHUNKS - Split heavy libraries into separate chunks
+        // MANUAL CHUNKS - Split libraries to prevent circular dependencies
         manualChunks: (id) => {
+          // Supabase client - MUST be in its own chunk to prevent circular deps
+          if (id.includes('@supabase/supabase-js')) {
+            return 'supabase';
+          }
+          
           // Heavy PDF/Canvas libraries - load only when needed
           if (id.includes('html2canvas')) {
             return 'html2canvas';
@@ -49,12 +54,14 @@ export default defineConfig(({ mode }) => ({
             return 'dompurify';
           }
           
-          // Supabase - separate chunk
-          if (id.includes('@supabase')) {
-            return 'supabase';
+          // React and core UI libraries
+          if (id.includes('node_modules/react') || 
+              id.includes('node_modules/react-dom') ||
+              id.includes('node_modules/react-router')) {
+            return 'react-vendor';
           }
           
-          // React ecosystem - keep together in vendor to avoid circular deps
+          // All other node_modules in vendor chunk
           if (id.includes('node_modules')) {
             return 'vendor';
           }

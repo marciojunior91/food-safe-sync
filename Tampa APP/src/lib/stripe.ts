@@ -12,6 +12,7 @@
  */
 
 import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { supabase } from '@/integrations/supabase/client';
 import { FEATURES } from './featureFlags';
 
 // =====================================================
@@ -158,7 +159,7 @@ export async function createCheckoutSession(params: CreateCheckoutSessionParams)
   try {
     // Get Supabase URL and auth token
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const { supabase } = await import('@/integrations/supabase/client');
+    // Use static import to avoid circular dependency issues
     const { data: { session } } = await supabase.auth.getSession();
     
     if (!session?.access_token) {
