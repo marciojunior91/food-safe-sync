@@ -8,18 +8,24 @@ import { BluetoothUniversalPrinter } from './BluetoothUniversalPrinter'; // NEW:
 
 export class PrinterFactory {
   static createPrinter(type: PrinterType, settings?: Partial<PrinterSettings>): PrinterDriver {
+    console.log(`🏭 PrinterFactory: Creating ${type} printer...`, settings);
+    
     switch (type) {
       case 'generic':
+        console.log('✅ PrinterFactory: Instantiating GenericPrinter');
         return new GenericPrinter(settings?.name || 'Browser Print', settings);
       
       case 'pdf':
+        console.log('✅ PrinterFactory: Instantiating PDFPrinter');
         return new PDFPrinter(settings?.name || 'PDF Export', settings);
       
       case 'zebra':
+        console.log('✅ PrinterFactory: Instantiating ZebraPrinter');
         return new ZebraPrinter(settings?.name || 'Zebra Thermal', settings);
       
       case 'bluetooth':
         // NEW: Universal Bluetooth support (Zebra, ESC/POS, etc.)
+        console.log('✅ PrinterFactory: Instantiating BluetoothUniversalPrinter');
         return new BluetoothUniversalPrinter(
           settings?.name || 'Bluetooth Printer', 
           settings,

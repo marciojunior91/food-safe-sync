@@ -8,8 +8,10 @@ interface LabelData {
   productName: string;
   categoryName?: string;
   subcategoryName?: string;
-  preparedDate: string;
-  useByDate: string;
+  preparedDate?: string; // Legacy field name
+  prepDate?: string;     // New field name
+  useByDate?: string;    // Legacy field name
+  expiryDate?: string;   // New field name
   allergens?: string[];
   storageInstructions?: string;
   barcode?: string;
@@ -72,7 +74,7 @@ export class ZebraPrinter implements PrinterDriver {
     return this.connected;
   }
 
-  async print(labelData: any, testMode: boolean = import.meta.env.VITE_PRINTER_TEST_MODE === 'true'): Promise<boolean> {
+  async print(labelData: any, testMode: boolean = false): Promise<boolean> {
     console.log('\n🖨️  ============================================');
     console.log('🖨️  ZEBRA PRINTER - PRINT REQUEST');
     console.log('🖨️  ============================================');
@@ -235,8 +237,8 @@ export class ZebraPrinter implements PrinterDriver {
       categoryName: labelData.categoryName || 'General',
       preparedBy,
       preparedByName,
-      prepDate: labelData.preparedDate,
-      expiryDate: labelData.useByDate,
+      prepDate: labelData.prepDate || labelData.preparedDate,
+      expiryDate: labelData.expiryDate || labelData.useByDate,
       condition,
       organizationId,
       quantity: labelData.quantity,

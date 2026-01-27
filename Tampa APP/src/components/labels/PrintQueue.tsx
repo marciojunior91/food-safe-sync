@@ -172,7 +172,7 @@ export function PrintQueue() {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
   const { toast } = useToast();
-  const { print } = usePrinter();
+  const { print } = usePrinter('labels-print-queue');
 
   const sensors = useSensors(
     useSensor(PointerSensor),

@@ -83,7 +83,8 @@ interface QuickPrintGridProps {
 
 export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrintGridProps) {
   const { user } = useAuth();
-  const { settings, availablePrinters, changePrinter } = usePrinter();
+  // Use isolated printer context for Quick Print
+  const { settings, availablePrinters, changePrinter } = usePrinter('quick-print');
   
   // View mode state
   const [printMode, setPrintMode] = useState<PrintMode>('categories');

@@ -44,7 +44,7 @@ interface PrintResult {
 
 export function usePrintQueue() {
   const { toast } = useToast();
-  const { printBatch, isLoading: isPrinterBusy } = usePrinter();
+  const { printBatch, isLoading: isPrinterBusy } = usePrinter('print-queue');
   const { isOpen, items, setItems, openQueue, closeQueue, toggleQueue } = usePrintQueueContext();
   const { organizationId } = useOrganizationId();
   

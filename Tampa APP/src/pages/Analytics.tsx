@@ -56,7 +56,7 @@ export default function Analytics() {
             <Download className="w-4 h-4 mr-2" />
             Export Reports
           </Button>
-          <Button variant="hero">
+          <Button variant="hero" className="text-white">
             <Eye className="w-4 h-4 mr-2" />
             Custom Report
           </Button>

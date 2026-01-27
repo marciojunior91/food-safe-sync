@@ -119,7 +119,7 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="hero">Generate Report</Button>
+          <Button variant="hero" className="text-white">Generate Report</Button>
         </div>
       </div>
 

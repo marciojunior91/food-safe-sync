@@ -35,7 +35,7 @@ interface RecipePrintDialogProps {
 
 export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: RecipePrintDialogProps) {
   const { toast } = useToast();
-  const { printer, print, availablePrinters, changePrinter } = usePrinter();
+  const { printer, print, availablePrinters, changePrinter } = usePrinter('recipe-print');
   
   const [loading, setLoading] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);

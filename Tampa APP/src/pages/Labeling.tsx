@@ -42,7 +42,7 @@ export default function Labeling() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
-  const { print, isLoading: isPrinting } = usePrinter();
+  const { print, isLoading: isPrinting } = usePrinter('labeling-quick-print');
   const { openQueue, totalLabels: queueTotalLabels, items: queueItems, printAll: printQueueAll } = usePrintQueue();
   const [organizationId, setOrganizationId] = useState<string>("");
 
@@ -401,7 +401,7 @@ export default function Labeling() {
   const handleSaveLabel = (data: LabelData) => {
     toast({
       title: "Label Saved",
-      description: "Your label has been saved as a draft.",
+      description: "Your label has been saved successfully.",
     });
     setCurrentView('overview');
   };

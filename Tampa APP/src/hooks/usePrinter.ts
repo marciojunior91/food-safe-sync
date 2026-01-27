@@ -4,63 +4,125 @@ import { PrinterDriver, PrinterType, PrinterSettings } from '@/types/printer';
 import { PrinterFactory } from '@/lib/printers/PrinterFactory';
 import { useToast } from '@/hooks/use-toast';
 
-const STORAGE_KEY = 'printer_settings';
+const DEFAULT_STORAGE_KEY = 'printer_settings';
 
-export function usePrinter() {
+// Custom event for printer settings changes
+const PRINTER_SETTINGS_CHANGED_EVENT = 'printer-settings-changed';
+
+interface PrinterSettingsChangedDetail {
+  storageKey: string;
+  settings: PrinterSettings;
+}
+
+/**
+ * usePrinter Hook
+ * 
+ * @param context - Optional context/namespace for isolated printer settings
+ *                  Examples: 'quick-print', 'print-queue', 'label-form'
+ *                  If not provided, uses global 'printer_settings'
+ */
+export function usePrinter(context?: string) {
+  const STORAGE_KEY = context ? `printer_settings_${context}` : DEFAULT_STORAGE_KEY;
   const { toast } = useToast();
   const [printer, setPrinter] = useState<PrinterDriver | null>(null);
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load settings from localStorage on mount
-  useEffect(() => {
-    const loadSettings = () => {
-      try {
-        // ✅ REMOVED PRODUCTION LOCK - Allow testing all printer methods
-        console.log('🖨️ Loading printer settings (all methods available)');
+  // Load settings from localStorage
+  const loadSettings = useCallback(() => {
+    try {
+      console.log(`🖨️ Loading printer settings for context: ${context || 'default'}`);
+      
+      // Load user preference from localStorage
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsedSettings = JSON.parse(stored) as PrinterSettings;
+        setSettings(parsedSettings);
         
-        // Load user preference from localStorage
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsedSettings = JSON.parse(stored) as PrinterSettings;
-          setSettings(parsedSettings);
-          
-          // Initialize printer with stored settings
-          const printerInstance = PrinterFactory.createPrinter(parsedSettings.type, parsedSettings);
-          setPrinter(printerInstance);
-        } else {
-          // Default to Zebra printer (recommended for production)
-          const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
-          setSettings(defaultSettings);
-          setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
-        }
-      } catch (error) {
-        console.error('Failed to load printer settings:', error);
-        toast({
-          title: 'Settings Error',
-          description: 'Failed to load printer settings. Using default Zebra printer.',
-          variant: 'destructive'
-        });
+        // Initialize printer with stored settings
+        const printerInstance = PrinterFactory.createPrinter(parsedSettings.type, parsedSettings);
+        setPrinter(printerInstance);
         
-        // Fallback to Zebra
+        console.log(`✅ Printer loaded: ${parsedSettings.type} for context: ${context || 'default'}`);
+      } else {
+        // Default to Zebra printer (recommended for production)
         const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
         setSettings(defaultSettings);
         setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
+        
+        console.log(`✅ Default Zebra printer loaded for context: ${context || 'default'}`);
+      }
+    } catch (error) {
+      console.error('Failed to load printer settings:', error);
+      toast({
+        title: 'Settings Error',
+        description: 'Failed to load printer settings. Using default Zebra printer.',
+        variant: 'destructive'
+      });
+      
+      // Fallback to Zebra
+      const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
+      setSettings(defaultSettings);
+      setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
+    }
+  }, [STORAGE_KEY, context, toast]);
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  // Listen for printer settings changes from other components
+  useEffect(() => {
+    const handleSettingsChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<PrinterSettingsChangedDetail>;
+      const { storageKey, settings: newSettings } = customEvent.detail;
+      
+      // Only reload if this is our storage key
+      if (storageKey === STORAGE_KEY) {
+        console.log(`🔄 Printer settings changed externally for context: ${context || 'default'}`);
+        setSettings(newSettings);
+        
+        // Create new printer instance with updated settings
+        const printerInstance = PrinterFactory.createPrinter(newSettings.type, newSettings);
+        setPrinter(printerInstance);
+        
+        console.log(`✅ Printer reloaded: ${newSettings.type} for context: ${context || 'default'}`);
       }
     };
 
-    loadSettings();
-  }, [toast]);
+    window.addEventListener(PRINTER_SETTINGS_CHANGED_EVENT, handleSettingsChanged);
+    
+    return () => {
+      window.removeEventListener(PRINTER_SETTINGS_CHANGED_EVENT, handleSettingsChanged);
+    };
+  }, [STORAGE_KEY, context]);
 
   // Save settings to localStorage
   const saveSettings = useCallback((newSettings: PrinterSettings) => {
     try {
+      console.log(`💾 Saving printer settings for context: ${context || 'default'}`, newSettings);
+      
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
       setSettings(newSettings);
       
       // Create new printer instance with updated settings
       const printerInstance = PrinterFactory.createPrinter(newSettings.type, newSettings);
       setPrinter(printerInstance);
+      
+      // Dispatch custom event to notify other components
+      const event = new CustomEvent<PrinterSettingsChangedDetail>(
+        PRINTER_SETTINGS_CHANGED_EVENT,
+        {
+          detail: {
+            storageKey: STORAGE_KEY,
+            settings: newSettings
+          }
+        }
+      );
+      window.dispatchEvent(event);
+      
+      console.log(`📢 Dispatched settings change event for context: ${context || 'default'}`);
       
       toast({
         title: 'Settings Saved',
@@ -74,16 +136,15 @@ export function usePrinter() {
         variant: 'destructive'
       });
     }
-  }, [toast]);
+  }, [STORAGE_KEY, context, toast]);
 
   // Change printer type
   const changePrinter = useCallback((type: PrinterType) => {
-    // ✅ REMOVED PRODUCTION LOCK - Allow switching printer methods for testing
-    console.log(`🖨️ Switching to ${type} printer`);
+    console.log(`� Switching to ${type} printer for context: ${context || 'default'}`);
     
     const newSettings = PrinterFactory.getDefaultSettings(type);
     saveSettings(newSettings);
-  }, [saveSettings]);
+  }, [context, saveSettings]);
 
   // Print single label
   const print = useCallback(async (labelData: any): Promise<boolean> => {
@@ -180,19 +241,8 @@ export function usePrinter() {
     }
   }, [printer, toast]);
 
-  // Update printer settings
-  const updateSettings = useCallback((newSettings: Partial<PrinterSettings>) => {
-    if (!settings) return;
-    
-    const updatedSettings = { ...settings, ...newSettings };
-    saveSettings(updatedSettings);
-  }, [settings, saveSettings]);
-
   // Get available printers
   const availablePrinters = PrinterFactory.getAvailablePrinters();
-  
-  // Check if in production mode
-  const isProduction = import.meta.env.PROD;
 
   return {
     printer,
@@ -201,9 +251,7 @@ export function usePrinter() {
     print,
     printBatch,
     changePrinter,
-    updateSettings,
     saveSettings,
     availablePrinters,
-    isProduction, // Expose to UI so it can hide printer selection in prod
   };
 }

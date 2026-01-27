@@ -168,7 +168,7 @@ export function QuickAddToQueueDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="button" variant="hero" onClick={handleAdd}>
+          <Button type="button" variant="hero" onClick={handleAdd} className="text-white">
             Add {quantity} Label{quantity > 1 ? 's' : ''} to Queue
           </Button>
         </DialogFooter>

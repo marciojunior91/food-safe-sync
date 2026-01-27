@@ -9,7 +9,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { TeamMember } from "@/types/teamMembers";
 import { 
   Printer, 
-  Save, 
   X, 
   Package,
   Check,
@@ -126,7 +125,8 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   const { toast } = useToast();
   const { updateProductAllergens, allergens: allAllergens } = useAllergens();
   const { user } = useAuth();
-  const { print, printer, settings, changePrinter, availablePrinters, isLoading: isPrinting } = usePrinter();
+  // Use isolated printer context for Label Form (main labeling)
+  const { print, printer, settings, changePrinter, availablePrinters, isLoading: isPrinting } = usePrinter('label-form');
   const { addToQueue } = usePrintQueue();
   
   // Organization ID fetched from user profile
@@ -172,11 +172,6 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   const [newProductCategory, setNewProductCategory] = useState("");
   const [newProductSubcategory, setNewProductSubcategory] = useState("");
   const [creatingProduct, setCreatingProduct] = useState(false);
-
-  // Draft saving states
-  const [showSaveDraftDialog, setShowSaveDraftDialog] = useState(false);
-  const [draftName, setDraftName] = useState("");
-  const [savingDraft, setSavingDraft] = useState(false);
   
   // Canvas preview states
   const [showCanvasPreview, setShowCanvasPreview] = useState(false);
@@ -711,50 +706,6 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
     setOpenProduct(false);
   };
 
-  const handleSaveDraft = async () => {
-    if (!draftName.trim()) {
-      toast({
-        title: "Invalid Name",
-        description: "Please enter a draft name",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    setSavingDraft(true);
-
-    try {
-      // user_id, created_at, updated_at são gerados automaticamente pelo banco
-      const { error } = await supabase
-        .from("label_drafts")
-        .insert({
-          draft_name: draftName.trim(),
-          form_data: labelData as any, // Cast to any to match Json type
-          user_id: (await supabase.auth.getUser()).data.user?.id || ''
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Draft Saved",
-        description: `Draft "${draftName}" has been saved successfully.`
-      });
-
-      setDraftName("");
-      setShowSaveDraftDialog(false);
-
-    } catch (error) {
-      console.error("Error saving draft:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save draft",
-        variant: "destructive"
-      });
-    } finally {
-      setSavingDraft(false);
-    }
-  };
-
   const handleSave = async () => {
     if (!labelData.productId || !labelData.condition) {
       toast({
@@ -888,10 +839,6 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setShowSaveDraftDialog(true)} variant="outline" className="flex items-center gap-2">
-            <Save className="w-4 h-4" />
-            Save Draft
-          </Button>
           <Button 
             onClick={handleAddToQueue} 
             variant="outline" 
@@ -901,7 +848,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
             <Plus className="w-4 h-4" />
             Add to Queue ({labelData.quantity || 1})
           </Button>
-          <Button onClick={handlePrint} disabled={isPrinting} variant="hero" className="flex items-center gap-2">
+          <Button onClick={handlePrint} disabled={isPrinting} variant="hero" className="flex items-center gap-2 text-white">
             <Printer className="w-4 h-4" />
             {isPrinting ? 'Printing...' : 'Print Now'}
           </Button>
@@ -1572,42 +1519,6 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
               disabled={creatingCategory || !newCategoryName.trim()}
             >
               {creatingCategory ? "Creating..." : "Create Category"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Save Draft Dialog */}
-      <AlertDialog open={showSaveDraftDialog} onOpenChange={setShowSaveDraftDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save Draft</AlertDialogTitle>
-            <AlertDialogDescription>
-              Give your draft a name to save your progress and continue later.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="my-4">
-            <Label htmlFor="draft-name">Draft Name *</Label>
-            <Input
-              id="draft-name"
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              placeholder="e.g., Chicken Breast Label"
-              className="mt-2"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !savingDraft && draftName.trim()) {
-                  handleSaveDraft();
-                }
-              }}
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={savingDraft}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleSaveDraft} 
-              disabled={savingDraft || !draftName.trim()}
-            >
-              {savingDraft ? "Saving..." : "Save Draft"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

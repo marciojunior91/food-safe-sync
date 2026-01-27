@@ -69,7 +69,7 @@ export default function DraftManagement() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [draftToDelete, setDraftToDelete] = useState<string | null>(null);
   const { toast } = useToast();
-  const { print, isLoading: isPrinting } = usePrinter();
+  const { print, isLoading: isPrinting } = usePrinter('draft-management');
 
   useEffect(() => {
     fetchDrafts();

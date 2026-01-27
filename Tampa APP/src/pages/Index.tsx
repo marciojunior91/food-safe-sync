@@ -63,7 +63,7 @@ const Index = () => {
               <TampaIcon className="w-12 h-12" />
               <h1 className="font-bold text-xl">Tampa APP</h1>
             </div>
-            <Button variant="hero" asChild>
+            <Button variant="hero" asChild className="text-white">
               <a href="/auth">
                 Enter Platform
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -88,7 +88,7 @@ const Index = () => {
               SaaS platform designed specifically for the food service industry.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button variant="hero" size="lg" asChild>
+              <Button variant="hero" size="lg" asChild className="text-white">
                 <a href="/auth">
                   Start Free Trial
                   <ArrowRight className="w-5 h-5 ml-2" />

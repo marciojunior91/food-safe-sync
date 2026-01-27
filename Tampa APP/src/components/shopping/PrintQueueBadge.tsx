@@ -29,6 +29,7 @@ export function PrintQueueBadge() {
         "fixed bottom-6 right-6 z-30",
         "rounded-full w-16 h-16 shadow-lg",
         "hover:scale-110 transition-all duration-200",
+        "text-white",
         pulse && "animate-pulse"
       )}
       variant="hero"

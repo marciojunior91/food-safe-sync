@@ -103,7 +103,7 @@ export default function Inventory() {
             <Download className="w-4 h-4 mr-2" />
             Export Data
           </Button>
-          <Button variant="hero" onClick={handleAddItemClick}>
+          <Button variant="hero" onClick={handleAddItemClick} className="text-white">
             <Plus className="w-4 h-4 mr-2" />
             Add Item
           </Button>

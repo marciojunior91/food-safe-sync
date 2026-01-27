@@ -11,8 +11,10 @@ interface IncomingLabelData {
   productName: string;
   categoryName?: string;
   subcategoryName?: string;
-  preparedDate: string;
-  useByDate: string;
+  preparedDate?: string; // Legacy field name
+  prepDate?: string;     // New field name
+  useByDate?: string;    // Legacy field name
+  expiryDate?: string;   // New field name
   allergens?: string[];
   storageInstructions?: string;
   barcode?: string;
@@ -233,8 +235,8 @@ export class PDFPrinter implements PrinterDriver {
       categoryName: labelData.categoryName || 'General',
       preparedBy,
       preparedByName,
-      prepDate: labelData.preparedDate,
-      expiryDate: labelData.useByDate,
+      prepDate: labelData.prepDate || labelData.preparedDate,
+      expiryDate: labelData.expiryDate || labelData.useByDate,
       condition,
       organizationId,
       // ❌ REMOVED: organizationDetails - No org data on labels

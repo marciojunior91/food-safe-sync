@@ -47,7 +47,8 @@ export function PrintQueue() {
     printAll
   } = usePrintQueue();
 
-  const { settings, availablePrinters, changePrinter } = usePrinter();
+  // Use isolated printer context for Print Queue
+  const { settings, availablePrinters, changePrinter } = usePrinter('print-queue');
   const { toast } = useToast();
 
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -373,7 +374,7 @@ export function PrintQueue() {
                   variant="hero"
                   onClick={handlePrintAll}
                   disabled={isPrinting}
-                  className="flex-1"
+                  className="flex-1 text-white"
                 >
                   <Printer className="w-4 h-4 mr-2" />
                   Print All ({totalLabels})
