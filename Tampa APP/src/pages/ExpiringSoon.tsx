@@ -11,11 +11,20 @@ import {
   FileText,
   ChefHat,
   MapPin,
-  Loader2
+  Loader2,
+  QrCode,
+  MoreHorizontal
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Card,
   CardContent,
@@ -44,10 +53,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays, addDays, parseISO } from "date-fns";
+import { useNavigate } from "react-router-dom";
+import { QRScanner } from "@/components/QRScanner";
 
 type ItemType = 'product' | 'label' | 'recipe';
 type UrgencyLevel = 'critical' | 'urgent' | 'warning' | 'normal';
 type ActionType = 'consume' | 'extend' | 'discard';
+type LabelStatus = 'active' | 'near_expiry' | 'expired' | 'wasted' | 'used';
 
 interface ExpiringItem {
   id: string;
@@ -59,6 +71,8 @@ interface ExpiringItem {
   unit?: string;
   urgency: UrgencyLevel;
   daysUntilExpiry: number;
+  status?: LabelStatus; // For labels
+  qrCode?: string; // For QR code scanning
 }
 
 interface ActionDialogData {
@@ -70,11 +84,15 @@ interface ActionDialogData {
 export default function ExpiringSoon() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Data state
   const [products, setProducts] = useState<any[]>([]);
   const [labels, setLabels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Multi-selection state
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,6 +109,9 @@ export default function ExpiringSoon() {
   const [actionReason, setActionReason] = useState("");
   const [newExpiryDate, setNewExpiryDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // QR Scanner state
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
 
   // Fetch data on mount
   useEffect(() => {
@@ -118,10 +139,10 @@ export default function ExpiringSoon() {
         .eq('organization_id', profile.organization_id)
         .not('expiry_date', 'is', null);
 
-      // Fetch labels  
+      // Fetch labels with status
       const { data: labelsData } = await supabase
         .from('printed_labels')
-        .select('*')
+        .select('*, status')
         .eq('organization_id', profile.organization_id)
         .not('expiry_date', 'is', null);
 
@@ -226,12 +247,21 @@ export default function ExpiringSoon() {
       }
     });
 
-    // Add labels
+    // Add labels with lifecycle status
     labels?.forEach(label => {
       if (label.expiry_date) {
         const expiryDate = parseISO(label.expiry_date);
         if (expiryDate <= sevenDaysFromNow) {
           const daysUntil = differenceInDays(expiryDate, now);
+          
+          // Determine label status based on expiry and current status
+          let labelStatus: LabelStatus = label.status || 'active';
+          if (daysUntil <= 0 && labelStatus === 'active') {
+            labelStatus = 'expired';
+          } else if (daysUntil <= 1 && labelStatus === 'active') {
+            labelStatus = 'near_expiry';
+          }
+          
           items.push({
             id: label.id,
             name: label.product_name,
@@ -240,6 +270,8 @@ export default function ExpiringSoon() {
             location: label.storage_location,
             urgency: calculateUrgency(daysUntil),
             daysUntilExpiry: daysUntil,
+            status: labelStatus,
+            qrCode: `label-${label.id}`, // Generate QR code identifier
           });
         }
       }
@@ -305,14 +337,111 @@ export default function ExpiringSoon() {
     }
   };
 
+  // Multi-selection handlers
+  const toggleSelectItem = (itemId: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedItems(new Set(filteredItems.map(item => `${item.type}-${item.id}`)));
+  };
+
+  const clearSelection = () => {
+    setSelectedItems(new Set());
+  };
+
+  // Bulk actions
+  const handleBulkAction = async (action: ActionType) => {
+    if (selectedItems.size === 0) return;
+    
+    try {
+      // Group by type for different update strategies
+      const labelIds = Array.from(selectedItems)
+        .filter(id => id.startsWith('label-'))
+        .map(id => id.replace('label-', ''));
+
+      if (labelIds.length > 0) {
+        let updateData: any = {};
+        
+        switch (action) {
+          case 'consume':
+            updateData = { status: 'used' };
+            break;
+          case 'discard':
+            updateData = { status: 'wasted' };
+            break;
+          // extend would require individual handling
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error } = await supabase
+            .from('printed_labels')
+            .update(updateData)
+            .in('id', labelIds);
+
+          if (error) throw error;
+        }
+      }
+
+      toast({
+        title: "Bulk Action Completed",
+        description: `${action} applied to ${selectedItems.size} items`,
+      });
+
+      clearSelection();
+      fetchData(); // Refresh data
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to complete bulk action",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Submit action
   const handleSubmitAction = async () => {
     if (!actionDialog.item || !actionDialog.action) return;
 
     setIsSubmitting(true);
     try {
-      // TODO: Implement actual database updates
-      // For now, just show success message
+      const item = actionDialog.item;
+      
+      // Handle label lifecycle updates
+      if (item.type === 'label') {
+        let updateData: any = {};
+        
+        switch (actionDialog.action) {
+          case 'consume':
+            updateData = { status: 'used' };
+            break;
+          case 'discard':
+            updateData = { status: 'wasted' };
+            break;
+          case 'extend':
+            if (newExpiryDate) {
+              updateData = { expiry_date: newExpiryDate };
+            }
+            break;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error } = await supabase
+            .from('printed_labels')
+            .update(updateData)
+            .eq('id', item.id);
+
+          if (error) throw error;
+        }
+      }
       
       const actionMessages = {
         consume: `Marked "${actionDialog.item.name}" as consumed`,
@@ -326,6 +455,7 @@ export default function ExpiringSoon() {
       });
 
       setActionDialog({ open: false, action: null, item: null });
+      fetchData(); // Refresh data to show updated status
     } catch (error) {
       toast({
         title: "Error",
@@ -335,6 +465,29 @@ export default function ExpiringSoon() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // QR Code handling
+  const handleQRScan = (qrData: string) => {
+    // Extract label ID from QR code
+    if (qrData.startsWith('label-')) {
+      const labelId = qrData.replace('label-', '');
+      // Navigate directly to the QR Label Action page
+      navigate(`/qr-label-action/${labelId}`);
+    } else {
+      // Try to use as direct label ID
+      navigate(`/qr-label-action/${qrData}`);
+    }
+  };
+
+  // Navigate to QR Label Action page
+  const handleOpenQRPage = (labelId: string) => {
+    navigate(`/qr-label-action/${labelId}`);
+  };
+
+  // Open QR Scanner (for future implementation with camera)
+  const handleOpenQRScanner = () => {
+    setQrScannerOpen(true);
   };
 
   // Get item icon
@@ -490,6 +643,49 @@ export default function ExpiringSoon() {
         </CardContent>
       </Card>
 
+          {/* Bulk Actions and QR Scanner */}
+          <div className="flex flex-wrap gap-2 items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              {selectedItems.size > 0 && (
+                <>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedItems.size} selected
+                  </span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <MoreHorizontal className="w-4 h-4 mr-2" />
+                        Bulk Actions
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleBulkAction('consume')}>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Mark as Consumed
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkAction('discard')}>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Mark as Discarded
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button variant="outline" size="sm" onClick={clearSelection}>
+                    Clear Selection
+                  </Button>
+                </>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={selectAllVisible}>
+                Select All
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleOpenQRScanner}>
+                <QrCode className="w-4 h-4 mr-2" />
+                QR Scanner
+              </Button>
+            </div>
+          </div>
+
       {/* Items List */}
       <div className="space-y-3">
         {filteredItems.length === 0 ? (
@@ -509,10 +705,20 @@ export default function ExpiringSoon() {
         ) : (
           filteredItems.map(item => {
             const colors = getUrgencyColor(item.urgency);
+            const itemKey = `${item.type}-${item.id}`;
+            const isSelected = selectedItems.has(itemKey);
+            
             return (
-              <Card key={`${item.type}-${item.id}`} className={`${colors.bg} ${colors.border}`}>
+              <Card key={itemKey} className={`${colors.bg} ${colors.border} ${isSelected ? 'ring-2 ring-primary' : ''}`}>
                 <CardContent className="pt-6">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4">
+                    {/* Checkbox for multi-selection */}
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleSelectItem(itemKey)}
+                      className="mt-1"
+                    />
+                    
                     {/* Left: Item Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-2">
@@ -525,6 +731,16 @@ export default function ExpiringSoon() {
                             <Badge variant="outline" className="capitalize">
                               {item.type}
                             </Badge>
+                            {item.status && item.type === 'label' && (
+                              <Badge variant={
+                                item.status === 'used' ? 'default' :
+                                item.status === 'wasted' ? 'destructive' :
+                                item.status === 'expired' ? 'destructive' :
+                                item.status === 'near_expiry' ? 'secondary' : 'outline'
+                              }>
+                                {item.status.replace('_', ' ')}
+                              </Badge>
+                            )}
                             {item.location && (
                               <span className="flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
@@ -534,6 +750,12 @@ export default function ExpiringSoon() {
                             {item.quantity && (
                               <span>
                                 {item.quantity} {item.unit}
+                              </span>
+                            )}
+                            {item.qrCode && (
+                              <span className="flex items-center gap-1 text-xs">
+                                <QrCode className="w-3 h-3" />
+                                {item.qrCode}
                               </span>
                             )}
                           </div>
@@ -559,6 +781,7 @@ export default function ExpiringSoon() {
                         variant="outline"
                         onClick={() => handleAction('consume', item)}
                         className="gap-2"
+                        disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
                       >
                         <CheckCircle2 className="w-4 h-4" />
                         <span className="hidden sm:inline">Consumed</span>
@@ -568,6 +791,7 @@ export default function ExpiringSoon() {
                         variant="outline"
                         onClick={() => handleAction('extend', item)}
                         className="gap-2"
+                        disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
                       >
                         <CalendarClock className="w-4 h-4" />
                         <span className="hidden sm:inline">Extend</span>
@@ -577,6 +801,7 @@ export default function ExpiringSoon() {
                         variant="outline"
                         onClick={() => handleAction('discard', item)}
                         className="gap-2 text-destructive hover:text-destructive"
+                        disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
                       >
                         <Trash2 className="w-4 h-4" />
                         <span className="hidden sm:inline">Discard</span>
@@ -672,6 +897,13 @@ export default function ExpiringSoon() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* QR Scanner Dialog */}
+      <QRScanner
+        open={qrScannerOpen}
+        onClose={() => setQrScannerOpen(false)}
+        onScan={handleQRScan}
+      />
         </>
       )}
     </div>

@@ -24,6 +24,7 @@ export interface LabelPrintData {
   productName: string;
   categoryId: string | null;
   categoryName: string;
+  subcategoryId?: string | null; // UUID for subcategory
   preparedBy: string;
   preparedByName: string;
   prepDate: string;
@@ -204,9 +205,17 @@ export const saveLabelToDatabase = async (data: LabelPrintData): Promise<string 
     // Format allergens as array of names for storage
     const allergenNames = data.allergens?.map(a => a.name) || [];
     
+    // Validate required FK fields
+    if (!data.productId || data.productId.trim() === '') {
+      console.warn('product_id is required for printed_labels but was empty');
+      // For now, we'll allow it to maintain backwards compatibility
+      // TODO: Make this a hard requirement after data cleanup
+    }
+    
     // Handle product_id - convert empty string to null for UUID field
     const productId = data.productId && data.productId.trim() !== '' ? data.productId : null;
     const categoryId = data.categoryId && data.categoryId.trim() !== '' ? data.categoryId : null;
+    const subcategoryId = data.subcategoryId && data.subcategoryId.trim() !== '' ? data.subcategoryId : null;
     
     const { data: insertedData, error } = await supabase
       .from("printed_labels")
@@ -215,6 +224,7 @@ export const saveLabelToDatabase = async (data: LabelPrintData): Promise<string 
         product_name: data.productName,
         category_id: categoryId,
         category_name: data.categoryName,
+        subcategory_id: subcategoryId, // Now included!
         prepared_by: data.preparedBy,
         prepared_by_name: data.preparedByName,
         prep_date: data.prepDate,

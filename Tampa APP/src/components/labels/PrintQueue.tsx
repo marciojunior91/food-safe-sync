@@ -563,7 +563,7 @@ export function PrintQueue() {
       <UserSelectionDialog
         open={userDialogOpen}
         onOpenChange={setUserDialogOpen}
-        onUserSelected={handleUserSelected}
+        onSelectUser={handleUserSelected}
       />
     </div>
   );

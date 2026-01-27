@@ -4,26 +4,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-interface PreparedItem {
+import { useAuth } from '@/hooks/useAuth';
+
+interface PrintedLabel {
   id: string;
-  recipe_id: string;
-  prepared_at: string;
-  expires_at: string;
-  prepared_by: string;
-  recipes?: {
-    name: string;
-    allergens: string[];
-  };
+  product_name: string;
+  prep_date: string;
+  expiry_date: string;
+  prepared_by_name: string | null;
+  allergens: string[] | null;
 }
+
 interface ExpiryStatus {
   status: 'expired' | 'warning' | 'good';
   hoursUntilExpiry: number;
   message: string;
 }
-const getExpiryStatus = (expiresAt: string): ExpiryStatus => {
+
+const getExpiryStatus = (expiryDate: string): ExpiryStatus => {
   const now = new Date();
-  const expiryDate = new Date(expiresAt);
-  const hoursUntilExpiry = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60));
+  const expiry = new Date(expiryDate);
+  const hoursUntilExpiry = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60));
+
   if (hoursUntilExpiry < 0) {
     return {
       status: 'expired',
@@ -50,6 +52,7 @@ const getExpiryStatus = (expiresAt: string): ExpiryStatus => {
     };
   }
 };
+
 const getStatusIcon = (status: ExpiryStatus['status']) => {
   switch (status) {
     case 'expired':
@@ -60,6 +63,7 @@ const getStatusIcon = (status: ExpiryStatus['status']) => {
       return <CheckCircle className="w-4 h-4 text-success" />;
   }
 };
+
 const getStatusBadgeVariant = (status: ExpiryStatus['status']) => {
   switch (status) {
     case 'expired':
@@ -72,62 +76,77 @@ const getStatusBadgeVariant = (status: ExpiryStatus['status']) => {
       return 'outline';
   }
 };
+
 export default function ExpiryAlerts() {
-  const [preparedItems, setPreparedItems] = useState<PreparedItem[]>([]);
+  const [labels, setLabels] = useState<PrintedLabel[]>([]);
   const [loading, setLoading] = useState(true);
-  const {
-    toast
-  } = useToast();
-  const fetchPreparedItems = async () => {
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  const fetchLabels = async () => {
     try {
-      const {
-        data,
-        error
-      } = await supabase.from('prepared_items').select(`
-          *,
-          recipes (
-            name,
-            allergens
-          )
-        `).order('expires_at', {
-        ascending: true
-      });
-      if (error) {
-        console.error('Error fetching prepared items:', error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch prepared items",
-          variant: "destructive"
-        });
+      if (!user) {
+        setLoading(false);
         return;
       }
-      setPreparedItems(data || []);
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!profile?.organization_id) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('printed_labels')
+        .select('id, product_name, prep_date, expiry_date, prepared_by_name, allergens')
+        .eq('organization_id', profile.organization_id)
+        .order('expiry_date', { ascending: true })
+        .limit(10);
+
+      if (error) {
+        console.error('Error fetching labels:', error);
+        setLoading(false);
+        return;
+      }
+
+      setLabels(data || []);
     } catch (error) {
       console.error('Error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch prepared items",
-        variant: "destructive"
-      });
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
-    fetchPreparedItems();
-  }, []);
-  const filteredItems = preparedItems.filter(item => {
-    const status = getExpiryStatus(item.expires_at);
-    return status.hoursUntilExpiry <= 72; // Show items expiring within 3 days
+    fetchLabels();
+  }, [user]);
+
+  const filteredLabels = labels.filter(label => {
+    const status = getExpiryStatus(label.expiry_date);
+    return status.hoursUntilExpiry <= 72;
   });
-  const expiredCount = filteredItems.filter(item => getExpiryStatus(item.expires_at).status === 'expired').length;
-  const warningCount = filteredItems.filter(item => getExpiryStatus(item.expires_at).status === 'warning').length;
-  const soonCount = filteredItems.filter(item => {
-    const status = getExpiryStatus(item.expires_at);
+
+  const expiredCount = filteredLabels.filter(label => 
+    getExpiryStatus(label.expiry_date).status === 'expired'
+  ).length;
+  
+  const warningCount = filteredLabels.filter(label => 
+    getExpiryStatus(label.expiry_date).status === 'warning'
+  ).length;
+  
+  const soonCount = filteredLabels.filter(label => {
+    const status = getExpiryStatus(label.expiry_date);
     return status.status === 'good' && status.hoursUntilExpiry <= 72;
   }).length;
+
   if (loading) {
-    return <Card>
+    return (
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
@@ -139,7 +158,80 @@ export default function ExpiryAlerts() {
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
         </CardContent>
-      </Card>;
+      </Card>
+    );
   }
-  return;
+
+  if (filteredLabels.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-success" />
+            Expiry Alerts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground text-center py-4">
+            All items are fresh! No expiry alerts at this time.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Expiry Alerts
+          </span>
+          <div className="flex gap-2 text-sm font-normal">
+            {expiredCount > 0 && (
+              <Badge variant="destructive">{expiredCount} Expired</Badge>
+            )}
+            {warningCount > 0 && (
+              <Badge variant="secondary">{warningCount} Urgent</Badge>
+            )}
+            {soonCount > 0 && (
+              <Badge variant="outline">{soonCount} Soon</Badge>
+            )}
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {filteredLabels.map((label) => {
+            const status = getExpiryStatus(label.expiry_date);
+            return (
+              <div
+                key={label.id}
+                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-start gap-3 flex-1">
+                  {getStatusIcon(status.status)}
+                  <div className="flex-1">
+                    <h4 className="font-medium">{label.product_name}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {status.message}
+                    </p>
+                    {label.prepared_by_name && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Prepared by {label.prepared_by_name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <Badge variant={getStatusBadgeVariant(status.status) as any}>
+                  {status.status}
+                </Badge>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }

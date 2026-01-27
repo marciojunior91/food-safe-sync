@@ -264,7 +264,7 @@ export function PrinterManagementPanel({
       <Tabs defaultValue="printers" className="w-full">
         <TabsList>
           <TabsTrigger value="printers">Printers ({printers.length})</TabsTrigger>
-          <TabsTrigger value="statistics">Estatísticas</TabsTrigger>
+          <TabsTrigger value="statistics">Statistics</TabsTrigger>
         </TabsList>
 
         {/* Printers List */}

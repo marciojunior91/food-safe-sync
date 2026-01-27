@@ -1161,8 +1161,10 @@ export type Database = {
           product_id: string | null
           product_name: string
           quantity: string | null
+          status: string | null
           subcategory_id: string | null
           unit: string | null
+          updated_at: string | null
         }
         Insert: {
           allergens?: string[] | null
@@ -1179,8 +1181,10 @@ export type Database = {
           product_id?: string | null
           product_name: string
           quantity?: string | null
+          status?: string | null
           subcategory_id?: string | null
           unit?: string | null
+          updated_at?: string | null
         }
         Update: {
           allergens?: string[] | null
@@ -1197,8 +1201,10 @@ export type Database = {
           product_id?: string | null
           product_name?: string
           quantity?: string | null
+          status?: string | null
           subcategory_id?: string | null
           unit?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -2948,6 +2954,132 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      training_courses: {
+        Row: {
+          category: string | null
+          certificate_template: string | null
+          content: Json | null
+          created_at: string
+          created_by: string
+          description: string | null
+          difficulty: string | null
+          duration_minutes: number | null
+          id: string
+          is_published: boolean
+          is_required: boolean
+          organization_id: string | null
+          passing_score: number | null
+          renewal_months: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string | null
+          certificate_template?: string | null
+          content?: Json | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          difficulty?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_published?: boolean
+          is_required?: boolean
+          organization_id?: string | null
+          passing_score?: number | null
+          renewal_months?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string | null
+          certificate_template?: string | null
+          content?: Json | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          difficulty?: string | null
+          duration_minutes?: number | null
+          id?: string
+          is_published?: boolean
+          is_required?: boolean
+          organization_id?: string | null
+          passing_score?: number | null
+          renewal_months?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_courses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_courses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_enrollments: {
+        Row: {
+          certificate_url: string | null
+          completed_at: string | null
+          course_id: string
+          enrolled_at: string
+          expires_at: string | null
+          id: string
+          last_activity: string | null
+          progress: number
+          score: number | null
+          user_id: string
+        }
+        Insert: {
+          certificate_url?: string | null
+          completed_at?: string | null
+          course_id: string
+          enrolled_at?: string
+          expires_at?: string | null
+          id?: string
+          last_activity?: string | null
+          progress?: number
+          score?: number | null
+          user_id: string
+        }
+        Update: {
+          certificate_url?: string | null
+          completed_at?: string | null
+          course_id?: string
+          enrolled_at?: string
+          expires_at?: string | null
+          id?: string
+          last_activity?: string | null
+          progress?: number
+          score?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_enrollments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "training_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_enrollments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

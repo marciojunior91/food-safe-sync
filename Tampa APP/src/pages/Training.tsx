@@ -1,287 +1,401 @@
-import { useState, useEffect, useMemo } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { GraduationCap, Users } from "lucide-react";
-import TrainingStats from "@/components/training/TrainingStats";
-import TrainingCourseCard from "@/components/training/TrainingCourseCard";
-import TrainingFilters, { TrainingFilter } from "@/components/training/TrainingFilters";
-import { 
-  TrainingCourse, 
-  TrainingEnrollment, 
-  TrainingCategory, 
-  TrainingDifficulty,
-  TeamTrainingStats,
-  getExpiryStatus,
-  isCourseExpiringSoon
-} from "@/types/training";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Trophy, BookOpen, Clock, Users, CheckCircle, Star, Play, Award, Calendar } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface Course {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  difficulty: string;
+  duration_minutes: number;
+  is_required: boolean;
+  passing_score: number;
+}
+
+interface Enrollment {
+  id: string;
+  progress: number;
+  score: number | null;
+  completed_at: string | null;
+  course_id: string;
+  course: Course;
+}
 
 export default function Training() {
-  // State
-  const [courses, setCourses] = useState<TrainingCourse[]>([]);
-  const [enrollments, setEnrollments] = useState<Map<string, TrainingEnrollment>>(new Map());
+  const [activeTab, setActiveTab] = useState("courses");
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'courses' | 'team'>('courses');
-  
-  // Filters
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<TrainingFilter>('all');
-  const [categoryFilter, setCategoryFilter] = useState<TrainingCategory | 'all'>('all');
-  const [difficultyFilter, setDifficultyFilter] = useState<TrainingDifficulty | 'all'>('all');
-  
-  const { toast } = useToast();
 
-  // Fetch data
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      setLoading(true);
 
-      const [coursesRes, enrollmentsRes] = await Promise.all([
-        supabase
-          .from("training_courses")
-          .select("*")
-          .eq("is_published", true)
-          .order("title"),
-        supabase
-          .from("training_enrollments")
-          .select("*")
-          .eq("user_id", user.id)
-      ]);
+      // Fetch available courses
+      const { data: coursesData, error: coursesError } = await supabase
+        .from('training_courses')
+        .select('*')
+        .eq('is_published', true)
+        .order('title');
 
-      if (coursesRes.error) throw coursesRes.error;
-      if (enrollmentsRes.error) throw enrollmentsRes.error;
+      if (coursesError) throw coursesError;
 
-      setCourses(coursesRes.data || []);
-      
-      const enrollmentMap = new Map();
-      (enrollmentsRes.data || []).forEach((enrollment) => {
-        enrollmentMap.set(enrollment.course_id, enrollment);
-      });
-      setEnrollments(enrollmentMap);
+      // Fetch user enrollments with course details
+      const { data: enrollmentsData, error: enrollmentsError } = await supabase
+        .from('training_enrollments')
+        .select(`
+          *,
+          course:training_courses(*)
+        `)
+        .order('enrolled_at', { ascending: false });
+
+      if (enrollmentsError) throw enrollmentsError;
+
+      setCourses(coursesData || []);
+      setEnrollments(enrollmentsData || []);
     } catch (error) {
-      console.error("Error fetching data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load training courses",
-        variant: "destructive",
-      });
+      console.error('Error fetching training data:', error);
+      toast.error('Failed to load training data');
     } finally {
       setLoading(false);
     }
   };
 
-  // Actions
   const enrollInCourse = async (courseId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
       const { error } = await supabase
-        .from("training_enrollments")
-        .insert({
+        .from('training_enrollments')
+        .insert([{ 
           course_id: courseId,
-          user_id: user.id,
-        });
+          user_id: (await supabase.auth.getUser()).data.user?.id || ''
+        }]);
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Enrolled in course successfully",
-      });
-
+      toast.success('Successfully enrolled in course');
       fetchData();
     } catch (error) {
-      console.error("Error enrolling:", error);
-      toast({
-        title: "Error",
-        description: "Failed to enroll in course",
-        variant: "destructive",
-      });
+      console.error('Error enrolling in course:', error);
+      toast.error('Failed to enroll in course');
     }
   };
 
-  const continueCourse = (courseId: string) => {
-    // TODO: Navigate to course detail page
-    toast({
-      title: "Coming Soon",
-      description: "Course viewer will be implemented in next phase",
-    });
-  };
-
-  const viewCertificate = (enrollment: TrainingEnrollment) => {
-    if (enrollment.certificate_url) {
-      window.open(enrollment.certificate_url, '_blank');
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'beginner': return 'bg-green-100 text-green-800';
+      case 'intermediate': return 'bg-yellow-100 text-yellow-800';
+      case 'advanced': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // Filtered courses
-  const filteredCourses = useMemo(() => {
-    return courses.filter(course => {
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesTitle = course.title.toLowerCase().includes(query);
-        const matchesDescription = course.description?.toLowerCase().includes(query);
-        if (!matchesTitle && !matchesDescription) return false;
-      }
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'food_safety': return '🛡️';
+      case 'haccp': return '🔬';
+      case 'allergen_awareness': return '⚠️';
+      case 'temperature_control': return '🌡️';
+      case 'cleaning_procedures': return '🧽';
+      case 'personal_hygiene': return '🧼';
+      default: return '📚';
+    }
+  };
 
-      // Status filter
-      const enrollment = enrollments.get(course.id);
-      switch (statusFilter) {
-        case 'required':
-          if (!course.is_required) return false;
-          break;
-        case 'enrolled':
-          if (!enrollment) return false;
-          break;
-        case 'completed':
-          if (!enrollment?.completed_at) return false;
-          break;
-        case 'expiring':
-          if (!isCourseExpiringSoon(enrollment)) return false;
-          break;
-      }
+  const completedCourses = enrollments.filter(e => e.completed_at);
+  const inProgressCourses = enrollments.filter(e => !e.completed_at && e.progress > 0);
+  const totalEnrolled = enrollments.length;
+  const averageScore = completedCourses.length > 0 
+    ? Math.round(completedCourses.reduce((sum, e) => sum + (e.score || 0), 0) / completedCourses.length)
+    : 0;
 
-      // Category filter
-      if (categoryFilter !== 'all' && course.category !== categoryFilter) {
-        return false;
-      }
-
-      // Difficulty filter
-      if (difficultyFilter !== 'all' && course.difficulty !== difficultyFilter) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [courses, enrollments, searchQuery, statusFilter, categoryFilter, difficultyFilter]);
-
-  // Stats calculation
-  const stats = useMemo((): TeamTrainingStats => {
-    const totalCourses = courses.length;
-    const requiredCourses = courses.filter(c => c.is_required).length;
-    const enrolledCourses = Array.from(enrollments.values());
-    
-    const completedCount = enrolledCourses.filter(e => e.completed_at).length;
-    const inProgressCount = enrolledCourses.filter(e => !e.completed_at && e.progress > 0).length;
-    const notStartedCount = enrolledCourses.filter(e => e.progress === 0).length;
-    
-    const averageCompletion = enrolledCourses.length > 0
-      ? enrolledCourses.reduce((sum, e) => sum + e.progress, 0) / enrolledCourses.length
-      : 0;
-    
-    const expiringSoon = enrolledCourses.filter(e => 
-      isCourseExpiringSoon(e)
-    ).length;
-
-    return {
-      total_members: 1, // Current user only
-      total_courses: totalCourses,
-      required_courses: requiredCourses,
-      completed_count: completedCount,
-      in_progress_count: inProgressCount,
-      not_started_count: notStartedCount,
-      average_completion: averageCompletion,
-      expiring_soon: expiringSoon
-    };
-  }, [courses, enrollments]);
-
-  // Render
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-4">
-          <GraduationCap className="h-12 w-12 animate-pulse mx-auto text-primary" />
-          <p className="text-muted-foreground">Loading training courses...</p>
-        </div>
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <GraduationCap className="h-8 w-8" />
-            Training Center
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Enhance your skills with our training programs
+          <h1 className="text-3xl font-bold tracking-tight">Training Center</h1>
+          <p className="text-muted-foreground">
+            Comprehensive training and certification management
           </p>
         </div>
       </div>
 
-      {/* Stats */}
-      <TrainingStats stats={stats} loading={loading} />
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <BookOpen className="h-8 w-8 text-blue-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Enrolled</p>
+                <p className="text-2xl font-bold">{totalEnrolled}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold">{completedCourses.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Clock className="h-8 w-8 text-orange-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">In Progress</p>
+                <p className="text-2xl font-bold">{inProgressCourses.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Star className="h-8 w-8 text-yellow-600" />
+              <div>
+                <p className="text-sm text-muted-foreground">Avg Score</p>
+                <p className="text-2xl font-bold">{averageScore}%</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'courses' | 'team')}>
-        <TabsList>
-          <TabsTrigger value="courses" className="gap-2">
-            <GraduationCap className="h-4 w-4" />
-            My Courses
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="courses" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Courses
           </TabsTrigger>
-          <TabsTrigger value="team" className="gap-2" disabled>
+          <TabsTrigger value="progress" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            My Progress
+          </TabsTrigger>
+          <TabsTrigger value="achievements" className="flex items-center gap-2">
+            <Trophy className="h-4 w-4" />
+            Achievements
+          </TabsTrigger>
+          <TabsTrigger value="manage" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            Team Progress (Coming Soon)
+            Manage
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="courses" className="space-y-6 mt-6">
-          {/* Filters */}
-          <TrainingFilters
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            categoryFilter={categoryFilter}
-            onCategoryFilterChange={setCategoryFilter}
-            difficultyFilter={difficultyFilter}
-            onDifficultyFilterChange={setDifficultyFilter}
-            resultCount={filteredCourses.length}
-          />
+        <TabsContent value="courses" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {courses.map((course) => {
+              const enrollment = enrollments.find(e => e.course_id === course.id);
+              const isEnrolled = !!enrollment;
+              const isCompleted = enrollment?.completed_at;
 
-          {/* Course Grid */}
-          {filteredCourses.length === 0 ? (
-            <div className="text-center py-12">
-              <GraduationCap className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No courses found</h3>
-              <p className="text-muted-foreground">
-                {searchQuery || statusFilter !== 'all' || categoryFilter !== 'all' || difficultyFilter !== 'all'
-                  ? "Try adjusting your filters"
-                  : "No training courses are available yet"}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCourses.map((course) => (
-                <TrainingCourseCard
-                  key={course.id}
-                  course={course}
-                  enrollment={enrollments.get(course.id)}
-                  onEnroll={enrollInCourse}
-                  onContinue={continueCourse}
-                  onViewCertificate={viewCertificate}
-                />
-              ))}
-            </div>
-          )}
+              return (
+                <Card key={course.id} className="relative">
+                  {course.is_required && (
+                    <Badge className="absolute top-2 right-2 bg-red-100 text-red-800">
+                      Required
+                    </Badge>
+                  )}
+                  
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">{getCategoryIcon(course.category)}</span>
+                        <div>
+                          <CardTitle className="text-lg">{course.title}</CardTitle>
+                          <Badge className={getDifficultyColor(course.difficulty)}>
+                            {course.difficulty}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground line-clamp-3">
+                      {course.description}
+                    </p>
+                    
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {course.duration_minutes}m
+                      </div>
+                      {course.passing_score && (
+                        <div className="flex items-center gap-1">
+                          <Award className="h-4 w-4" />
+                          {course.passing_score}% to pass
+                        </div>
+                      )}
+                    </div>
+
+                    {isEnrolled ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Progress</span>
+                          <span>{enrollment.progress}%</span>
+                        </div>
+                        <Progress value={enrollment.progress} className="h-2" />
+                        {isCompleted ? (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle className="h-4 w-4" />
+                            <span className="text-sm font-medium">Completed</span>
+                            {enrollment.score && (
+                              <span className="text-sm">({enrollment.score}%)</span>
+                            )}
+                          </div>
+                        ) : (
+                          <Button size="sm" className="w-full">
+                            <Play className="h-4 w-4 mr-2" />
+                            Continue Learning
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => enrollInCourse(course.id)}
+                      >
+                        <BookOpen className="h-4 w-4 mr-2" />
+                        Enroll Now
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </TabsContent>
 
-        <TabsContent value="team">
+        <TabsContent value="progress" className="space-y-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">My Enrollments</h3>
+            
+            {enrollments.length === 0 ? (
+              <div className="text-center py-12">
+                <BookOpen className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Enrollments Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Start learning by enrolling in your first course.
+                </p>
+                <Button onClick={() => setActiveTab("courses")}>
+                  Browse Courses
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {enrollments.map((enrollment) => (
+                  <Card key={enrollment.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="text-xl">{getCategoryIcon(enrollment.course.category)}</span>
+                            <div>
+                              <h4 className="font-medium">{enrollment.course.title}</h4>
+                              <p className="text-sm text-muted-foreground">
+                                {enrollment.course.duration_minutes} minutes
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span>Progress</span>
+                              <span>{enrollment.progress}%</span>
+                            </div>
+                            <Progress value={enrollment.progress} className="h-2" />
+                          </div>
+                        </div>
+                        
+                        <div className="ml-4 text-right">
+                          {enrollment.completed_at ? (
+                            <div className="text-green-600">
+                              <CheckCircle className="h-5 w-5 mx-auto mb-1" />
+                              <p className="text-sm font-medium">Completed</p>
+                              {enrollment.score && (
+                                <p className="text-sm">Score: {enrollment.score}%</p>
+                              )}
+                            </div>
+                          ) : (
+                            <Button size="sm">
+                              <Play className="h-4 w-4 mr-1" />
+                              Continue
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="achievements" className="space-y-6">
+          <div className="text-center py-12">
+            <Trophy className="h-16 w-16 mx-auto text-yellow-600 mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Achievements System</h3>
+            <p className="text-muted-foreground mb-4">
+              Complete courses to earn badges and certificates!
+            </p>
+            
+            {completedCourses.length > 0 && (
+              <div className="mt-8">
+                <h4 className="font-medium mb-4">Your Achievements</h4>
+                <div className="flex flex-wrap justify-center gap-4">
+                  {completedCourses.map((enrollment) => (
+                    <Card key={enrollment.id} className="w-48">
+                      <CardContent className="p-4 text-center">
+                        <Award className="h-8 w-8 mx-auto text-yellow-600 mb-2" />
+                        <p className="font-medium text-sm">{enrollment.course.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Completed with {enrollment.score}%
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="manage" className="space-y-6">
           <div className="text-center py-12">
             <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Team Progress Dashboard</h3>
+            <h3 className="text-lg font-semibold mb-2">Course Management</h3>
             <p className="text-muted-foreground">
-              This feature will be available in the next update
+              Advanced course creation and team management features coming soon.
             </p>
           </div>
         </TabsContent>

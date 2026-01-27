@@ -27,6 +27,7 @@ import Billing from "./pages/Billing";
 import FeedModule from "./pages/FeedModule";
 import Settings from "./pages/Settings";
 import ExpiringSoon from "./pages/ExpiringSoon";
+import QRLabelAction from "./pages/QRLabelAction";
 import KnowledgeBase from "./pages/KnowledgeBase";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,10 @@ const App = () => (
               <Route path="billing" element={<Billing />} />
               <Route path="settings/billing" element={<Billing />} />
             </Route>
+            
+            {/* QR Code Routes (outside protected route for public access) */}
+            <Route path="/qr/label/:labelId" element={<QRLabelAction />} />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

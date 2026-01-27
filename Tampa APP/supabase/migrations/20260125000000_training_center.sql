@@ -52,6 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_training_courses_category
   ON public.training_courses(category);
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view published courses in their org" ON public.training_courses;
 CREATE POLICY "Users can view published courses in their org"
   ON public.training_courses FOR SELECT
   USING (
@@ -61,6 +62,7 @@ CREATE POLICY "Users can view published courses in their org"
     )
   );
 
+DROP POLICY IF EXISTS "Admins can manage courses" ON public.training_courses;
 CREATE POLICY "Admins can manage courses"
   ON public.training_courses FOR ALL
   USING (
@@ -111,10 +113,12 @@ CREATE INDEX IF NOT EXISTS idx_training_enrollments_expires
   ON public.training_enrollments(expires_at);
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Users can view their own enrollments" ON public.training_enrollments;
 CREATE POLICY "Users can view their own enrollments"
   ON public.training_enrollments FOR SELECT
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Managers can view all enrollments in their org" ON public.training_enrollments;
 CREATE POLICY "Managers can view all enrollments in their org"
   ON public.training_enrollments FOR SELECT
   USING (
@@ -127,10 +131,12 @@ CREATE POLICY "Managers can view all enrollments in their org"
     public.has_any_role(auth.uid(), ARRAY['admin', 'owner', 'manager']::app_role[])
   );
 
+DROP POLICY IF EXISTS "Users can enroll themselves" ON public.training_enrollments;
 CREATE POLICY "Users can enroll themselves"
   ON public.training_enrollments FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can update their own enrollment progress" ON public.training_enrollments;
 CREATE POLICY "Users can update their own enrollment progress"
   ON public.training_enrollments FOR UPDATE
   USING (user_id = auth.uid());

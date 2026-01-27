@@ -171,6 +171,8 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   const [newProductName, setNewProductName] = useState("");
   const [newProductCategory, setNewProductCategory] = useState("");
   const [newProductSubcategory, setNewProductSubcategory] = useState("");
+  const [newProductMeasuringUnit, setNewProductMeasuringUnit] = useState("");
+  const [measuringUnits, setMeasuringUnits] = useState<Array<{ id: string; name: string }>>([]);
   const [creatingProduct, setCreatingProduct] = useState(false);
   
   // Canvas preview states
@@ -342,6 +344,39 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
     fetchFormSubcategories();
   }, [labelData.categoryId, organizationId]);
+
+  // Fetch measuring units on mount
+  useEffect(() => {
+    const fetchMeasuringUnits = async () => {
+      try {
+        if (!organizationId) {
+          console.log("⏳ Waiting for organization_id before fetching measuring units");
+          return;
+        }
+
+        console.log("🔍 Fetching measuring units for organization:", organizationId);
+
+        // Try to get measuring units with OR condition (org-specific OR global)
+        const { data, error } = await supabase
+          .from('measuring_units')
+          .select('id, name, abbreviation, organization_id')
+          .or(`organization_id.eq.${organizationId},organization_id.is.null`)
+          .order('name');
+
+        if (error) {
+          console.error("❌ Error fetching measuring units:", error);
+          throw error;
+        }
+        
+        console.log("✅ Fetched measuring units:", data);
+        setMeasuringUnits(data || []);
+      } catch (error) {
+        console.error('Error fetching measuring units:', error);
+      }
+    };
+
+    fetchMeasuringUnits();
+  }, [organizationId]);
 
   // Fetch subcategories for CREATE PRODUCT DIALOG when category changes
   useEffect(() => {
@@ -565,6 +600,15 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       return;
     }
 
+    if (!newProductMeasuringUnit) {
+      toast({
+        title: "Measuring Unit Required",
+        description: "Please select a measuring unit for the product",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setCreatingProduct(true);
 
     try {
@@ -574,6 +618,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
           name: newProductName.trim(),
           category_id: newProductCategory,
           subcategory_id: newProductSubcategory || null,
+          measuring_unit_id: newProductMeasuringUnit, // FK to measuring_units table
           organization_id: organizationId  // Add organization_id to pass RLS
         })
         .select(`
@@ -638,6 +683,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       setNewProductName("");
       setNewProductCategory("");
       setNewProductSubcategory("");
+      setNewProductMeasuringUnit(""); // Reset measuring unit
       setShowCreateProductDialog(false);
       setProductSearch("");
       setOpenProduct(false);
@@ -753,6 +799,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         productName: labelData.productName,
         categoryId: labelData.categoryId === "all" ? null : labelData.categoryId,
         categoryName: labelData.categoryName,
+        subcategoryId: labelData.subcategoryId || null, // Include subcategory!
         preparedBy: labelData.preparedBy,
         preparedByName: labelData.preparedByName,
         prepDate: labelData.prepDate,
@@ -1669,12 +1716,50 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                 )}
               </div>
             </div>
+
+            {/* Measuring Unit Selection - Required */}
+            <div>
+              <Label htmlFor="product-measuring-unit" className="text-destructive">
+                Measuring Unit *
+              </Label>
+              <Select
+                value={newProductMeasuringUnit}
+                onValueChange={setNewProductMeasuringUnit}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Select measuring unit..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {measuringUnits.length === 0 ? (
+                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                      No measuring units found. Please contact support.
+                    </div>
+                  ) : (
+                    measuringUnits.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {!newProductMeasuringUnit && (
+                <span className="text-xs text-destructive mt-1 block">
+                  Measuring unit is required
+                </span>
+              )}
+              {measuringUnits.length === 0 && organizationId && (
+                <span className="text-xs text-muted-foreground mt-1 block">
+                  Loading measuring units... (Org: {organizationId.slice(0, 8)}...)
+                </span>
+              )}
+            </div>
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={creatingProduct}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleCreateProduct} 
-              disabled={creatingProduct || !newProductName.trim() || !newProductCategory || isDuplicate}
+              disabled={creatingProduct || !newProductName.trim() || !newProductCategory || !newProductMeasuringUnit || isDuplicate}
             >
               {creatingProduct ? "Creating..." : "Create Product"}
             </AlertDialogAction>
