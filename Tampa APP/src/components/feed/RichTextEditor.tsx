@@ -209,14 +209,14 @@ export function RichTextEditor({
               <Smile className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-64 p-2">
-            <div className="grid grid-cols-8 gap-1">
+          <PopoverContent className="w-80 p-3 max-h-64 overflow-y-auto">
+            <div className="grid grid-cols-8 gap-2">
               {COMMON_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => handleEmojiClick(emoji)}
-                  className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
+                  className="text-2xl hover:bg-gray-100 dark:hover:bg-gray-800 rounded p-2 transition-colors flex items-center justify-center"
                   title={emoji}
                 >
                   {emoji}

@@ -303,20 +303,6 @@ export default function Recipes() {
 
   return (
     <div className="space-y-6">
-      {/* Debug Info - Remove after testing */}
-      <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200">
-        <CardContent className="pt-4">
-          <p className="text-sm font-mono">
-            <strong>Debug Info:</strong> User ID: {user?.id?.slice(0, 8)}... | 
-            Role: {role || 'none'} | 
-            Is Admin: {isAdmin ? '✅' : '❌'} | 
-            Is Leader Chef: {isLeaderChef ? '✅' : '❌'} | 
-            Can Manage: {canManageRecipes ? '✅ YES' : '❌ NO'} | 
-            Loading: {rolesLoading ? 'Yes' : 'No'}
-          </p>
-        </CardContent>
-      </Card>
-
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recipes</h1>
@@ -334,12 +320,12 @@ export default function Recipes() {
 
       <div className="flex items-center space-x-4">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
           <Input
-            placeholder="Search recipes, allergens, or dietary..."
+            placeholder="Search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-12"
           />
         </div>
         <div className="flex items-center gap-2">

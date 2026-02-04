@@ -693,10 +693,10 @@ export default function Labeling() {
           <h3 className="font-semibold text-lg">Recent Labels</h3>
             <div className="flex gap-2">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <Input 
-                  placeholder="Search labels..." 
-                  className="pl-10 w-48"
+                  placeholder="Search" 
+                  className="pl-12 w-48 md:w-64"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />

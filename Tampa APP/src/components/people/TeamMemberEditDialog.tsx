@@ -175,20 +175,20 @@ export function TeamMemberEditDialog({
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="personal" className="flex items-center gap-1">
+            <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+              <TabsTrigger value="personal" className="flex items-center gap-1 py-2 px-3">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Personal</span>
               </TabsTrigger>
-              <TabsTrigger value="employment" className="flex items-center gap-1">
+              <TabsTrigger value="employment" className="flex items-center gap-1 py-2 px-3">
                 <Briefcase className="w-4 h-4" />
                 <span className="hidden sm:inline">Employment</span>
               </TabsTrigger>
-              <TabsTrigger value="emergency" className="flex items-center gap-1">
+              <TabsTrigger value="emergency" className="flex items-center gap-1 py-2 px-3">
                 <Heart className="w-4 h-4" />
                 <span className="hidden sm:inline">Emergency</span>
               </TabsTrigger>
-              <TabsTrigger value="documents" className="flex items-center gap-1">
+              <TabsTrigger value="documents" className="flex items-center gap-1 py-2 px-3">
                 <FileText className="w-4 h-4" />
                 <span className="hidden sm:inline">Documents</span>
               </TabsTrigger>

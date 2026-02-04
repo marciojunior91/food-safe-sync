@@ -725,12 +725,12 @@ export default function TasksOverview() {
             {/* Search Bar */}
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search tasks by title or description..."
+                  placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-12"
                 />
                 {searchQuery && (
                   <Button
@@ -1029,8 +1029,8 @@ export default function TasksOverview() {
 
       {/* Tasks Tabs */}
       <Tabs defaultValue="today" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="today" className="gap-2">
+        <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+          <TabsTrigger value="today" className="gap-2 py-2 px-3">
             <span>Today</span>
             {todayTasks.length > 0 && (
               <Badge variant="secondary" className="ml-1">
@@ -1038,7 +1038,7 @@ export default function TasksOverview() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="overdue" className="gap-2">
+          <TabsTrigger value="overdue" className="gap-2 py-2 px-3">
             <span>Overdue</span>
             {overdueTasks.length > 0 && (
               <Badge variant="destructive" className="ml-1">
@@ -1046,7 +1046,7 @@ export default function TasksOverview() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="in-progress" className="gap-2">
+          <TabsTrigger value="in-progress" className="gap-2 py-2 px-3">
             <span>In Progress</span>
             {inProgressTasks.length > 0 && (
               <Badge variant="secondary" className="ml-1">
@@ -1054,7 +1054,7 @@ export default function TasksOverview() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="all">All Tasks</TabsTrigger>
+          <TabsTrigger value="all" className="py-2 px-3">All Tasks</TabsTrigger>
         </TabsList>
 
         {/* Today's Tasks */}
@@ -1064,9 +1064,16 @@ export default function TasksOverview() {
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <CalendarIcon className="w-12 h-12 text-muted-foreground mb-4" />
                 <p className="text-lg font-medium">No tasks scheduled for today</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mb-4">
                   Create a new task to get started
                 </p>
+                <Button 
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Task
+                </Button>
               </CardContent>
             </Card>
           ) : (

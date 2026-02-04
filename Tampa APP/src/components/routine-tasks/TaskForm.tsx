@@ -82,7 +82,8 @@ const taskFormSchema = z.object({
   requires_approval: z.boolean().default(false),
   // Recurrence fields
   is_recurring: z.boolean().default(false),
-  recurrence_frequency: z.enum(["daily", "weekly", "biweekly", "monthly"]).optional(),
+  recurrence_frequency: z.enum(["daily", "weekly", "biweekly", "monthly", "custom"]).optional(),
+  custom_period_days: z.number().min(1).max(365).optional(),
   recurrence_end_date: z.date().optional(),
 }).refine((data) => {
   // If task_type is "others", custom_task_type must be filled
@@ -224,6 +225,7 @@ export function TaskForm({
       requires_approval: defaultValues?.requires_approval || false,
       is_recurring: false,
       recurrence_frequency: undefined,
+      custom_period_days: undefined,
       recurrence_end_date: undefined,
     },
   });
@@ -250,6 +252,9 @@ export function TaskForm({
         } else if (data.recurrence_frequency === 'monthly') {
           frequency = 'monthly';
           interval = 1;
+        } else if (data.recurrence_frequency === 'custom' && data.custom_period_days) {
+          frequency = 'daily';
+          interval = data.custom_period_days;
         }
 
         recurrencePattern = {
@@ -764,6 +769,20 @@ export function TaskForm({
                             </div>
                           </Label>
                         </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="custom" id="custom" />
+                          <Label 
+                            htmlFor="custom" 
+                            className="font-normal cursor-pointer flex items-center gap-2"
+                          >
+                            <span className="text-lg">⚙️</span>
+                            <div>
+                              <div className="font-medium">Custom</div>
+                              <div className="text-xs text-muted-foreground">Set your own period</div>
+                            </div>
+                          </Label>
+                        </div>
                       </RadioGroup>
                     </FormControl>
                     <FormDescription>
@@ -773,6 +792,33 @@ export function TaskForm({
                   </FormItem>
                 )}
               />
+
+              {/* Custom Period Input - Only show if "custom" is selected */}
+              {form.watch("recurrence_frequency") === "custom" && (
+                <FormField
+                  control={form.control}
+                  name="custom_period_days"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Repeat Every (Days) *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="365"
+                          placeholder="e.g., 3 for every 3 days"
+                          {...field}
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Task will repeat every {field.value || 1} days
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Recurrence End Date */}
               <FormField

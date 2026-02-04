@@ -272,7 +272,9 @@ export function AddTeamMemberDialog({
                       value={formData.date_of_birth || ''}
                       onChange={(e) => handleFieldChange('date_of_birth', e.target.value)}
                       className={errors.date_of_birth ? 'border-destructive' : ''}
+                      min="1950-01-01"
                       max={new Date().toISOString().split('T')[0]}
+                      placeholder="DD/MM/YYYY"
                     />
                     {errors.date_of_birth && (
                       <p className="text-xs text-destructive flex items-center gap-1">
@@ -280,6 +282,9 @@ export function AddTeamMemberDialog({
                         {errors.date_of_birth}
                       </p>
                     )}
+                    <p className="text-xs text-muted-foreground">
+                      Click on the year to select from dropdown (1950-2026)
+                    </p>
                   </div>
 
                   {/* Email */}
@@ -412,6 +417,7 @@ export function AddTeamMemberDialog({
                   </div>
 
                   {/* Hire Date */}
+                  {/* Hire Date */}
                   <div className="space-y-2">
                     <Label htmlFor="hire_date">
                       Hire Date <span className="text-destructive">*</span>
@@ -422,7 +428,9 @@ export function AddTeamMemberDialog({
                       value={formData.hire_date || ''}
                       onChange={(e) => handleFieldChange('hire_date', e.target.value)}
                       className={errors.hire_date ? 'border-destructive' : ''}
+                      min="2000-01-01"
                       max={new Date().toISOString().split('T')[0]}
+                      placeholder="DD/MM/YYYY"
                     />
                     {errors.hire_date && (
                       <p className="text-xs text-destructive flex items-center gap-1">
@@ -430,6 +438,9 @@ export function AddTeamMemberDialog({
                         {errors.hire_date}
                       </p>
                     )}
+                    <p className="text-xs text-muted-foreground">
+                      Click on the year to select from dropdown (2000-2026)
+                    </p>
                   </div>
                 </CardContent>
               </Card>

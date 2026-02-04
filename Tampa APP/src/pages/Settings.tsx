@@ -46,24 +46,24 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'} gap-1`}>
-          <TabsTrigger value="profile" className="text-xs md:text-sm py-2 md:py-3">
-            <User className="w-4 h-4 md:mr-2" />
-            <span className="hidden sm:inline ml-1 md:ml-0">Profile</span>
+        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'} h-auto p-1`}>
+          <TabsTrigger value="profile" className="py-2 px-3">
+            <User className="w-4 h-4 mr-2" />
+            <span>Profile</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs md:text-sm py-2 md:py-3">
-            <Bell className="w-4 h-4 md:mr-2" />
-            <span className="hidden sm:inline ml-1 md:ml-0">Notifications</span>
+          <TabsTrigger value="notifications" className="py-2 px-3">
+            <Bell className="w-4 h-4 mr-2" />
+            <span>Notifications</span>
           </TabsTrigger>
           {isAdmin && (
-            <TabsTrigger value="admin" className="text-xs md:text-sm py-2 md:py-3">
-              <Shield className="w-4 h-4 md:mr-2" />
-              <span className="hidden sm:inline ml-1 md:ml-0">Admin</span>
+            <TabsTrigger value="admin" className="py-2 px-3">
+              <Shield className="w-4 h-4 mr-2" />
+              <span>Admin</span>
             </TabsTrigger>
           )}
-          <TabsTrigger value="billing" className="text-xs md:text-sm py-2 md:py-3">
-            <CreditCard className="w-4 h-4 md:mr-2" />
-            <span className="hidden sm:inline ml-1 md:ml-0">Billing</span>
+          <TabsTrigger value="billing" className="py-2 px-3">
+            <CreditCard className="w-4 h-4 mr-2" />
+            <span>Billing</span>
           </TabsTrigger>
         </TabsList>
 

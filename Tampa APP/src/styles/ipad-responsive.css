@@ -9,6 +9,39 @@
 @media (min-width: 768px) and (max-width: 1024px) {
   
   /* =========================================================================
+     EXPIRING SOON - FILTER GRID FIX
+     Force 3 columns for filters instead of 4
+  ========================================================================= */
+  
+  /* Target the filter grid specifically - 3 columns on iPad portrait */
+  div[class*="grid-cols-1"][class*="md:grid-cols-2"][class*="lg:grid-cols-4"],
+  div.grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-4 {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 1rem !important;
+  }
+  
+  /* Ensure filter inputs/selects are properly sized in 3-column layout */
+  div[class*="grid-cols-1"][class*="md:grid-cols-2"][class*="lg:grid-cols-4"] > div,
+  div.grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-4 > div {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  
+  /* Stats cards grid - FORCE 3 columns on iPad (override sm:grid-cols-2) */
+  div[class*="grid-cols-1"][class*="sm:grid-cols-2"][class*="lg:grid-cols-3"],
+  div.grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 1.25rem !important;
+  }
+  
+  /* Ensure stats cards are equal width in 3-column layout */
+  div[class*="grid-cols-1"][class*="sm:grid-cols-2"][class*="lg:grid-cols-3"] > *,
+  div.grid.grid-cols-1.sm\:grid-cols-2.lg\:grid-cols-3 > * {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  
+  /* =========================================================================
      QUICK PRINT GRID - Product Cards
   ========================================================================= */
   
@@ -277,13 +310,34 @@
      SEARCH & FILTERS
   ========================================================================= */
   
-  /* Search input - prominent on iPad */
-  input[placeholder*="Search"],
-  input[placeholder*="search"],
-  input[type="search"] {
+  /* Search input containers - ensure proper icon spacing */
+  div[class*="relative"] > input[placeholder*="Search"],
+  div[class*="relative"] > input[placeholder*="search"],
+  div[class*="relative"] > input[type="search"],
+  div.relative > input {
     min-height: 48px !important;
     font-size: 1rem !important;
-    padding: 0.875rem 1.25rem !important;
+    padding-left: 3rem !important; /* 48px - enough space for icon */
+    padding-right: 1rem !important;
+    padding-top: 0.875rem !important;
+    padding-bottom: 0.875rem !important;
+  }
+  
+  /* Search icons - ensure they don't overlap */
+  div[class*="relative"] > svg[class*="absolute"],
+  div.relative > svg.absolute {
+    pointer-events: none !important;
+    left: 0.75rem !important; /* 12px from left */
+    width: 1rem !important;
+    height: 1rem !important;
+  }
+  
+  /* Specific search input targeting */
+  input[placeholder="Search"],
+  input[placeholder="Search items..."],
+  input[placeholder="Search..."] {
+    padding-left: 3rem !important;
+    font-size: 1rem !important;
   }
   
   /* Filter buttons */
@@ -444,6 +498,13 @@
   ========================================================================= */
   
   @media (orientation: landscape) {
+    /* Filter grid - 4 columns in landscape works better */
+    div[class*="grid-cols-1"][class*="md:grid-cols-2"][class*="lg:grid-cols-4"],
+    div.grid.grid-cols-1.md\:grid-cols-2.lg\:grid-cols-4 {
+      grid-template-columns: repeat(4, 1fr) !important;
+      gap: 0.875rem !important;
+    }
+    
     /* Header - single line in landscape */
     header > div,
     header div[class*="flex"] {
@@ -653,3 +714,89 @@
     scrollbar-width: thin;
   }
 }
+
+/* ============================================================================
+   CRITICAL FIX - Search Icon Overlap on iPad
+   High specificity to override Tailwind classes
+============================================================================ */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Target all search inputs with icons - maximum specificity */
+  div.relative input[class*="pl-"],
+  div[class*="relative"] input[class*="pl-"],
+  .relative input[class*="pl-"],
+  input[placeholder*="Search"][class*="pl-"],
+  input[placeholder*="search"][class*="pl-"],
+  input[placeholder="Search"],
+  input[placeholder="Search..."],
+  input[placeholder="Search items..."],
+  input[placeholder="Search articles..."],
+  input[placeholder="Search tasks..."],
+  input[placeholder="Search team members..."] {
+    padding-left: 3rem !important;
+    font-size: 1rem !important;
+    min-height: 48px !important;
+  }
+  
+  /* Ensure search icons are positioned correctly and don't interfere */
+  div.relative svg[class*="lucide-search"],
+  div.relative svg[class*="Search"],
+  div[class*="relative"] svg[class*="absolute"][class*="left"],
+  svg.lucide-search {
+    pointer-events: none !important;
+    position: absolute !important;
+    left: 0.75rem !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 1rem !important;
+    height: 1rem !important;
+    z-index: 10 !important;
+  }
+  
+  /* Override any pl-10, pl-11, pl-12 classes specifically on iPad */
+  input.pl-10,
+  input.pl-11,
+  input.pl-12,
+  input[class*="pl-10"],
+  input[class*="pl-11"],
+  input[class*="pl-12"] {
+    padding-left: 3rem !important;
+  }
+  
+  /* Labeling page specific fix (has w-48) */
+  input.w-48[placeholder*="Search"],
+  input[class*="w-48"][placeholder*="Search"] {
+    width: 12rem !important; /* w-48 = 12rem */
+    padding-left: 3rem !important;
+  }
+  
+  @media (min-width: 768px) {
+    input.md\:w-64[placeholder*="Search"],
+    input[class*="md:w-64"][placeholder*="Search"] {
+      width: 16rem !important; /* md:w-64 = 16rem */
+      padding-left: 3rem !important;
+    }
+  }
+}
+
+/* ============================================================================
+   SETTINGS TABS - iPad optimization
+   ============================================================================
+   Remove gaps and center tabs ONLY for Settings page (768-1024px)
+============================================================================ */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* Target ONLY Settings page tabs - more specific selector */
+  .space-y-4 > div[class*="w-full"] > div[role="tablist"],
+  .space-y-6 > div[class*="w-full"] > div[role="tablist"] {
+    padding: 0 !important;
+    gap: 0 !important;
+  }
+  
+  /* Individual tab buttons in Settings page only */
+  .space-y-4 > div[class*="w-full"] > div[role="tablist"] button[role="tab"],
+  .space-y-6 > div[class*="w-full"] > div[role="tablist"] button[role="tab"] {
+    justify-content: center !important;
+  }
+}
+

@@ -146,8 +146,8 @@ export default function Inventory() {
       <div className="bg-card rounded-lg border shadow-card p-6">
         <div className="flex items-center gap-4">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search inventory items..." className="pl-10" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input placeholder="Search" className="pl-12" />
           </div>
           <select className="h-10 px-3 py-2 text-sm border border-input bg-background rounded-md">
             <option>All Categories</option>

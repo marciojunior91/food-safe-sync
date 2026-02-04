@@ -55,9 +55,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays, addDays, parseISO } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { QRScanner } from "@/components/QRScanner";
+import { Grid3x3, List as ListIcon } from "lucide-react";
 
 type ItemType = 'product' | 'label' | 'recipe';
-type UrgencyLevel = 'critical' | 'urgent' | 'warning' | 'normal';
+type UrgencyLevel = 'critical' | 'warning' | 'upcoming';
 type ActionType = 'consume' | 'extend' | 'discard';
 type LabelStatus = 'active' | 'near_expiry' | 'expired' | 'wasted' | 'used';
 
@@ -99,6 +100,9 @@ export default function ExpiringSoon() {
   const [typeFilter, setTypeFilter] = useState<ItemType | "all">("all");
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | "all">("all");
   const [locationFilter, setLocationFilter] = useState<string>("all");
+
+  // View mode
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Action Dialog
   const [actionDialog, setActionDialog] = useState<ActionDialogData>({
@@ -162,10 +166,9 @@ export default function ExpiringSoon() {
 
   // Calculate urgency level based on days until expiry
   const calculateUrgency = (daysUntil: number): UrgencyLevel => {
-    if (daysUntil <= 0) return 'critical'; // Expired or today
-    if (daysUntil === 1) return 'urgent'; // Tomorrow
-    if (daysUntil <= 3) return 'warning'; // 2-3 days
-    return 'normal'; // 4-7 days
+    if (daysUntil <= 0) return 'critical'; // Expired
+    if (daysUntil === 1) return 'warning'; // Expires tomorrow
+    return 'upcoming'; // 2-7 days
   };
 
   // Get urgency color classes
@@ -179,14 +182,6 @@ export default function ExpiringSoon() {
           badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
           dot: 'bg-red-500',
         };
-      case 'urgent':
-        return {
-          bg: 'bg-orange-50 dark:bg-orange-950',
-          border: 'border-orange-200 dark:border-orange-800',
-          text: 'text-orange-700 dark:text-orange-300',
-          badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-          dot: 'bg-orange-500',
-        };
       case 'warning':
         return {
           bg: 'bg-yellow-50 dark:bg-yellow-950',
@@ -195,13 +190,21 @@ export default function ExpiringSoon() {
           badge: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
           dot: 'bg-yellow-500',
         };
-      default:
+      case 'upcoming':
         return {
           bg: 'bg-green-50 dark:bg-green-950',
           border: 'border-green-200 dark:border-green-800',
           text: 'text-green-700 dark:text-green-300',
           badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
           dot: 'bg-green-500',
+        };
+      default:
+        return {
+          bg: 'bg-gray-50 dark:bg-gray-950',
+          border: 'border-gray-200 dark:border-gray-800',
+          text: 'text-gray-700 dark:text-gray-300',
+          badge: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
+          dot: 'bg-gray-500',
         };
     }
   };
@@ -210,10 +213,10 @@ export default function ExpiringSoon() {
   const getUrgencyLabel = (urgency: UrgencyLevel, daysUntil: number) => {
     switch (urgency) {
       case 'critical':
-        return daysUntil < 0 ? `Expired ${Math.abs(daysUntil)} days ago` : 'Expires today';
-      case 'urgent':
-        return 'Expires tomorrow';
+        return daysUntil < 0 ? `Expired ${Math.abs(daysUntil)} days ago` : 'Expired';
       case 'warning':
+        return 'Expires tomorrow';
+      case 'upcoming':
         return `${daysUntil} days left`;
       default:
         return `${daysUntil} days left`;
@@ -279,7 +282,7 @@ export default function ExpiringSoon() {
 
     // Sort by urgency (critical first) and then by expiry date
     return items.sort((a, b) => {
-      const urgencyOrder = { critical: 0, urgent: 1, warning: 2, normal: 3 };
+      const urgencyOrder = { critical: 0, warning: 1, upcoming: 2 };
       const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
       if (urgencyDiff !== 0) return urgencyDiff;
       return a.expiryDate.getTime() - b.expiryDate.getTime();
@@ -322,9 +325,8 @@ export default function ExpiringSoon() {
   const urgencyCounts = useMemo(() => {
     return {
       critical: expiringItems.filter(i => i.urgency === 'critical').length,
-      urgent: expiringItems.filter(i => i.urgency === 'urgent').length,
       warning: expiringItems.filter(i => i.urgency === 'warning').length,
-      normal: expiringItems.filter(i => i.urgency === 'normal').length,
+      upcoming: expiringItems.filter(i => i.urgency === 'upcoming').length,
     };
   }, [expiringItems]);
 
@@ -519,11 +521,11 @@ export default function ExpiringSoon() {
       ) : (
         <>
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className={`${getUrgencyColor('critical').bg} ${getUrgencyColor('critical').border}`}>
           <CardHeader className="pb-3">
             <CardDescription className={getUrgencyColor('critical').text}>
-              Critical
+              🔴 Expired
             </CardDescription>
             <CardTitle className="text-3xl">
               {urgencyCounts.critical}
@@ -531,23 +533,7 @@ export default function ExpiringSoon() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Expired or expires today
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className={`${getUrgencyColor('urgent').bg} ${getUrgencyColor('urgent').border}`}>
-          <CardHeader className="pb-3">
-            <CardDescription className={getUrgencyColor('urgent').text}>
-              Urgent
-            </CardDescription>
-            <CardTitle className="text-3xl">
-              {urgencyCounts.urgent}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Expires tomorrow
+              Past expiry date
             </p>
           </CardContent>
         </Card>
@@ -555,7 +541,7 @@ export default function ExpiringSoon() {
         <Card className={`${getUrgencyColor('warning').bg} ${getUrgencyColor('warning').border}`}>
           <CardHeader className="pb-3">
             <CardDescription className={getUrgencyColor('warning').text}>
-              Warning
+              🟡 Expires Tomorrow
             </CardDescription>
             <CardTitle className="text-3xl">
               {urgencyCounts.warning}
@@ -563,23 +549,23 @@ export default function ExpiringSoon() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              2-3 days left
+              Requires immediate attention
             </p>
           </CardContent>
         </Card>
 
-        <Card className={`${getUrgencyColor('normal').bg} ${getUrgencyColor('normal').border}`}>
+        <Card className={`${getUrgencyColor('upcoming').bg} ${getUrgencyColor('upcoming').border}`}>
           <CardHeader className="pb-3">
-            <CardDescription className={getUrgencyColor('normal').text}>
-              Upcoming
+            <CardDescription className={getUrgencyColor('upcoming').text}>
+              🟢 Upcoming (3-7 Days)
             </CardDescription>
             <CardTitle className="text-3xl">
-              {urgencyCounts.normal}
+              {urgencyCounts.upcoming}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              4-7 days left
+              Plan ahead items
             </p>
           </CardContent>
         </Card>
@@ -591,12 +577,12 @@ export default function ExpiringSoon() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Search */}
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
+              <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="Search items..."
+                placeholder="Search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-12"
               />
             </div>
 
@@ -620,10 +606,9 @@ export default function ExpiringSoon() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Urgency</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="urgent">Urgent</SelectItem>
-                <SelectItem value="warning">Warning</SelectItem>
-                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="critical">🔴 Expired</SelectItem>
+                <SelectItem value="warning">🟡 Expires Tomorrow</SelectItem>
+                <SelectItem value="upcoming">🟢 Upcoming (3-7 Days)</SelectItem>
               </SelectContent>
             </Select>
 
@@ -643,9 +628,29 @@ export default function ExpiringSoon() {
         </CardContent>
       </Card>
 
-          {/* Bulk Actions and QR Scanner */}
+          {/* Bulk Actions, View Toggle, and QR Scanner */}
           <div className="flex flex-wrap gap-2 items-center justify-between mb-4">
             <div className="flex items-center gap-2">
+              {/* Grid/List View Toggle */}
+              <div className="flex items-center gap-1 border rounded-md p-1">
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                  className="h-8 w-8 p-0"
+                >
+                  <Grid3x3 className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="h-8 w-8 p-0"
+                >
+                  <ListIcon className="w-4 h-4" />
+                </Button>
+              </div>
+              
               {selectedItems.size > 0 && (
                 <>
                   <span className="text-sm text-muted-foreground">
@@ -702,7 +707,8 @@ export default function ExpiringSoon() {
               </div>
             </CardContent>
           </Card>
-        ) : (
+        ) : viewMode === "grid" ? (
+          // Grid View (current/default)
           filteredItems.map(item => {
             const colors = getUrgencyColor(item.urgency);
             const itemKey = `${item.type}-${item.id}`;
@@ -812,6 +818,92 @@ export default function ExpiringSoon() {
               </Card>
             );
           })
+        ) : (
+          // List View (condensed)
+          <Card>
+            <CardContent className="pt-6">
+              <div className="space-y-1">
+                {filteredItems.map(item => {
+                  const colors = getUrgencyColor(item.urgency);
+                  const itemKey = `${item.type}-${item.id}`;
+                  const isSelected = selectedItems.has(itemKey);
+                  
+                  return (
+                    <div 
+                      key={itemKey} 
+                      className={`flex items-center gap-3 py-2 px-3 rounded-md border ${colors.border} ${colors.bg} ${isSelected ? 'ring-2 ring-primary' : ''} hover:bg-muted/50 transition-colors`}
+                    >
+                      {/* Checkbox */}
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelectItem(itemKey)}
+                      />
+                      
+                      {/* Urgency Indicator */}
+                      <div className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0`} />
+                      
+                      {/* Item Name */}
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <span className="font-medium truncate">{item.name}</span>
+                        <Badge variant="outline" className="capitalize text-xs flex-shrink-0">
+                          {item.type}
+                        </Badge>
+                      </div>
+                      
+                      {/* Expiry Info */}
+                      <div className="flex items-center gap-2 text-sm flex-shrink-0">
+                        <span className={`font-medium ${colors.text}`}>
+                          {item.daysUntilExpiry === 0 
+                            ? "Today" 
+                            : item.daysUntilExpiry < 0 
+                              ? `${Math.abs(item.daysUntilExpiry)}d ago`
+                              : `${item.daysUntilExpiry}d`
+                          }
+                        </span>
+                        <span className="text-muted-foreground hidden sm:inline">
+                          {format(item.expiryDate, 'MMM dd')}
+                        </span>
+                      </div>
+                      
+                      {/* Quick Actions */}
+                      <div className="flex gap-1 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAction('consume', item)}
+                          className="h-8 w-8 p-0"
+                          disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
+                          title="Mark as Consumed"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAction('extend', item)}
+                          className="h-8 w-8 p-0"
+                          disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
+                          title="Extend Expiry"
+                        >
+                          <CalendarClock className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleAction('discard', item)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
+                          title="Discard"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
 
