@@ -38,6 +38,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { LabelPreview } from "./LabelPreview";
 import { LabelPreviewCanvas, type LabelFormat, type PreviewScale } from "./LabelPreviewCanvas";
 import { AllergenSelectorEnhanced } from "./AllergenSelectorEnhanced";
+import { 
+  calculateExpiryDate, 
+  type StorageCondition, 
+  STORAGE_CONDITION_SHELF_LIFE,
+  STORAGE_CONDITION_LABELS 
+} from '@/utils/dateCalculations';
 import { DuplicateProductWarning } from "./DuplicateProductWarning";
 import { useAllergens } from "@/hooks/useAllergens";
 import { useDuplicateDetection } from "@/hooks/useDuplicateDetection";
@@ -113,12 +119,14 @@ interface Product {
   };
 }
 
-const CONDITIONS = [
-  { value: "fresh", label: "Fresh", days: 1 },
-  { value: "cooked", label: "Cooked", days: 3 },
-  { value: "frozen", label: "Frozen", days: 30 },
-  { value: "dry", label: "Dry Storage", days: 90 },
-  { value: "refrigerated", label: "Refrigerated", days: 7 },
+// Storage conditions using centralized utility
+const CONDITIONS: Array<{ value: StorageCondition; label: string; days: number }> = [
+  { value: "fresh", label: STORAGE_CONDITION_LABELS.fresh, days: STORAGE_CONDITION_SHELF_LIFE.fresh },
+  { value: "cooked", label: STORAGE_CONDITION_LABELS.cooked, days: STORAGE_CONDITION_SHELF_LIFE.cooked },
+  { value: "frozen", label: STORAGE_CONDITION_LABELS.frozen, days: STORAGE_CONDITION_SHELF_LIFE.frozen },
+  { value: "dry", label: STORAGE_CONDITION_LABELS.dry, days: STORAGE_CONDITION_SHELF_LIFE.dry },
+  { value: "refrigerated", label: STORAGE_CONDITION_LABELS.refrigerated, days: STORAGE_CONDITION_SHELF_LIFE.refrigerated },
+  { value: "hot", label: STORAGE_CONDITION_LABELS.hot, days: 1 }, // Display as 1 day (actually 4 hours)
 ];
 
 export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelFormProps) {
@@ -700,18 +708,13 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
     }
   };
 
-  const calculateExpiryDate = (condition: string, prepDate: string) => {
-    const conditionData = CONDITIONS.find(c => c.value === condition);
-    if (!conditionData || !prepDate) return "";
-
-    const prep = new Date(prepDate);
-    prep.setDate(prep.getDate() + conditionData.days);
-    return prep.toISOString().split('T')[0];
-  };
-
+  // Use centralized date calculation utility
   const handleConditionChange = (value: string) => {
     setLabelData(prev => {
-      const expiry = calculateExpiryDate(value, prev.prepDate);
+      const expiry = calculateExpiryDate(
+        prev.prepDate, 
+        value as StorageCondition
+      );
       return {
         ...prev,
         condition: value,
@@ -728,7 +731,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         ...prev,
         prepDate: date,
         expiryDate: expiry
-      };
+      };date, prev.condition as StorageCondition
     });
   };
 
@@ -872,7 +875,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           {onCancel && (
@@ -881,24 +884,9 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
             </Button>
           )}
           <div>
-            <h2 className="text-2xl font-bold">Create Label</h2>
-            <p className="text-muted-foreground">Fill in the information for your food label</p>
+            <h2 className="text-3xl font-bold">Create Label</h2>
+            <p className="text-base text-muted-foreground">Fill in the information for your food label</p>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            onClick={handleAddToQueue} 
-            variant="outline" 
-            disabled={isPrinting || !labelData.productId || !labelData.prepDate || !labelData.expiryDate}
-            className="flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add to Queue ({labelData.quantity || 1})
-          </Button>
-          <Button onClick={handlePrint} disabled={isPrinting} variant="hero" className="flex items-center gap-2 text-white">
-            <Printer className="w-4 h-4" />
-            {isPrinting ? 'Printing...' : 'Print Now'}
-          </Button>
         </div>
       </div>
 
@@ -929,7 +917,6 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                       <Printer className="h-4 w-4 flex-shrink-0" />
                       <div className="min-w-0">
                         <div className="font-medium">{p.name}</div>
-                        <div className="text-xs text-muted-foreground line-clamp-1">{p.description}</div>
                       </div>
                     </div>
                   </SelectItem>
@@ -950,14 +937,14 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         <CardContent className="space-y-4">
           {/* Category */}
           <div className="space-y-2">
-            <Label>Category *</Label>
+            <Label className="text-base font-medium">Category *</Label>
             <Popover open={openCategory} onOpenChange={setOpenCategory}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
                   aria-expanded={openCategory}
-                  className="w-full justify-between"
+                  className="w-full justify-between text-lg h-12"
                 >
                   <span className="flex items-center gap-2">
                     {labelData.categoryId && labelData.categoryId !== "all" && 
@@ -1075,7 +1062,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
           {/* Subcategory - Always visible */}
           <div className="space-y-2">
-            <Label htmlFor="subcategory">
+            <Label htmlFor="subcategory" className="text-base font-medium">
               Subcategory (Optional)
               {!labelData.categoryId && <span className="text-xs text-muted-foreground ml-2">- Select a category first</span>}
             </Label>
@@ -1106,7 +1093,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                     setProductSearch("");
                   }}
                 >
-                  <SelectTrigger id="subcategory">
+                  <SelectTrigger id="subcategory" className="text-lg h-12">
                     <SelectValue placeholder="Select a subcategory...">
                       {labelData.subcategoryId && formSubcategories.find(s => s.id === labelData.subcategoryId) && (
                         <span className="flex items-center gap-2">
@@ -1151,14 +1138,14 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
           {/* Product */}
           <div className="space-y-2">
-            <Label>Product *</Label>
+            <Label className="text-base font-medium">Product *</Label>
             <Popover open={openProduct} onOpenChange={setOpenProduct}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
                   aria-expanded={openProduct}
-                  className="w-full justify-between"
+                  className="w-full justify-between text-lg h-12"
                 >
                   {labelData.productName || "Select product..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1222,14 +1209,14 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
           {/* Condition */}
           <div className="space-y-2">
-            <Label>Condition *</Label>
+            <Label className="text-base font-medium">Condition *</Label>
             <Popover open={openCondition} onOpenChange={setOpenCondition}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   role="combobox"
                   aria-expanded={openCondition}
-                  className="w-full justify-between"
+                  className="w-full justify-between text-lg h-12"
                 >
                   {CONDITIONS.find(c => c.value === labelData.condition)?.label || "Select condition..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1270,34 +1257,35 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
           {/* Prepared By - Read Only */}
           <div className="space-y-2">
-            <Label>Prepared By</Label>
+            <Label className="text-base font-medium">Prepared By</Label>
             <Input
               value={labelData.preparedByName}
               readOnly
-              className="bg-muted"
+              className="bg-muted text-lg h-12"
             />
           </div>
 
           {/* Prep Date */}
           <div className="space-y-2">
-            <Label htmlFor="prep-date">Prep Date</Label>
+            <Label htmlFor="prep-date" className="text-base font-medium">Prep Date</Label>
             <Input
               id="prep-date"
               type="date"
               value={labelData.prepDate}
               onChange={(e) => handlePrepDateChange(e.target.value)}
+              className="text-lg h-12"
             />
           </div>
 
           {/* Expiry Date - Auto Calculated */}
           <div className="space-y-2">
-            <Label htmlFor="expiry-date">Expiry Date</Label>
+            <Label htmlFor="expiry-date" className="text-base font-medium">Expiry Date</Label>
             <Input
               id="expiry-date"
               type="date"
               value={labelData.expiryDate}
               readOnly
-              className="bg-muted"
+              className="bg-muted text-lg h-12"
             />
             <p className="text-xs text-muted-foreground">
               Automatically calculated based on condition
@@ -1307,7 +1295,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
           {/* Quantity - Optional */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity (Optional)</Label>
+              <Label htmlFor="quantity" className="text-base font-medium">Quantity (Optional)</Label>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -1320,9 +1308,9 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                     }
                   }}
                   disabled={!labelData.quantity || parseInt(labelData.quantity) <= 0}
-                  className="h-10 w-10 shrink-0"
+                  className="h-12 w-12 shrink-0"
                 >
-                  <Minus className="h-4 w-4" />
+                  <Minus className="h-5 w-5" />
                 </Button>
                 <Input
                   id="quantity"
@@ -1337,7 +1325,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                   }}
                   placeholder="0"
                   min="0"
-                  className="text-center"
+                  className="text-center text-lg h-12"
                 />
                 <Button
                   type="button"
@@ -1347,19 +1335,19 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                     const currentQty = parseInt(labelData.quantity) || 0;
                     setLabelData(prev => ({ ...prev, quantity: String(currentQty + 1) }));
                   }}
-                  className="h-10 w-10 shrink-0"
+                  className="h-12 w-12 shrink-0"
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-5 w-5" />
                 </Button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="unit">Unit</Label>
+              <Label htmlFor="unit" className="text-base font-medium">Unit</Label>
               <Select 
                 value={labelData.unit} 
                 onValueChange={(value) => setLabelData(prev => ({ ...prev, unit: value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="text-lg h-12">
                   <SelectValue placeholder="Select unit..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -1509,7 +1497,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
               </div>
             </div>
 
-            {/* Canvas Preview */}
+            {/* Canvas Preview - Sprint 4 T7.1: Removed min-h to prevent cutting label */}
             <LabelPreviewCanvas
               labelData={{
                 ...labelData,
@@ -1518,7 +1506,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
               }}
               format={(settings?.type as LabelFormat) || 'generic'}
               scale={previewScale}
-              className="min-h-[400px]"
+              className="w-full"
             />
 
             {/* Format Info */}
@@ -1766,6 +1754,25 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Sprint 3 T10.1: Fixed footer with print buttons - always visible regardless of responsiveness */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50">
+        <div className="max-w-7xl mx-auto flex gap-3 justify-end flex-wrap sm:flex-nowrap">
+          <Button 
+            onClick={handleAddToQueue} 
+            variant="outline" 
+            disabled={isPrinting || !labelData.productId || !labelData.prepDate || !labelData.expiryDate}
+            className="flex items-center gap-2 text-lg h-12 px-6 flex-1 sm:flex-none"
+          >
+            <Plus className="w-5 h-5" />
+            Add to Queue ({labelData.quantity || 1})
+          </Button>
+          <Button onClick={handlePrint} disabled={isPrinting} variant="hero" className="flex items-center gap-2 text-white text-lg h-12 px-6 flex-1 sm:flex-none">
+            <Printer className="w-5 h-5" />
+            {isPrinting ? 'Printing...' : 'Print Now'}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

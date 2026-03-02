@@ -54,8 +54,7 @@ export function PrintQueue() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
 
-  // Calculate estimated print time (3 seconds per label)
-  const estimatedMinutes = Math.ceil((totalLabels * 3) / 60);
+  // Sprint 3 T10.2: Removed estimated time calculation (unnecessary info)
 
   // Format relative time
   const formatTimeAgo = (isoString: string) => {
@@ -352,10 +351,7 @@ export function PrintQueue() {
                   <span className="text-muted-foreground">Total Labels:</span>
                   <span className="font-bold text-lg">{totalLabels}</span>
                 </div>
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Estimated time:</span>
-                  <span>~{estimatedMinutes} minute{estimatedMinutes !== 1 ? 's' : ''}</span>
-                </div>
+                {/* Sprint 3 T10.2: Removed estimated time - simplified UI */}
               </div>
 
               <Separator />

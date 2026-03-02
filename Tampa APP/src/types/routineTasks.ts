@@ -69,6 +69,12 @@ export interface RoutineTask {
   requires_approval: boolean;
   approved_by?: string;
   approved_at?: string;
+  subtasks?: Array<{
+    id: string;
+    title: string;
+    completed: boolean;
+  }>;
+  completion_dates?: string[]; // Per-occurrence completion tracking for recurring tasks (YYYY-MM-DD)
   recurrence_pattern?: RecurrencePattern;
   created_at: string;
   updated_at: string;

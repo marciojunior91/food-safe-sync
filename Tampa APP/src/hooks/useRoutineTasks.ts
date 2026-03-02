@@ -171,6 +171,54 @@ export function useRoutineTasks(organizationId?: string) {
     return updateTask(taskId, updates);
   };
 
+  // Complete a single occurrence of a recurring task (adds date to completion_dates)
+  const completeRecurringOccurrence = async (
+    taskId: string,
+    occurrenceDate: string,
+    completedBy?: string
+  ): Promise<boolean> => {
+    try {
+      // Fetch current completion_dates
+      const { data, error: fetchError } = await supabase
+        .from('routine_tasks')
+        .select('completion_dates')
+        .eq('id', taskId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const existing: string[] = Array.isArray(data?.completion_dates) ? data.completion_dates : [];
+      if (existing.includes(occurrenceDate)) return true; // Already completed
+
+      const updated = [...existing, occurrenceDate];
+      const { error: updateError } = await supabase
+        .from('routine_tasks')
+        .update({
+          completion_dates: updated,
+          completed_at: new Date().toISOString(),
+          ...(completedBy ? { completed_by: completedBy } : {}),
+        })
+        .eq('id', taskId);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setTasks(prev =>
+        prev.map(task =>
+          task.id === taskId
+            ? { ...task, completion_dates: updated }
+            : task
+        )
+      );
+
+      return true;
+    } catch (err) {
+      console.error('Error completing recurring occurrence:', err);
+      setError(err as Error);
+      return false;
+    }
+  };
+
   // Delete a task
   const deleteTask = async (taskId: string): Promise<boolean> => {
     try {
@@ -292,6 +340,7 @@ export function useRoutineTasks(organizationId?: string) {
     createTask,
     updateTask,
     updateTaskStatus,
+    completeRecurringOccurrence,
     deleteTask,
     // Helper functions
     getTasksByStatus,

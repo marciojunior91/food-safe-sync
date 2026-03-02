@@ -43,7 +43,7 @@ export const getStatusColor = (status: ExpiryStatus): string => {
 export const getStatusLabel = (status: ExpiryStatus): string => {
   switch (status) {
     case 'expired':
-      return 'Expired';
+      return 'Expired'; // Sprint 3 T11.1: Still used for internal logic, but badge hidden via shouldShowStatusBadge
     case 'warning':
       return 'Expiring Soon';
     case 'safe':
@@ -54,7 +54,8 @@ export const getStatusLabel = (status: ExpiryStatus): string => {
 };
 
 // Helper to check if status should display a badge
+// Sprint 3 T11.1: Hide "Expired" badge to reduce visual clutter - color indication is enough
 export const shouldShowStatusBadge = (status: ExpiryStatus): boolean => {
-  return status === 'expired' || status === 'warning';
+  return status === 'warning'; // Only show "Expiring Soon" - not "Expired"
 };
 

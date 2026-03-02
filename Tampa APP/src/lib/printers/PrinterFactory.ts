@@ -3,7 +3,8 @@ import { PrinterDriver, PrinterType, PrinterSettings } from '@/types/printer';
 import { GenericPrinter } from './GenericPrinter';
 import { PDFPrinter } from './PDFPrinter';
 import { ZebraPrinter } from './ZebraPrinter';
-import { BluetoothUniversalPrinter } from './BluetoothUniversalPrinter'; // NEW: Universal Bluetooth support
+import { BluetoothUniversalPrinter } from './BluetoothUniversalPrinter'; // Universal Bluetooth support
+import { UniversalPrinter } from './UniversalPrinter'; // NEW: Multi-connection universal printer
 // import { BluetoothZebraPrinter } from './BluetoothZebraPrinter'; // OLD: Zebra-only
 
 export class PrinterFactory {
@@ -20,16 +21,24 @@ export class PrinterFactory {
         return new PDFPrinter(settings?.name || 'PDF Export', settings);
       
       case 'zebra':
-        console.log('✅ PrinterFactory: Instantiating ZebraPrinter');
+        console.log('✅ PrinterFactory: Instantiating ZebraPrinter (Legacy)');
         return new ZebraPrinter(settings?.name || 'Zebra Thermal', settings);
       
       case 'bluetooth':
-        // NEW: Universal Bluetooth support (Zebra, ESC/POS, etc.)
+        // Universal Bluetooth support (Zebra, ESC/POS, etc.)
         console.log('✅ PrinterFactory: Instantiating BluetoothUniversalPrinter');
         return new BluetoothUniversalPrinter(
           settings?.name || 'Bluetooth Printer', 
           settings,
           'auto' // Auto-detect protocol (ZPL or ESC/POS)
+        );
+      
+      case 'universal':
+        // NEW: Multi-connection universal printer (Bluetooth LE, TCP/IP, Bridge, etc.)
+        console.log('✅ PrinterFactory: Instantiating UniversalPrinter');
+        return new UniversalPrinter(
+          settings?.name || 'Universal Printer',
+          settings
         );
       
       default:
@@ -40,24 +49,29 @@ export class PrinterFactory {
   static getAvailablePrinters(): Array<{ type: PrinterType; name: string; description: string }> {
     return [
       {
+        type: 'universal',
+        name: 'Universal Printer (Recommended)',
+        description: '⭐ Multi-connection: Bluetooth, TCP/IP, WiFi, Bridge adapters - Perfect for Zebra D411 with adapter!'
+      },
+      {
         type: 'bluetooth',
         name: 'Bluetooth Printer',
-        description: '🔵 ANY Bluetooth thermal printer (Zebra, MPT-II, Xprinter, ESC/POS, etc.)'
+        description: '🔵 Bluetooth-only thermal printer (Zebra BLE, MPT-II, Xprinter, ESC/POS)'
       },
       {
         type: 'zebra',
-        name: 'Zebra Network',
-        description: '🌐 Network connection to Zebra printer via IP address'
+        name: 'Zebra Network (Legacy)',
+        description: '🌐 Network connection to Zebra printer via IP address only'
       },
       {
         type: 'pdf',
         name: 'PDF Export',
-        description: '📄 Generate PDF files for labels (for testing or manual printing)'
+        description: '📄 Generate PDF files for labels (testing or manual printing)'
       },
       {
         type: 'generic',
         name: 'Browser Print',
-        description: '🖨️ Use your browser\'s print dialog (fallback option)'
+        description: '🖨️ Use browser print dialog (basic fallback)'
       }
     ];
   }
@@ -91,7 +105,9 @@ export class PrinterFactory {
           ipAddress: '192.168.1.100',
           port: 9100,
           darkness: 20,
-          speed: 4
+          speed: 4,
+          connectionType: 'tcp-ip',
+          protocol: 'zpl'
         };
       
       case 'bluetooth':
@@ -99,7 +115,30 @@ export class PrinterFactory {
           ...baseSettings,
           name: 'Bluetooth Printer',
           darkness: 20,
-          speed: 4
+          speed: 4,
+          connectionType: 'bluetooth-le',
+          protocol: 'auto'
+        };
+      
+      case 'universal':
+        return {
+          ...baseSettings,
+          name: 'Universal Printer',
+          model: 'Zebra D411',
+          manufacturer: 'Zebra',
+          darkness: 20,
+          speed: 4,
+          dpi: 203,
+          protocol: 'auto',
+          connectionType: 'tcp-ip',
+          connectionConfig: {
+            ipAddress: '192.168.1.100',
+            port: 9100,
+            preferredConnection: 'tcp-ip',
+            fallbackConnections: ['bluetooth-le', 'wifi'],
+            autoReconnect: true,
+            timeout: 5000
+          }
         };
       
       default:

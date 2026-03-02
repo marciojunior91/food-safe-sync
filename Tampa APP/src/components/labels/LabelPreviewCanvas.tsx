@@ -103,7 +103,8 @@ export function LabelPreviewCanvas({
   }, [labelData, format, scale]);
 
   return (
-    <div className={`relative flex items-center justify-center bg-muted/30 rounded-lg p-4 overflow-auto ${className}`}>
+    <div className={`relative flex items-center justify-center bg-muted/30 rounded-lg p-4 ${className}`}>
+      {/* Sprint 4 T7.1: Removed overflow-auto to prevent label cutting */}
       {isRendering && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-lg z-10">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />

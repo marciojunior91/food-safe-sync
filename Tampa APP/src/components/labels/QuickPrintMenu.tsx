@@ -55,13 +55,7 @@ interface QuickPrintMenuProps {
   onSuccess?: () => void;
 }
 
-const SHELF_LIFE_DAYS = {
-  fresh: 1,
-  cooked: 3,
-  frozen: 30,
-  refrigerated: 7,
-  thawed: 1, // 24 hours
-};
+// Shelf life is now handled by centralized dateCalculations utility
 
 export function QuickPrintMenu({ onSuccess }: QuickPrintMenuProps) {
   const [products, setProducts] = useState<Product[]>([]);
@@ -209,8 +203,9 @@ export function QuickPrintMenu({ onSuccess }: QuickPrintMenuProps) {
         .single();
 
       const prepDate = new Date();
-      const shelfLifeDays = SHELF_LIFE_DAYS[condition as keyof typeof SHELF_LIFE_DAYS] || 7;
-      const expiryDate = addDays(prepDate, shelfLifeDays);
+      const prepDateString = format(prepDate, "yyyy-MM-dd");
+      const expiryDateString = calculateExpiryDate(prepDateString, condition as StorageCondition);
+      const expiryDate = new Date(expiryDateString);
 
       // Add to print queue
       const { error: queueError } = await supabase

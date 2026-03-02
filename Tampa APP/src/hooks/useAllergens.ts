@@ -211,6 +211,43 @@ export function useAllergens() {
     return allergens.filter(a => a.severity === 'critical');
   };
 
+  // Sprint 3 T6.5: Add custom allergen to database
+  const addAllergen = async (allergenData: {
+    name: string;
+    is_common?: boolean;
+    severity?: string;
+    icon?: string | null;
+  }) => {
+    try {
+      const { data, error } = await supabase
+        .from("allergens")
+        .insert([{
+          name: allergenData.name,
+          is_common: allergenData.is_common ?? false,
+          severity: allergenData.severity ?? 'info',
+          icon: allergenData.icon ?? null,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Refresh allergens list
+      await fetchAllergens();
+
+      return data as Allergen;
+    } catch (error: any) {
+      console.error("Error adding allergen:", error);
+      
+      // Check for duplicate
+      if (error.code === '23505') {
+        throw new Error("An allergen with this name already exists");
+      }
+      
+      throw error;
+    }
+  };
+
   return {
     allergens,
     loading,
@@ -220,6 +257,7 @@ export function useAllergens() {
     updateProductAllergens,
     getCommonAllergens,
     getCriticalAllergens,
+    addAllergen, // Sprint 3 T6.5: Added
     refetch: fetchAllergens,
   };
 }

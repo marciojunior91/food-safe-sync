@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   Search,
   Filter,
-  GitMerge
+  GitMerge,
+  User
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,7 @@ import { LabelForm, LabelData } from "@/components/labels/LabelForm";
 import { UserSelectionDialog } from "@/components/labels/UserSelectionDialog";
 import { QuickPrintDetailsDialog } from "@/components/labels/QuickPrintDetailsDialog";
 import { RecipePrintDialog } from "@/components/recipes/RecipePrintDialog";
+import { CreateCategoryDialog } from "@/components/labels/CreateCategoryDialog";
 import { QuickPrintGrid } from "@/components/labels/QuickPrintGrid";
 import { MergeProductsAdmin } from "@/components/admin/MergeProductsAdmin";
 import { PrintQueue } from "@/components/shopping/PrintQueue";
@@ -26,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { usePrinter } from "@/hooks/usePrinter";
+import { useTeamMemberSelection } from "@/hooks/useTeamMemberSelection";
 import type { TeamMember } from "@/types/teamMembers";
 import { supabase } from "@/integrations/supabase/client";
 import { saveLabelToDatabase } from "@/utils/zebraPrinter";
@@ -34,17 +37,31 @@ import { getExpiryStatus, getStatusColor } from "@/utils/trafficLight";
 export default function Labeling() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentView, setCurrentView] = useState<'overview' | 'form' | 'admin'>('overview');
-  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [quickPrintDetailsOpen, setQuickPrintDetailsOpen] = useState(false);
   const [recipePrintDialogOpen, setRecipePrintDialogOpen] = useState(false);
   const [pendingQuickPrint, setPendingQuickPrint] = useState<any | null>(null);
-  const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
+  const [createCategoryOpen, setCreateCategoryOpen] = useState(false); // Sprint 3 T13.1: Category creation modal
   const { toast } = useToast();
   const { user } = useAuth();
   const { isAdmin, loading: roleLoading } = useUserRole();
   const { print, isLoading: isPrinting } = usePrinter('labeling-quick-print');
   const { openQueue, totalLabels: queueTotalLabels, items: queueItems, printAll: printQueueAll } = usePrintQueue();
   const [organizationId, setOrganizationId] = useState<string>("");
+  
+  // T1.2: Team Member Selection Hook (auto-opens modal if not selected)
+  const {
+    teamMember: selectedUser,
+    isModalOpen: userDialogOpen,
+    closeModal: closeUserDialog,
+    selectTeamMember: handleUserSelected,
+    openModal: openUserDialog,
+    clearSelection: clearUserSelection
+  } = useTeamMemberSelection();
+
+  // Debug: Log selected user changes
+  useEffect(() => {
+    console.log('[Labeling] Selected user changed:', selectedUser);
+  }, [selectedUser]);
 
   // Dashboard Stats State
   const [labelsToday, setLabelsToday] = useState(0);
@@ -239,20 +256,40 @@ export default function Labeling() {
 
   // Handler for QuickPrintGrid
   const handleQuickPrintFromGrid = async (product: any) => {
-    // Store product and open user selection dialog
     setPendingQuickPrint(product);
-    setUserDialogOpen(true);
+    
+    // T1.2: Only open dialog if no team member selected yet
+    if (!selectedUser) {
+      openUserDialog();
+    } else {
+      // Team member already selected, proceed directly
+      if (product.shelf_life_days !== undefined) {
+        setRecipePrintDialogOpen(true);
+      } else {
+        setQuickPrintDetailsOpen(true);
+      }
+    }
   };
 
 
   const handleCreateLabel = () => {
     setPendingQuickPrint(null);
-    setUserDialogOpen(true);
+    
+    // T1.2: Only open dialog if no team member selected yet
+    if (!selectedUser) {
+      openUserDialog();
+    } else {
+      // Team member already selected, go straight to form
+      setCurrentView('form');
+    }
   };
 
-  const handleUserSelected = (selectedUserData: TeamMember) => {
-    setSelectedUser(selectedUserData);
+  // T1.2: Wrapper for team member selection to handle post-selection actions
+  const handleTeamMemberSelectedWrapper = (selectedUserData: TeamMember) => {
+    // Save selection via hook
+    handleUserSelected(selectedUserData);
     
+    // Only proceed with actions if there was a pending action (quick print or new label)
     if (pendingQuickPrint) {
       // Check if it's a recipe (has shelf_life_days property from recipes table)
       if (pendingQuickPrint.shelf_life_days !== undefined) {
@@ -262,10 +299,8 @@ export default function Labeling() {
         // It's a regular product - open quick print details dialog
         setQuickPrintDetailsOpen(true);
       }
-    } else {
-      // Open form for new label creation
-      setCurrentView('form');
     }
+    // If no pending action, just close the dialog (user was selecting/changing their identity)
   };
 
   const handleQuickPrintDetailsConfirmed = (details: { quantity: string; unit: string; condition: string }) => {
@@ -519,8 +554,8 @@ export default function Labeling() {
         />
         <UserSelectionDialog
           open={userDialogOpen}
-          onOpenChange={setUserDialogOpen}
-          onSelectUser={handleUserSelected}
+          onOpenChange={closeUserDialog}
+          onSelectUser={handleTeamMemberSelectedWrapper}
         />
       </>
     );
@@ -588,8 +623,10 @@ export default function Labeling() {
     <>
       <UserSelectionDialog
         open={userDialogOpen}
-        onOpenChange={setUserDialogOpen}
-        onSelectUser={handleUserSelected}
+        onOpenChange={closeUserDialog}
+        onSelectUser={handleTeamMemberSelectedWrapper}
+        title="Who are you?"
+        description="Select your name to continue"
       />
       <QuickPrintDetailsDialog
         open={quickPrintDetailsOpen}
@@ -600,22 +637,50 @@ export default function Labeling() {
       <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Label Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Quick print labels with one tap - designed for busy kitchens
-          </p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Labels</h1>
+          </div>
+          {/* T1.2: Team Member Indicator - Always visible */}
+          <Button
+            variant={selectedUser ? "outline" : "default"}
+            size="sm"
+            onClick={openUserDialog}
+            className="flex items-center gap-2"
+          >
+            <User className="w-4 h-4" />
+            {selectedUser ? (
+              <>
+                <span className="font-medium">{selectedUser.display_name}</span>
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  {selectedUser.role_type}
+                </Badge>
+              </>
+            ) : (
+              <span className="text-sm">Select Team Member</span>
+            )}
+          </Button>
         </div>
         <div className="flex gap-3">
           {isAdmin && (
-            <Button 
-              variant="outline"
-              onClick={() => setCurrentView('admin')}
-              className="flex items-center gap-2"
-            >
-              <GitMerge className="w-4 h-4" />
-              Manage Duplicates
-            </Button>
+            <>
+              <Button 
+                variant="outline"
+                onClick={() => setCurrentView('admin')}
+                className="flex items-center gap-2"
+              >
+                <GitMerge className="w-4 h-4" />
+                Manage Duplicates
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => setCreateCategoryOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                New Category
+              </Button>
+            </>
           )}
           <Button variant="outline" onClick={openQueue}>
             <Printer className="w-4 h-4 mr-2" />
@@ -766,7 +831,7 @@ export default function Labeling() {
             setRecipePrintDialogOpen(open);
             if (!open) {
               setPendingQuickPrint(null);
-              setSelectedUser(null);
+              // Don't clear user selection when closing dialog - user stays logged in
             }
           }}
           recipe={{
@@ -781,6 +846,19 @@ export default function Labeling() {
           } : null}
         />
       )}
+
+      {/* Sprint 3 T13.1: Create Category Modal */}
+      <CreateCategoryDialog
+        open={createCategoryOpen}
+        onOpenChange={setCreateCategoryOpen}
+        onSuccess={() => {
+          // Categories will auto-refresh via useProducts hook
+          toast({
+            title: 'Success',
+            description: 'Category list has been updated',
+          });
+        }}
+      />
     </>
   );
 }

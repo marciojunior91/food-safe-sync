@@ -22,7 +22,9 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
     supportsPDF: false,
     supportsColor: false,
     maxWidth: 832,
-    maxHeight: 1368
+    maxHeight: 1368,
+    supportedProtocols: ['zpl', 'escpos', 'auto'],
+    supportedConnections: ['bluetooth-le', 'bluetooth-classic']
   };
   
   private settings: PrinterSettings;
@@ -209,8 +211,9 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     // Set QR code size (module size = 6)
     commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06); // GS ( k - Size 6
     
-    // Set error correction level (M = 49)
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x31); // GS ( k - Error correction M
+    // Set error correction level (H = 51) - Sprint 4 T9.1: High error correction (30%)
+    // Changed from M (49/0x31) to H (51/0x33) for maximum reliability
+    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x33); // GS ( k - Error correction H
     
     // Store QR code data
     const qrBytes = this.stringToBytes(qrData);

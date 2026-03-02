@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
+import { Checkbox as UICheckbox } from "@/components/ui/checkbox";
 
 import {
   RoutineTask,
@@ -101,6 +103,43 @@ export function TaskDetailView({
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [subtasks, setSubtasks] = useState<Array<{id: string; title: string; completed: boolean}>>([]);
+  const [savingSubtask, setSavingSubtask] = useState<string | null>(null);
+
+  // Sync subtasks only when a different task is opened — NOT on every parent re-render.
+  // Depending on task.subtasks (object ref) caused the optimistic toggle to be
+  // overwritten whenever the parent re-fetched tasks before the DB save returned.
+  useEffect(() => {
+    if (task.subtasks && Array.isArray(task.subtasks)) {
+      setSubtasks(task.subtasks as Array<{id: string; title: string; completed: boolean}>);
+    } else {
+      setSubtasks([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id]);
+
+  // Toggle subtask completion and persist to DB
+  const toggleSubtask = async (subtaskId: string) => {
+    const updated = subtasks.map((s) =>
+      s.id === subtaskId ? { ...s, completed: !s.completed } : s
+    );
+    setSubtasks(updated);
+    setSavingSubtask(subtaskId);
+    try {
+      const { error } = await supabase
+        .from('routine_tasks')
+        .update({ subtasks: updated as any })
+        .eq('id', task.id);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error updating subtask:', err);
+      // Revert on failure
+      setSubtasks(subtasks);
+      toast({ title: 'Error', description: 'Could not update subtask', variant: 'destructive' });
+    } finally {
+      setSavingSubtask(null);
+    }
+  };
 
   // Load attachments when dialog opens or task changes
   useEffect(() => {
@@ -322,6 +361,51 @@ export function TaskDetailView({
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                   {task.description}
                 </p>
+              </div>
+            </>
+          )}
+
+          {/* Subtasks */}
+          {subtasks.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Subtasks
+                  </h3>
+                  <span className="text-xs text-muted-foreground">
+                    {subtasks.filter((s) => s.completed).length}/{subtasks.length} completed
+                  </span>
+                </div>
+                <Progress
+                  value={(subtasks.filter((s) => s.completed).length / subtasks.length) * 100}
+                  className="h-1.5 mb-3"
+                />
+                <div className="space-y-2">
+                  {subtasks.map((subtask) => (
+                    <div
+                      key={subtask.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <UICheckbox
+                        id={subtask.id}
+                        checked={subtask.completed}
+                        disabled={savingSubtask === subtask.id}
+                        onCheckedChange={() => toggleSubtask(subtask.id)}
+                      />
+                      <label
+                        htmlFor={subtask.id}
+                        className={`text-sm flex-1 cursor-pointer ${
+                          subtask.completed ? 'line-through text-muted-foreground' : ''
+                        }`}
+                      >
+                        {subtask.title}
+                      </label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </>
           )}

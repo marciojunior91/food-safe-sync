@@ -130,8 +130,8 @@ const generateZPL = (data: LabelPrintData): string => {
 
 ^FO30,190^GB752,2,2^FS
 
-// Manufacturing & Expiry Dates
-^FO50,210^A0N,30,30^FDMfg Date:^FS
+// Prep & Expiry Dates
+^FO50,210^A0N,30,30^FDPrep Date:^FS
 ^FO350,210^A0N,30,30^FD${prepDate}^FS
 
 ^FO50,260^A0N,30,30^FDExpiry:^FS
@@ -171,11 +171,13 @@ ${labelId ? `^FO50,${allergens && allergens.length > 0 ?
   (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '490' : '440') : (data.batchNumber ? '440' : '390'))
 }^A0N,20,20^FDLabel ID: #${labelId.substring(0, 8).toUpperCase()}^FS` : ''}
 
-// QR Code (bottom right, larger for readability)
+// QR Code (bottom right, HIGH error correction for maximum reliability)
+// Sprint 4 - T9.1: Changed from ^BQN (normal) to ^BQH (high) error correction
+// ^BQH,2,6 = High error correction, model 2, magnification 6
 ^FO600,${allergens && allergens.length > 0 ? 
   (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '950' : '900') : (data.batchNumber ? '900' : '850')) : 
   (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '850' : '800') : (data.batchNumber ? '800' : '750'))
-}^BQN,2,6^FDQA,${qrData}^FS
+}^BQH,2,6^FDQA,${qrData}^FS
 
 ^XZ
 `;

@@ -77,19 +77,7 @@ export default function Recipes() {
   // Check if user can manage recipes (admin or leader_chef)
   const canManageRecipes = isAdmin || isLeaderChef;
 
-  // Debug logging (development only)
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔍 Recipe Permissions Debug:', {
-        userId: user?.id,
-        role: role,
-        rolesLoading: rolesLoading,
-        isAdmin: isAdmin,
-        isLeaderChef: isLeaderChef,
-        canManageRecipes: canManageRecipes
-      });
-    }
-  }, [user, role, rolesLoading, isAdmin, isLeaderChef, canManageRecipes]);
+
 
   // Handle create recipe button click with limit check
   const handleCreateRecipeClick = () => {
@@ -249,7 +237,9 @@ export default function Recipes() {
           dietary.toLowerCase().includes(searchTerm.toLowerCase())
         );
       
-      const matchesCategory = selectedCategory === "All Categories" || recipe.category === selectedCategory;
+      // BUGFIX RECIPES-5: Case-insensitive category comparison
+      const matchesCategory = selectedCategory === "All Categories" || 
+        recipe.category?.toLowerCase() === selectedCategory.toLowerCase();
       
       return matchesSearch && matchesCategory;
     })

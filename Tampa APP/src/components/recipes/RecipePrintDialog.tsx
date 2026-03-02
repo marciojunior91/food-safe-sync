@@ -16,10 +16,11 @@ import { usePrinter } from '@/hooks/usePrinter';
 import { supabase } from '@/integrations/supabase/client';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { UserSelectionDialog } from '@/components/labels/UserSelectionDialog';
 import type { RecipePrintData } from '@/types/recipePrint';
+import { calculateExpiryDate, type StorageCondition } from '@/utils/dateCalculations';
 
 interface RecipePrintDialogProps {
   open: boolean;
@@ -45,7 +46,7 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
   // Form state
   const [batchMultiplier, setBatchMultiplier] = useState(1);
   const [manufacturingDate, setManufacturingDate] = useState(new Date());
-  const [storageCondition, setStorageCondition] = useState<'ambient' | 'refrigerated' | 'frozen'>('refrigerated');
+  const [storageCondition, setStorageCondition] = useState<StorageCondition>('refrigerated');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('');
   const [batchNumber, setBatchNumber] = useState('');
@@ -54,10 +55,14 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   
-  // Calculate expiry date
-  const shelfLifeDays = recipe.shelf_life_days || 3; // Default 3 days
-  const expiryDate = new Date(manufacturingDate);
-  expiryDate.setDate(expiryDate.getDate() + shelfLifeDays);
+  // Calculate expiry date - recalculates when storage condition or date changes
+  const shelfLifeDays = recipe.shelf_life_days || 3; // Default 3 days (baseline)
+  const expiryDateString = calculateExpiryDate(
+    format(manufacturingDate, 'yyyy-MM-dd'),
+    storageCondition,
+    shelfLifeDays
+  );
+  const expiryDate = parseISO(expiryDateString);
 
   // Update selectedUser when initialUser changes
   useEffect(() => {
@@ -202,9 +207,9 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
               </Select>
             </div>
 
-            {/* Manufacturing Date */}
+            {/* Prep Date */}
             <div className="space-y-2">
-              <Label>Manufacturing Date</Label>
+              <Label>Prep Date</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -245,7 +250,10 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
             {/* Storage Condition */}
             <div className="space-y-2">
               <Label>Storage Condition</Label>
-              <Select value={storageCondition} onValueChange={(v: any) => setStorageCondition(v)}>
+              <Select 
+                value={storageCondition} 
+                onValueChange={(v: StorageCondition) => setStorageCondition(v)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -253,8 +261,12 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
                   <SelectItem value="ambient">Ambient</SelectItem>
                   <SelectItem value="refrigerated">Refrigerated</SelectItem>
                   <SelectItem value="frozen">Frozen</SelectItem>
+                  <SelectItem value="hot">Hot</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Changes shelf life calculation
+              </p>
             </div>
 
             {/* Optional: Quantity & Unit */}

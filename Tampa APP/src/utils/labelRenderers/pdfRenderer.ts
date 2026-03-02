@@ -96,7 +96,7 @@ export async function renderPdfLabel(
   // ============================================================================
   ctx.fillStyle = '#212529';
   ctx.font = '18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
-  ctx.fillText('Manufacturing Date:', xPos, yPos);
+  ctx.fillText('Prep Date:', xPos, yPos);
   ctx.font = 'bold 18px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
   ctx.fillText(data.prepDate || 'N/A', xPos + 210, yPos);
   yPos += 30;
@@ -204,15 +204,14 @@ export async function renderPdfLabel(
 
   // ============================================================================
   // COMPANY FOOTER - Professional style with spacing
+  // Sprint 3 T7.2: Removed organization name (redundant information)
   // ============================================================================
   if (data.organizationDetails) {
     ctx.fillStyle = '#212529';
-    ctx.font = 'bold 16px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
-    ctx.fillText(data.organizationDetails.name.toUpperCase(), xPos, yPos);
-    yPos += 24;
-
+    
+    // Organization name removed - starts with phone
     if (data.organizationDetails.phone) {
-      ctx.font = '13px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
+      ctx.font = 'bold 14px "Century Gothic", "Trebuchet MS", "Arial", sans-serif';
       ctx.fillText(`Tel: ${data.organizationDetails.phone}`, xPos, yPos);
       yPos += 20;
     }
@@ -265,13 +264,15 @@ export async function renderPdfLabel(
       by: data.preparedByName,
     });
     
-    // Generate QR code as data URL
+    // Generate QR code as data URL with HIGH error correction for maximum readability
+    // Sprint 4 - T9.1: High error correction (30%) + proper quiet zone (margin 4)
     const qrDataUrl = await QRCode.toDataURL(qrData, {
+      errorCorrectionLevel: 'H', // HIGH - 30% error correction for damaged/dirty labels
       width: qrSize,
-      margin: 1,
+      margin: 4, // Proper quiet zone for scanner recognition
       color: {
-        dark: '#000000',
-        light: '#ffffff'
+        dark: '#000000', // Pure black for maximum contrast
+        light: '#ffffff' // Pure white background
       }
     });
     

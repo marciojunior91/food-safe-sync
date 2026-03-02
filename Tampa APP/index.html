@@ -1,9 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <!-- Build: 2026-01-26 - Circular dependency fix -->
+    <!-- Build: 2026-02-12 - iOS Responsiveness (T16.1) -->
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- T16.1: iOS-optimized viewport - prevent zoom on input focus, respect safe areas -->
+    <meta 
+      name="viewport" 
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" 
+    />
+    <!-- iOS Web App Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="icon" type="image/png" href="/tampa-logo.png" />
     <title>Tampa APP - Smart Food Safety & Kitchen Management</title>
     <meta name="description" content="Complete food safety labeling system with smart inventory control, kitchen management, and compliance tools for modern food service operations." />

@@ -19,14 +19,14 @@ import { useUserContext } from "@/hooks/useUserContext";
 import { TampaIcon } from "@/components/TampaIcon";
 const navigation = [{
   name: "Dashboard",
-  href: "/",
+  href: "/dashboard",
   icon: BarChart3
 }, {
-  name: "Labeling",
-  href: "/labeling",
+  name: "Labels",
+  href: "/",
   icon: Tags
 }, {
-  name: "Expiring Soon",
+  name: "Expiring Alerts",
   href: "/expiring-soon",
   icon: AlertTriangle
 }, {
@@ -143,6 +143,12 @@ export function Layout() {
           <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setSidebarOpen(true)}>
             <Menu className="w-5 h-5" />
           </Button>
+
+          {/* Logo for mobile and tablet (T1.3) */}
+          <Link to="/" className="lg:hidden flex items-center gap-2">
+            <TampaIcon className="w-6 h-6 sm:w-7 sm:h-7" />
+            <h1 className="font-bold text-base sm:text-lg">Tampa APP</h1>
+          </Link>
 
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1 items-center justify-between">

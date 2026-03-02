@@ -126,7 +126,7 @@ export function ImageUpload({
         // Generate unique filename
         const fileExt = image.file.name.split(".").pop();
         const fileName = `${taskId}/${crypto.randomUUID()}.${fileExt}`;
-        const filePath = `task-attachments/${fileName}`;
+        const filePath = fileName; // Path inside the bucket (no bucket name prefix)
 
         // Upload to Supabase Storage
         const { data, error } = await supabase.storage

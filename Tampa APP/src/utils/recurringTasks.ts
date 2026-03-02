@@ -80,14 +80,20 @@ export function expandRecurringTask(
   ) {
     // Create instance for this date - preserve ALL properties including scheduled_time
     // IMPORTANT: Keep original task ID for database operations (attachments, comments, etc.)
+    const instanceDate = format(currentDate, "yyyy-MM-dd");
+    const isOccurrenceCompleted = Array.isArray(task.completion_dates) &&
+      task.completion_dates.includes(instanceDate);
     const instance: RoutineTask = {
       ...task,
-      scheduled_date: format(currentDate, "yyyy-MM-dd"),
+      scheduled_date: instanceDate,
       // Explicitly preserve scheduled_time (should be copied by spread but making sure)
       scheduled_time: task.scheduled_time,
+      // Override status for this occurrence based on completion_dates
+      status: isOccurrenceCompleted ? 'completed' : task.status === 'completed' ? 'not_started' : task.status,
+      completed_at: isOccurrenceCompleted ? (task.completed_at || new Date().toISOString()) : undefined,
       // Add metadata to identify this is a recurring instance
       // Using a custom property that won't conflict with database operations
-      _recurringInstanceDate: format(currentDate, "yyyy-MM-dd"),
+      _recurringInstanceDate: instanceDate,
     } as RoutineTask & { _recurringInstanceDate?: string };
 
     instances.push(instance);

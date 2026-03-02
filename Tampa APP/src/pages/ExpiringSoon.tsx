@@ -1,19 +1,16 @@
 import { useState, useMemo, useEffect } from "react";
 import { 
-  AlertTriangle, 
-  Clock, 
   Search, 
-  Filter,
   CheckCircle2,
   CalendarClock,
   Trash2,
-  Package,
   FileText,
   ChefHat,
   MapPin,
   Loader2,
   QrCode,
-  MoreHorizontal
+  MoreHorizontal,
+  Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,13 +49,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { format, differenceInDays, addDays, parseISO } from "date-fns";
+import { format, addDays, parseISO } from "date-fns";
+import { 
+  calculateUrgency, 
+  getUrgencyLabel, 
+  getUrgencyColorClasses, 
+  calculateDaysUntilExpiry,
+  type UrgencyLevel 
+} from "@/utils/dateCalculations";
 import { useNavigate } from "react-router-dom";
 import { QRScanner } from "@/components/QRScanner";
 import { Grid3x3, List as ListIcon } from "lucide-react";
 
 type ItemType = 'product' | 'label' | 'recipe';
-type UrgencyLevel = 'critical' | 'warning' | 'upcoming';
 type ActionType = 'consume' | 'extend' | 'discard';
 type LabelStatus = 'active' | 'near_expiry' | 'expired' | 'wasted' | 'used';
 
@@ -88,7 +91,6 @@ export default function ExpiringSoon() {
   const navigate = useNavigate();
   
   // Data state
-  const [products, setProducts] = useState<any[]>([]);
   const [labels, setLabels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -98,8 +100,8 @@ export default function ExpiringSoon() {
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<ItemType | "all">("all");
-  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | "all">("all");
-  const [locationFilter, setLocationFilter] = useState<string>("all");
+  // null = nothing selected (default empty state); set by clicking counter cards
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | null>(null);
 
   // View mode
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -136,21 +138,14 @@ export default function ExpiringSoon() {
 
       if (!profile?.organization_id) return;
 
-      // Fetch products
-      const { data: productsData } = await supabase
-        .from('products')
-        .select('*')
-        .eq('organization_id', profile.organization_id)
-        .not('expiry_date', 'is', null);
-
-      // Fetch labels with status
+      // Fetch labels with status (exclude used/wasted labels)
       const { data: labelsData } = await supabase
         .from('printed_labels')
         .select('*, status')
         .eq('organization_id', profile.organization_id)
-        .not('expiry_date', 'is', null);
+        .not('expiry_date', 'is', null)
+        .not('status', 'in', '("wasted","used")'); // BUGFIX EXPIRING-6: Exclude discarded labels
 
-      setProducts(productsData || []);
       setLabels(labelsData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -164,105 +159,38 @@ export default function ExpiringSoon() {
     }
   };
 
-  // Calculate urgency level based on days until expiry
-  const calculateUrgency = (daysUntil: number): UrgencyLevel => {
-    if (daysUntil <= 0) return 'critical'; // Expired
-    if (daysUntil === 1) return 'warning'; // Expires tomorrow
-    return 'upcoming'; // 2-7 days
-  };
+  // Urgency calculation now uses centralized utility
 
-  // Get urgency color classes
-  const getUrgencyColor = (urgency: UrgencyLevel) => {
-    switch (urgency) {
-      case 'critical':
-        return {
-          bg: 'bg-red-50 dark:bg-red-950',
-          border: 'border-red-200 dark:border-red-800',
-          text: 'text-red-700 dark:text-red-300',
-          badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-          dot: 'bg-red-500',
-        };
-      case 'warning':
-        return {
-          bg: 'bg-yellow-50 dark:bg-yellow-950',
-          border: 'border-yellow-200 dark:border-yellow-800',
-          text: 'text-yellow-700 dark:text-yellow-300',
-          badge: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-          dot: 'bg-yellow-500',
-        };
-      case 'upcoming':
-        return {
-          bg: 'bg-green-50 dark:bg-green-950',
-          border: 'border-green-200 dark:border-green-800',
-          text: 'text-green-700 dark:text-green-300',
-          badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-          dot: 'bg-green-500',
-        };
-      default:
-        return {
-          bg: 'bg-gray-50 dark:bg-gray-950',
-          border: 'border-gray-200 dark:border-gray-800',
-          text: 'text-gray-700 dark:text-gray-300',
-          badge: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-          dot: 'bg-gray-500',
-        };
-    }
-  };
+  // Get urgency color classes using centralized utility
+  const getUrgencyColor = getUrgencyColorClasses;
 
-  // Get urgency label
-  const getUrgencyLabel = (urgency: UrgencyLevel, daysUntil: number) => {
-    switch (urgency) {
-      case 'critical':
-        return daysUntil < 0 ? `Expired ${Math.abs(daysUntil)} days ago` : 'Expired';
-      case 'warning':
-        return 'Expires tomorrow';
-      case 'upcoming':
-        return `${daysUntil} days left`;
-      default:
-        return `${daysUntil} days left`;
-    }
-  };
+  // Get urgency label using centralized utility (imported above)
 
-  // Transform products and labels into expiring items
+  // Transform labels (and future recipes) into expiring items
   const expiringItems = useMemo(() => {
     const items: ExpiringItem[] = [];
     const now = new Date();
     const sevenDaysFromNow = addDays(now, 7);
-
-    // Add products
-    products?.forEach(product => {
-      if (product.expiry_date) {
-        const expiryDate = parseISO(product.expiry_date);
-        if (expiryDate <= sevenDaysFromNow) {
-          const daysUntil = differenceInDays(expiryDate, now);
-          items.push({
-            id: product.id,
-            name: product.name,
-            type: 'product',
-            expiryDate,
-            location: product.storage_location,
-            quantity: product.quantity,
-            unit: product.unit,
-            urgency: calculateUrgency(daysUntil),
-            daysUntilExpiry: daysUntil,
-          });
-        }
-      }
-    });
 
     // Add labels with lifecycle status
     labels?.forEach(label => {
       if (label.expiry_date) {
         const expiryDate = parseISO(label.expiry_date);
         if (expiryDate <= sevenDaysFromNow) {
-          const daysUntil = differenceInDays(expiryDate, now);
+          const daysUntil = calculateDaysUntilExpiry(label.expiry_date, now);
           
-          // Determine label status based on expiry and current status
+          // BUGFIX EXPIRING-9: Always recalculate status based on current expiry date
+          // Don't rely on stored status for urgency calculation
           let labelStatus: LabelStatus = label.status || 'active';
-          if (daysUntil <= 0 && labelStatus === 'active') {
+          
+          // Recalculate status based on actual days until expiry
+          if (daysUntil <= 0) {
             labelStatus = 'expired';
-          } else if (daysUntil <= 1 && labelStatus === 'active') {
+          } else if (daysUntil <= 1) {
             labelStatus = 'near_expiry';
+          } else if (labelStatus === 'expired' || labelStatus === 'near_expiry') {
+            // If label was previously expired/near_expiry but now has more days, mark as active
+            labelStatus = 'active';
           }
           
           items.push({
@@ -287,39 +215,24 @@ export default function ExpiringSoon() {
       if (urgencyDiff !== 0) return urgencyDiff;
       return a.expiryDate.getTime() - b.expiryDate.getTime();
     });
-  }, [products, labels]);
+  }, [labels]);
 
-  // Apply filters
+  // Apply filters — default empty: list only appears after selecting a counter card or typing a search
   const filteredItems = useMemo(() => {
+    if (!urgencyFilter && !searchQuery) return [];
     return expiringItems.filter(item => {
-      // Search filter
       if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
-      // Type filter
       if (typeFilter !== 'all' && item.type !== typeFilter) {
         return false;
       }
-      // Urgency filter
-      if (urgencyFilter !== 'all' && item.urgency !== urgencyFilter) {
-        return false;
-      }
-      // Location filter
-      if (locationFilter !== 'all' && item.location !== locationFilter) {
+      if (urgencyFilter && item.urgency !== urgencyFilter) {
         return false;
       }
       return true;
     });
-  }, [expiringItems, searchQuery, typeFilter, urgencyFilter, locationFilter]);
-
-  // Get unique locations
-  const locations = useMemo(() => {
-    const locs = new Set<string>();
-    expiringItems.forEach(item => {
-      if (item.location) locs.add(item.location);
-    });
-    return Array.from(locs).sort();
-  }, [expiringItems]);
+  }, [expiringItems, searchQuery, typeFilter, urgencyFilter]);
 
   // Count by urgency
   const urgencyCounts = useMemo(() => {
@@ -495,12 +408,12 @@ export default function ExpiringSoon() {
   // Get item icon
   const getItemIcon = (type: ItemType) => {
     switch (type) {
-      case 'product':
-        return <Package className="w-4 h-4" />;
       case 'label':
         return <FileText className="w-4 h-4" />;
       case 'recipe':
         return <ChefHat className="w-4 h-4" />;
+      default:
+        return <FileText className="w-4 h-4" />;
     }
   };
 
@@ -508,7 +421,7 @@ export default function ExpiringSoon() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Expiring Soon</h1>
+        <h1 className="text-3xl font-bold text-foreground">Expiring Alerts</h1>
         <p className="text-muted-foreground mt-2">
           Monitor items approaching expiry and take action to reduce waste
         </p>
@@ -520,9 +433,16 @@ export default function ExpiringSoon() {
         </div>
       ) : (
         <>
-          {/* Stats Cards */}
+          {/* Stats Cards — click to filter by urgency */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Card className={`${getUrgencyColor('critical').bg} ${getUrgencyColor('critical').border}`}>
+        <Card
+          onClick={() => setUrgencyFilter(urgencyFilter === 'critical' ? null : 'critical')}
+          className={`cursor-pointer transition-all ${
+            urgencyFilter === 'critical'
+              ? `${getUrgencyColor('critical').bg} ${getUrgencyColor('critical').border} ring-2 ring-red-500`
+              : `${getUrgencyColor('critical').bg} ${getUrgencyColor('critical').border} hover:opacity-80`
+          }`}
+        >
           <CardHeader className="pb-3">
             <CardDescription className={getUrgencyColor('critical').text}>
               🔴 Expired
@@ -538,7 +458,14 @@ export default function ExpiringSoon() {
           </CardContent>
         </Card>
 
-        <Card className={`${getUrgencyColor('warning').bg} ${getUrgencyColor('warning').border}`}>
+        <Card
+          onClick={() => setUrgencyFilter(urgencyFilter === 'warning' ? null : 'warning')}
+          className={`cursor-pointer transition-all ${
+            urgencyFilter === 'warning'
+              ? `${getUrgencyColor('warning').bg} ${getUrgencyColor('warning').border} ring-2 ring-yellow-500`
+              : `${getUrgencyColor('warning').bg} ${getUrgencyColor('warning').border} hover:opacity-80`
+          }`}
+        >
           <CardHeader className="pb-3">
             <CardDescription className={getUrgencyColor('warning').text}>
               🟡 Expires Tomorrow
@@ -554,7 +481,14 @@ export default function ExpiringSoon() {
           </CardContent>
         </Card>
 
-        <Card className={`${getUrgencyColor('upcoming').bg} ${getUrgencyColor('upcoming').border}`}>
+        <Card
+          onClick={() => setUrgencyFilter(urgencyFilter === 'upcoming' ? null : 'upcoming')}
+          className={`cursor-pointer transition-all ${
+            urgencyFilter === 'upcoming'
+              ? `${getUrgencyColor('upcoming').bg} ${getUrgencyColor('upcoming').border} ring-2 ring-green-500`
+              : `${getUrgencyColor('upcoming').bg} ${getUrgencyColor('upcoming').border} hover:opacity-80`
+          }`}
+        >
           <CardHeader className="pb-3">
             <CardDescription className={getUrgencyColor('upcoming').text}>
               🟢 Upcoming (3-7 Days)
@@ -574,7 +508,7 @@ export default function ExpiringSoon() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Search */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -593,35 +527,8 @@ export default function ExpiringSoon() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="product">Products</SelectItem>
                 <SelectItem value="label">Labels</SelectItem>
                 <SelectItem value="recipe">Recipes</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Urgency Filter */}
-            <Select value={urgencyFilter} onValueChange={(value) => setUrgencyFilter(value as UrgencyLevel | "all")}>
-              <SelectTrigger>
-                <SelectValue placeholder="All urgency" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Urgency</SelectItem>
-                <SelectItem value="critical">🔴 Expired</SelectItem>
-                <SelectItem value="warning">🟡 Expires Tomorrow</SelectItem>
-                <SelectItem value="upcoming">🟢 Upcoming (3-7 Days)</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Location Filter */}
-            <Select value={locationFilter} onValueChange={setLocationFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All locations" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
-                {locations.map(loc => (
-                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                ))}
               </SelectContent>
             </Select>
           </div>
@@ -698,10 +605,14 @@ export default function ExpiringSoon() {
             <CardContent className="pt-6">
               <div className="text-center py-12">
                 <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Items Expiring Soon</h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  {!urgencyFilter && !searchQuery
+                    ? "Select a category above to view items"
+                    : "No Items Found"}
+                </h3>
                 <p className="text-muted-foreground">
-                  {expiringItems.length === 0
-                    ? "All items are fresh with plenty of time before expiry!"
+                  {!urgencyFilter && !searchQuery
+                    ? "Click on Expired, Expires Tomorrow or Upcoming to filter."
                     : "No items match your current filters."}
                 </p>
               </div>
@@ -758,12 +669,7 @@ export default function ExpiringSoon() {
                                 {item.quantity} {item.unit}
                               </span>
                             )}
-                            {item.qrCode && (
-                              <span className="flex items-center gap-1 text-xs">
-                                <QrCode className="w-3 h-3" />
-                                {item.qrCode}
-                              </span>
-                            )}
+
                           </div>
                         </div>
                       </div>
@@ -782,6 +688,18 @@ export default function ExpiringSoon() {
 
                     {/* Right: Actions */}
                     <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                      {/* Preview button - only for labels */}
+                      {item.type === 'label' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/labels/${item.id}/preview`)}
+                          className="gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span className="hidden sm:inline">Preview</span>
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         variant="outline"
@@ -867,6 +785,18 @@ export default function ExpiringSoon() {
                       
                       {/* Quick Actions */}
                       <div className="flex gap-1 flex-shrink-0">
+                        {/* Preview button - only for labels */}
+                        {item.type === 'label' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigate(`/labels/${item.id}/preview`)}
+                            className="h-8 w-8 p-0"
+                            title="Preview Label"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"

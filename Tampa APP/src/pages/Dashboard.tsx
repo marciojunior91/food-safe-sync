@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChefHat, CheckCircle, TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { StatsCard } from '@/components/StatsCard';
 import ExpiryAlerts from '@/components/ExpiryAlerts';
-import { AdminPanel } from '@/components/admin/AdminPanel';
 import { SubscriptionBadge } from '@/components/billing/SubscriptionBadge';
+import { ExpiringTodayCard } from '@/components/dashboard/ExpiringTodayCard';
+import { ExpiringTomorrowCard } from '@/components/dashboard/ExpiringTomorrowCard';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -18,6 +20,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboardStats();
@@ -70,7 +73,7 @@ export default function Dashboard() {
     <div className='space-y-8'>
       <div className='flex items-center justify-between'>
         <div>
-          <h1 className='text-3xl font-bold text-foreground'>Kitchen Dashboard</h1>
+          <h1 className='text-3xl font-bold text-foreground'>Dashboard</h1>
           <p className='text-muted-foreground mt-2'>
             Monitor your kitchen operations and food safety
           </p>
@@ -85,26 +88,40 @@ export default function Dashboard() {
       </div>
 
       <div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
-        <StatsCard
-          title='Labels Today'
-          value={loading ? '...' : stats.labelsToday.toString()}
-          icon={ChefHat}
-        />
-        <StatsCard
-          title='Total Labels'
-          value={loading ? '...' : stats.totalLabels.toString()}
-          icon={TrendingUp}
-        />
-        <StatsCard
-          title='Compliance Score'
-          value={loading ? '...' : `${stats.complianceScore}%`}
-          change='+0.3% this week'
-          changeType='positive'
-          icon={CheckCircle}
-        />
+        <div onClick={() => navigate('/labels?filter=today')} className="cursor-pointer">
+          <StatsCard
+            title='Labels Today'
+            value={loading ? '...' : stats.labelsToday.toString()}
+            icon={ChefHat}
+            className="hover:shadow-lg transition-shadow"
+          />
+        </div>
+        
+        <div onClick={() => navigate('/labels')} className="cursor-pointer">
+          <StatsCard
+            title='Total Labels'
+            value={loading ? '...' : stats.totalLabels.toString()}
+            icon={TrendingUp}
+            className="hover:shadow-lg transition-shadow"
+          />
+        </div>
+        
+        <div onClick={() => navigate('/compliance')} className="cursor-pointer">
+          <StatsCard
+            title='Compliance Score'
+            value={loading ? '...' : `${stats.complianceScore}%`}
+            change='+0.3% this week'
+            changeType='positive'
+            icon={CheckCircle}
+            className="hover:shadow-lg transition-shadow"
+          />
+        </div>
+
+        <ExpiringTodayCard />
+        <ExpiringTomorrowCard />
       </div>
 
-      <AdminPanel />
+      {/* AdminPanel removed - User Profile & Printer Management cards moved to Settings */}
       <ExpiryAlerts />
     </div>
   );

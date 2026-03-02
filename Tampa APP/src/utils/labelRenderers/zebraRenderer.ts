@@ -118,6 +118,8 @@ export async function renderZebraLabel(
   // ============================================================================
   // COMPANY FOOTER - Organization details
   // ============================================================================
+  // COMPANY FOOTER - Sprint 3 T7.2: Organization name removed
+  // ============================================================================
   if (data.organizationDetails) {
     // Add separator line
     ctx.strokeStyle = '#000000';
@@ -128,15 +130,11 @@ export async function renderZebraLabel(
     ctx.stroke();
     yPos += 25;
 
-    // Company name
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText(data.organizationDetails.name.toUpperCase(), padding, yPos);
-    yPos += 22;
-
+    // Organization name removed - starts with phone
     // Phone
     if (data.organizationDetails.phone) {
-      ctx.font = '14px monospace';
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 14px monospace';
       ctx.fillText(`Tel: ${data.organizationDetails.phone}`, padding, yPos);
       yPos += 20;
     }
@@ -190,12 +188,14 @@ export async function renderZebraLabel(
       timestamp: new Date().toISOString(),
     });
     
-    // Generate QR code as data URL - high contrast for thermal printing
+    // Generate QR code as data URL - optimized for thermal printing
+    // Sprint 4 - T9.1: High error correction for thermal printer quality variations
     const qrDataUrl = await QRCode.toDataURL(qrData, {
+      errorCorrectionLevel: 'H', // HIGH - critical for thermal printing variations
       width: qrSize,
-      margin: 1,
+      margin: 4, // Proper quiet zone essential for thermal labels
       color: {
-        dark: '#000000',
+        dark: '#000000', // Maximum contrast for thermal printing
         light: '#ffffff'
       }
     });

@@ -1,13 +1,23 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, AlertTriangle, Info, X } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, X, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAllergens, type Allergen } from "@/hooks/useAllergens";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 export interface AllergenSelectorEnhancedProps {
@@ -53,8 +63,12 @@ export function AllergenSelectorEnhanced({
   className = "",
   productId,
 }: AllergenSelectorEnhancedProps) {
-  const { allergens, loading, getProductAllergens } = useAllergens();
+  const { allergens, loading, getProductAllergens, addAllergen, refetch } = useAllergens();
   const [loadingProduct, setLoadingProduct] = useState(false);
+  const [showCustomDialog, setShowCustomDialog] = useState(false);
+  const [customAllergenName, setCustomAllergenName] = useState("");
+  const [creatingAllergen, setCreatingAllergen] = useState(false);
+  const { toast } = useToast();
 
   // Load existing allergens if productId is provided
   useEffect(() => {
@@ -91,6 +105,53 @@ export function AllergenSelectorEnhanced({
   const clearAll = () => {
     if (disabled) return;
     onChange([]);
+  };
+
+  // Sprint 3 T6.5: Handle custom allergen creation
+  const handleCreateCustomAllergen = async () => {
+    if (!customAllergenName.trim()) {
+      toast({
+        title: "Invalid Name",
+        description: "Please enter an allergen name.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCreatingAllergen(true);
+    try {
+      const newAllergen = await addAllergen({
+        name: customAllergenName.trim(),
+        is_common: false, // Custom allergens are not common
+        severity: 'info', // Default severity for custom
+        icon: '⚠️', // Default icon
+      });
+
+      if (newAllergen) {
+        // Refresh allergens list
+        await refetch();
+        
+        // Auto-select the new allergen
+        onChange([...selectedAllergenIds, newAllergen.id]);
+        
+        toast({
+          title: "Custom Allergen Added",
+          description: `"${customAllergenName}" has been added successfully.`,
+        });
+        
+        setCustomAllergenName("");
+        setShowCustomDialog(false);
+      }
+    } catch (error) {
+      console.error("Error creating custom allergen:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create custom allergen. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingAllergen(false);
+    }
   };
 
   // Show all allergens together (no filtering by common)
@@ -201,10 +262,72 @@ export function AllergenSelectorEnhanced({
         </div>
       </ScrollArea>
 
+      {/* Sprint 3 T6.5: Custom Allergen Button */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setShowCustomDialog(true)}
+        disabled={disabled}
+        className="w-full"
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Add Custom Allergen
+      </Button>
+
       {/* Info Text */}
       <p className="text-xs text-muted-foreground">
         Select all allergens present in this product. Click on any allergen to add or remove it.
       </p>
+
+      {/* Sprint 3 T6.5: Custom Allergen Dialog */}
+      <Dialog open={showCustomDialog} onOpenChange={setShowCustomDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Custom Allergen</DialogTitle>
+            <DialogDescription>
+              Create a custom allergen that isn't in the standard list. This will be saved and available for future labels.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="custom-allergen">Allergen Name</Label>
+              <Input
+                id="custom-allergen"
+                placeholder="e.g., Mustard, Sesame, Lupine..."
+                value={customAllergenName}
+                onChange={(e) => setCustomAllergenName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !creatingAllergen) {
+                    handleCreateCustomAllergen();
+                  }
+                }}
+                disabled={creatingAllergen}
+                className="text-lg h-12"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowCustomDialog(false);
+                setCustomAllergenName("");
+              }}
+              disabled={creatingAllergen}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleCreateCustomAllergen}
+              disabled={creatingAllergen || !customAllergenName.trim()}
+            >
+              {creatingAllergen ? "Adding..." : "Add Allergen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

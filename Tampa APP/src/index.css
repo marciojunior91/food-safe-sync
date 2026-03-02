@@ -140,5 +140,42 @@
 
   body {
     @apply bg-background text-foreground;
+    /* T16.1: iOS Safe Area Insets (notch support) */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    /* T16.1: Smooth scrolling on iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* T16.1: iOS Touch Target Optimization */
+  button, 
+  a, 
+  [role="button"],
+  [role="link"] {
+    /* Minimum touch target 44x44px for iOS */
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* T16.1: Prevent iOS zoom on input focus */
+  input,
+  select,
+  textarea {
+    /* iOS won't zoom if font-size >= 16px */
+    font-size: max(16px, 1rem);
+  }
+
+  /* T16.1: Fix iOS modal bounce */
+  .modal-content,
+  [role="dialog"] {
+    overscroll-behavior: contain;
+  }
+
+  /* T16.1: Better tap highlighting on iOS */
+  button,
+  a {
+    -webkit-tap-highlight-color: rgba(22, 95%, 55%, 0.1);
   }
 }

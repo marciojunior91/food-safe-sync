@@ -188,6 +188,26 @@ export function TaskCard({
           </p>
         )}
 
+        {/* Subtask progress */}
+        {task.subtasks && task.subtasks.length > 0 && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+              <span>Subtasks</span>
+              <span>
+                {task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}
+              </span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-1.5">
+              <div
+                className="bg-primary h-1.5 rounded-full transition-all"
+                style={{
+                  width: `${(task.subtasks.filter((s) => s.completed).length / task.subtasks.length) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Task Metadata */}
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
           {/* Scheduled Date/Time */}

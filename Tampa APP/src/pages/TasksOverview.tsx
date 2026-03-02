@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight, FileText, Repeat } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -42,6 +42,10 @@ import { useToast } from "@/hooks/use-toast";
 import { TaskForm } from "@/components/routine-tasks/TaskForm";
 import { TaskCard } from "@/components/routine-tasks/TaskCard";
 import { TaskDetailView } from "@/components/routine-tasks/TaskDetailView";
+import { EditDeleteContextModal } from "@/components/routine-tasks/EditDeleteContextModal";
+import { TaskOccurrenceCard } from "@/components/routine-tasks/TaskOccurrenceCard";
+import { useRecurringTasks } from "@/hooks/useRecurringTasks";
+import type { TaskOccurrence } from "@/types/recurring-tasks";
 import { TaskTimeline } from "@/components/routine-tasks/TaskTimeline";
 import { BulkActionsToolbar } from "@/components/routine-tasks/BulkActionsToolbar";
 import { TemplatesManagement } from "@/components/routine-tasks/TemplatesManagement";
@@ -70,6 +74,110 @@ export default function TasksOverview() {
   
   // Bulk selection state
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+
+  // Recurring task edit/delete context state (RoutineTask – old system)
+  const [editContextTask, setEditContextTask] = useState<RoutineTask | null>(null);
+  const [editContextAction, setEditContextAction] = useState<'edit' | 'delete'>('delete');
+  const [showEditDeleteModal, setShowEditDeleteModal] = useState(false);
+  const [editSeriesMode, setEditSeriesMode] = useState(false);
+
+  // ── Recurring tab state (new task_occurrences / task_series system) ──
+  const [recurringRange, setRecurringRange] = useState(() => {
+    const today = new Date();
+    return {
+      start: format(today, 'yyyy-MM-dd'),
+      end: format(addDays(today, 6), 'yyyy-MM-dd'),
+    };
+  });
+  const [occModal, setOccModal] = useState<{
+    occ: TaskOccurrence;
+    action: 'edit' | 'delete';
+  } | null>(null);
+
+  // Hook for new recurring system
+  const recurringTasks = useRecurringTasks({
+    organizationId: context?.organization_id,
+    autoFetch: false,          // we control fetching manually
+    generationDaysAhead: 30,
+  });
+
+  // Fetch when org is ready or date range changes
+  useEffect(() => {
+    if (context?.organization_id) {
+      recurringTasks.fetchOccurrences(recurringRange);
+      recurringTasks.fetchSeries();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context?.organization_id, recurringRange.start, recurringRange.end]);
+
+  // Shift the 7-day window forward or backward
+  const shiftRecurringRange = (dir: 'prev' | 'next') => {
+    setRecurringRange((prev) => {
+      const offset = dir === 'next' ? 7 : -7;
+      return {
+        start: format(addDays(new Date(prev.start), offset), 'yyyy-MM-dd'),
+        end:   format(addDays(new Date(prev.end),   offset), 'yyyy-MM-dd'),
+      };
+    });
+  };
+
+  // Complete a TaskOccurrence
+  const handleCompleteOccurrence = async (occ: TaskOccurrence) => {
+    if (!context?.user_id) return;
+    const ok = await recurringTasks.completeOccurrence(occ.id, context.user_id);
+    if (ok) {
+      toast({ title: 'Task Completed!', description: `"${occ.title}" marked as complete` });
+    }
+  };
+
+  // Skip a TaskOccurrence
+  const handleSkipOccurrence = async (occ: TaskOccurrence) => {
+    const ok = await recurringTasks.skipOccurrence(occ.id, 'Skipped by user');
+    if (ok) {
+      toast({ title: 'Task Skipped', description: `"${occ.title}" has been skipped` });
+    }
+  };
+
+  // Open edit/delete context modal for a TaskOccurrence
+  const openOccModal = (occ: TaskOccurrence, action: 'edit' | 'delete') => {
+    // One-off tasks (no series_id) → skip modal, act directly
+    if (!occ.series_id) {
+      if (action === 'delete') {
+        if (confirm(`Delete "${occ.title}"?`)) {
+          recurringTasks.deleteOccurrence(occ)
+            .then(ok => ok && toast({ title: 'Deleted', description: `"${occ.title}" removed` }));
+        }
+      }
+      return;
+    }
+    setOccModal({ occ, action });
+  };
+
+  // Confirm handler from the occurrence EditDeleteContextModal
+  const handleOccModalConfirm = async (ctx: 'occurrence' | 'series') => {
+    if (!occModal) return;
+    const { occ, action } = occModal;
+    setOccModal(null);
+    if (action === 'delete') {
+      const ok = await recurringTasks.deleteOccurrence(occ, ctx);
+      if (ok) {
+        toast({
+          title: ctx === 'series' ? 'Series Deleted' : 'Task Deleted',
+          description: ctx === 'series'
+            ? 'All future occurrences removed'
+            : `"${occ.title}" removed`,
+        });
+      }
+    } else {
+      // edit — for now, reload so the user can use the existing RoutineTask form
+      // TODO (Fase 3): open dedicated occurrence edit form
+      toast({
+        title: 'Edit coming soon',
+        description: 'Occurrence editing form is planned for Fase 3',
+        variant: 'default',
+      });
+    }
+  };
   
   // View mode state: 'list', 'timeline', or 'templates'
   const [viewMode, setViewMode] = useState<'list' | 'timeline' | 'templates'>('list');
@@ -112,6 +220,7 @@ export default function TasksOverview() {
     createTask,
     updateTask,
     updateTaskStatus,
+    completeRecurringOccurrence,
     deleteTask,
     getTodayTasks,
     getOverdueTasks,
@@ -162,18 +271,16 @@ export default function TasksOverview() {
   // Get categorized tasks (using filtered tasks)
   const todayTasks = filteredTasks.filter((task) => {
     if (!task.scheduled_date) return false;
-    const taskDate = new Date(task.scheduled_date);
-    const today = new Date();
-    return (
-      taskDate.getDate() === today.getDate() &&
-      taskDate.getMonth() === today.getMonth() &&
-      taskDate.getFullYear() === today.getFullYear()
-    );
+    const taskDate = task.scheduled_date.split('T')[0]; // Extract date part (YYYY-MM-DD)
+    const today = format(new Date(), "yyyy-MM-dd");
+    return taskDate === today;
   });
 
   const overdueTasks = filteredTasks.filter((task) => {
     if (!task.scheduled_date || task.status === "completed") return false;
-    return new Date(task.scheduled_date) < new Date();
+    const taskDate = task.scheduled_date.split('T')[0]; // Extract date part
+    const today = format(new Date(), "yyyy-MM-dd");
+    return taskDate < today; // String comparison works for YYYY-MM-DD format
   });
 
   const notStartedTasks = filteredTasks.filter((task) => task.status === "not_started");
@@ -233,6 +340,20 @@ export default function TasksOverview() {
 
   // Handle task completion
   const handleCompleteTask = async (task: RoutineTask) => {
+    // Detect virtual recurring instance (has _recurringInstanceDate from expandRecurringTask)
+    const instanceDate = (task as any)._recurringInstanceDate as string | undefined;
+    if (instanceDate && task.recurrence_pattern) {
+      // Only complete this single occurrence, not the whole series
+      const success = await completeRecurringOccurrence(task.id, instanceDate, context?.user_id);
+      if (success) {
+        toast({
+          title: "Occurrence Completed!",
+          description: `"${task.title}" on ${instanceDate} marked as complete`,
+        });
+      }
+      return;
+    }
+    // Non-recurring task — update status as before
     const success = await updateTaskStatus(
       task.id,
       "completed",
@@ -248,15 +369,55 @@ export default function TasksOverview() {
 
   // Handle task deletion
   const handleDeleteTask = async (task: RoutineTask) => {
+    // Recurring task — show context modal first
+    if (task.recurrence_pattern) {
+      setEditContextTask(task);
+      setEditContextAction('delete');
+      setShowEditDeleteModal(true);
+      return;
+    }
+    // Non-recurring — direct confirm
     if (confirm(`Are you sure you want to delete "${task.title}"?`)) {
       const success = await deleteTask(task.id);
       if (success) {
-        setSelectedTask(null); // Close detail view
+        setSelectedTask(null);
+        toast({ title: "Task Deleted", description: "Task has been removed" });
+      }
+    }
+  };
+
+  // Confirm callback from EditDeleteContextModal
+  const handleEditDeleteContextConfirm = async (ctx: 'occurrence' | 'series') => {
+    setShowEditDeleteModal(false);
+    if (!editContextTask) return;
+
+    if (editContextAction === 'delete') {
+      if (ctx === 'occurrence') {
+        const success = await deleteTask(editContextTask.id);
+        if (success) {
+          setSelectedTask(null);
+          toast({ title: "Task Deleted", description: "This occurrence has been removed" });
+        }
+      } else {
+        // Delete all tasks in the series (same title + has recurrence_pattern)
+        const seriesTasks = tasks.filter(
+          (t) => t.title === editContextTask.title && !!t.recurrence_pattern
+        );
+        let count = 0;
+        for (const t of seriesTasks) {
+          if (await deleteTask(t.id)) count++;
+        }
+        setSelectedTask(null);
         toast({
-          title: "Task Deleted",
-          description: "Task has been removed",
+          title: "Series Deleted",
+          description: `${count} recurring task${count !== 1 ? 's' : ''} removed`,
         });
       }
+    } else {
+      // edit action
+      setEditSeriesMode(ctx === 'series');
+      setTaskToEdit(editContextTask);
+      setIsEditDialogOpen(true);
     }
   };
 
@@ -344,20 +505,37 @@ export default function TasksOverview() {
     });
 
     if (success) {
+      // Series mode: also update all other tasks with the same title + recurrence_pattern
+      if (editSeriesMode) {
+        const updates = {
+          title: data.title,
+          description: data.description,
+          priority: data.priority,
+          team_member_id: data.team_member_id,
+          scheduled_time: data.scheduled_time,
+          estimated_minutes: data.estimated_minutes,
+        };
+        const seriesTasks = tasks.filter(
+          (t) => t.title === taskToEdit.title && !!t.recurrence_pattern && t.id !== taskToEdit.id
+        );
+        for (const t of seriesTasks) {
+          await updateTask(t.id, updates);
+        }
+      }
+
       setIsEditDialogOpen(false);
       setTaskToEdit(null);
-      
+      setEditSeriesMode(false);
+
       // Update selected task if it's the one being edited
       if (selectedTask && selectedTask.id === taskToEdit.id) {
         const updatedTask = tasks.find(t => t.id === taskToEdit.id);
-        if (updatedTask) {
-          setSelectedTask(updatedTask);
-        }
+        if (updatedTask) setSelectedTask(updatedTask);
       }
-      
+
       toast({
         title: "Success!",
-        description: "Task updated successfully",
+        description: editSeriesMode ? "All tasks in the series updated" : "Task updated successfully",
       });
     } else {
       toast({
@@ -370,6 +548,14 @@ export default function TasksOverview() {
 
   // Open edit dialog
   const openEditDialog = (task: RoutineTask) => {
+    // Recurring task — show context modal first
+    if (task.recurrence_pattern) {
+      setEditContextTask(task);
+      setEditContextAction('edit');
+      setShowEditDeleteModal(true);
+      return;
+    }
+    setEditSeriesMode(false);
     setTaskToEdit(task);
     setIsEditDialogOpen(true);
   };
@@ -603,7 +789,7 @@ export default function TasksOverview() {
             onClick={() => setIsCreateDialogOpen(true)}
           >
             <Plus className="w-5 h-5" />
-            <span>New Task</span>
+            <span>{todayTasks.length === 0 ? 'Add Task' : 'New Task'}</span>
           </Button>
             </>
           )}
@@ -1029,7 +1215,7 @@ export default function TasksOverview() {
 
       {/* Tasks Tabs */}
       <Tabs defaultValue="today" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-5 h-auto p-1">
           <TabsTrigger value="today" className="gap-2 py-2 px-3">
             <span>Today</span>
             {todayTasks.length > 0 && (
@@ -1055,6 +1241,15 @@ export default function TasksOverview() {
             )}
           </TabsTrigger>
           <TabsTrigger value="all" className="py-2 px-3">All Tasks</TabsTrigger>
+          <TabsTrigger value="recurring" className="gap-2 py-2 px-3">
+            <Repeat className="w-3 h-3" />
+            <span>Recurring</span>
+            {recurringTasks.occurrences.length > 0 && (
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {recurringTasks.occurrences.length}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* Today's Tasks */}
@@ -1205,6 +1400,103 @@ export default function TasksOverview() {
             </div>
           )}
         </TabsContent>
+
+        {/* ─── Recurring Tab ──────────────────────────────────── */}
+        <TabsContent value="recurring" className="space-y-4">
+          {/* Date range navigation */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => shiftRecurringRange('prev')}
+              className="gap-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev 7 days
+            </Button>
+            <span className="text-sm font-medium text-muted-foreground">
+              {format(new Date(recurringRange.start + 'T00:00:00'), 'MMM d')} –{' '}
+              {format(new Date(recurringRange.end + 'T00:00:00'), 'MMM d, yyyy')}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => shiftRecurringRange('next')}
+              className="gap-1"
+            >
+              Next 7 days
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Series summary badge */}
+          {recurringTasks.series.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Repeat className="w-3 h-3" />
+              <span>{recurringTasks.series.length} active series</span>
+            </div>
+          )}
+
+          {/* Loading */}
+          {recurringTasks.loading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-40 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : recurringTasks.occurrences.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Repeat className="w-12 h-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium">No recurring tasks in this period</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Recurring tasks created via series will appear here
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Group occurrences by date */
+            (() => {
+              const dates = [...new Set(
+                recurringTasks.occurrences.map(o => o.scheduled_date)
+              )].sort();
+
+              return (
+                <div className="space-y-6">
+                  {dates.map(date => (
+                    <div key={date} className="space-y-3">
+                      {/* Date header */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold">
+                          {format(new Date(date + 'T00:00:00'), 'EEEE, MMM d')}
+                        </span>
+                        <div className="flex-1 h-px bg-border" />
+                        <Badge variant="outline" className="text-xs">
+                          {recurringTasks.getOccurrencesByDate(date).length} tasks
+                        </Badge>
+                      </div>
+
+                      {/* TaskOccurrenceCards for this date */}
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {recurringTasks.getOccurrencesByDate(date).map(occ => (
+                          <TaskOccurrenceCard
+                            key={occ.id}
+                            occurrence={occ}
+                            showActions
+                            onComplete={handleCompleteOccurrence}
+                            onEdit={(o) => openOccModal(o, 'edit')}
+                            onDelete={(o) => openOccModal(o, 'delete')}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          )}
+        </TabsContent>
+
       </Tabs>
         </>
       )}
@@ -1240,6 +1532,39 @@ export default function TasksOverview() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Occurrence Edit/Delete Context Modal (task_occurrences system) */}
+      {occModal && (
+        <EditDeleteContextModal
+          open={!!occModal}
+          onOpenChange={(open) => { if (!open) setOccModal(null); }}
+          action={occModal.action}
+          taskTitle={occModal.occ.title}
+          taskDate={occModal.occ.scheduled_date
+            ? format(new Date(occModal.occ.scheduled_date + 'T00:00:00'), 'MMM d, yyyy')
+            : undefined}
+          onConfirm={handleOccModalConfirm}
+          showDeleteConfirmation={occModal.action === 'delete'}
+        />
+      )}
+
+      {/* Edit/Delete Context Modal for recurring tasks */}
+      {editContextTask && (
+        <EditDeleteContextModal
+          open={showEditDeleteModal}
+          onOpenChange={(open) => {
+            setShowEditDeleteModal(open);
+            if (!open) setEditContextTask(null);
+          }}
+          action={editContextAction}
+          taskTitle={editContextTask.title}
+          taskDate={editContextTask.scheduled_date
+            ? format(new Date(editContextTask.scheduled_date), "MMM d, yyyy")
+            : undefined}
+          onConfirm={handleEditDeleteContextConfirm}
+          showDeleteConfirmation={editContextAction === 'delete'}
+        />
       )}
 
       {/* Task Detail View Dialog */}

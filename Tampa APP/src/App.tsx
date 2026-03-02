@@ -29,6 +29,9 @@ import Settings from "./pages/Settings";
 import ExpiringSoon from "./pages/ExpiringSoon";
 import QRLabelAction from "./pages/QRLabelAction";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import TestEmail from "./pages/TestEmail";
+import Compliance from "./pages/Compliance";
+import LabelPreviewPage from "./pages/LabelPreviewPage";
 
 const queryClient = new QueryClient();
 
@@ -48,9 +51,16 @@ const App = () => (
                   <Layout />
                 </ProtectedRoute>
               }>
-                <Route index element={<Dashboard />} />
+                {/* T1.1: Landing page changed from Dashboard to Labels */}
+                <Route index element={<Labeling />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="compliance" element={<Compliance />} />
                 <Route path="labeling" element={<Labeling />} />
                 <Route path="expiring-soon" element={<ExpiringSoon />} />
+                
+                {/* Label Preview Route - Bloco 8 T8.2 */}
+                <Route path="labels/:id/preview" element={<LabelPreviewPage />} />
+                
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="recipes" element={<Recipes />} />
                 <Route path="routine-tasks" element={<RoutineTasks />} />
@@ -69,6 +79,9 @@ const App = () => (
               <Route path="pricing" element={<PricingPage />} />
               <Route path="billing" element={<Billing />} />
               <Route path="settings/billing" element={<Billing />} />
+              
+              {/* Email Testing */}
+              <Route path="test-email" element={<TestEmail />} />
             </Route>
             
             {/* QR Code Routes (outside protected route for public access) */}

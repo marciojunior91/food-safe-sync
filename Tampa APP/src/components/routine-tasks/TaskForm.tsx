@@ -125,16 +125,24 @@ export function TaskForm({
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSubtask, setNewSubtask] = useState("");
+  // Local text buffer so the user can freely erase / retype without the
+  // browser-native number-input locking mid-edit.
+  const [estimatedText, setEstimatedText] = useState<string>(
+    String(defaultValues?.estimated_minutes ?? 30)
+  );
+
+  // Local text buffer for custom period days (same pattern as estimatedText)
+  const [customPeriodText, setCustomPeriodText] = useState<string>(
+    String(defaultValues?.custom_period_days ?? '')
+  );
 
   // Check if user has permission to delete images
   // Includes: admin, owner, manager, leader_chef roles
-  console.log("🔐 TaskForm - User role:", userRole);
   const canDeleteImages = 
     userRole === 'admin' || 
     userRole === 'owner' ||
     userRole === 'manager' ||
     userRole === 'leader_chef';
-  console.log("🔐 TaskForm - Can delete images:", canDeleteImages);
 
   // Load attachments when editing
   useEffect(() => {
@@ -626,9 +634,22 @@ export function TaskForm({
                 <FormControl>
                   <Input
                     type="time"
-                    className="w-full h-10 [color-scheme:light] dark:[color-scheme:dark]"
+                    step="60"
+                    className="w-full h-10 cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
                     placeholder="09:00"
                     {...field}
+                    onClick={(e) => {
+                      // Force time picker to open on desktop
+                      const input = e.currentTarget;
+                      if (input.showPicker) {
+                        try {
+                          input.showPicker();
+                        } catch (error) {
+                          // Fallback for browsers without showPicker support
+                          input.focus();
+                        }
+                      }
+                    }}
                   />
                 </FormControl>
                 <FormDescription>Optional specific time</FormDescription>
@@ -647,12 +668,28 @@ export function TaskForm({
               <FormLabel>Estimated Duration (minutes)</FormLabel>
               <FormControl>
                 <Input
-                  type="number"
-                  min="1"
-                  max="480"
+                  type="text"
+                  inputMode="numeric"
                   placeholder="30"
-                  {...field}
-                  onChange={(e) => field.onChange(Number(e.target.value))}
+                  value={estimatedText}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    setEstimatedText(raw);
+                    const num = parseInt(raw, 10);
+                    field.onChange(!raw || isNaN(num) ? undefined : Math.min(num, 480));
+                  }}
+                  onBlur={() => {
+                    // Normalise display on focus-out
+                    const num = parseInt(estimatedText, 10);
+                    if (!estimatedText || isNaN(num)) {
+                      setEstimatedText('');
+                      field.onChange(undefined);
+                    } else {
+                      const clamped = Math.min(Math.max(num, 1), 480);
+                      setEstimatedText(String(clamped));
+                      field.onChange(clamped);
+                    }
+                  }}
                 />
               </FormControl>
               <FormDescription>
@@ -803,12 +840,27 @@ export function TaskForm({
                       <FormLabel>Repeat Every (Days) *</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
-                          min="1"
-                          max="365"
+                          type="text"
+                          inputMode="numeric"
                           placeholder="e.g., 3 for every 3 days"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                          value={customPeriodText}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/[^0-9]/g, '');
+                            setCustomPeriodText(raw);
+                            const num = parseInt(raw, 10);
+                            field.onChange(!raw || isNaN(num) ? undefined : Math.min(num, 365));
+                          }}
+                          onBlur={() => {
+                            const num = parseInt(customPeriodText, 10);
+                            if (!customPeriodText || isNaN(num)) {
+                              setCustomPeriodText('');
+                              field.onChange(undefined);
+                            } else {
+                              const clamped = Math.min(Math.max(num, 1), 365);
+                              setCustomPeriodText(String(clamped));
+                              field.onChange(clamped);
+                            }
+                          }}
                         />
                       </FormControl>
                       <FormDescription>

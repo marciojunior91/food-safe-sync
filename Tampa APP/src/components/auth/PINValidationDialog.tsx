@@ -159,7 +159,6 @@ export function PINValidationDialog({
                 maxLength={4}
                 className="text-center text-2xl tracking-widest font-mono pr-10"
                 disabled={isValidating || isMaxAttemptsReached}
-                autoFocus
                 autoComplete="off"
               />
               <button
