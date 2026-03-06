@@ -185,12 +185,6 @@ export default function TasksOverview() {
   // Selected date for timeline view
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  // Debug logging (development only)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('TasksOverview - context:', context);
-    console.log('TasksOverview - contextLoading:', contextLoading);
-  }
-
   // Filter states
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
@@ -314,11 +308,6 @@ export default function TasksOverview() {
 
   // Handle task creation
   const handleCreateTask = async (data: CreateTaskInput) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Creating task with data:', data);
-      console.log('Organization ID:', context?.organization_id);
-    }
-    
     if (!context?.organization_id) {
       toast({
         title: "Error",

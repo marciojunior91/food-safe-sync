@@ -623,7 +623,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
         {/* Search Bar - only in products mode */}
         {printMode === 'products' && (
           <div className="relative mt-3">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="Search products..."
               value={searchTerm}

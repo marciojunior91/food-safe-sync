@@ -58,11 +58,6 @@ export default function Labeling() {
     clearSelection: clearUserSelection
   } = useTeamMemberSelection();
 
-  // Debug: Log selected user changes
-  useEffect(() => {
-    console.log('[Labeling] Selected user changed:', selectedUser);
-  }, [selectedUser]);
-
   // Dashboard Stats State
   const [labelsToday, setLabelsToday] = useState(0);
   const [totalLabels, setTotalLabels] = useState(0);

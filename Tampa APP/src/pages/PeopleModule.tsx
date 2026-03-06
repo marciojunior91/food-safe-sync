@@ -192,11 +192,6 @@ export default function People() {
     );
   }
 
-  // BUG-006 FIX: Only log in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[PeopleModule] User context:', context);
-  }
-
   if (!context?.organization_id) {
     return (
       <div className="container mx-auto p-4 sm:p-6 space-y-6">

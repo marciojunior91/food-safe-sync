@@ -35,11 +35,6 @@ export default function FeedModule() {
   // Memoize selectedUserId to prevent unnecessary re-renders
   const selectedUserId = useMemo(() => selectedUser?.id, [selectedUser?.id]);
 
-  console.log('[FeedModule] 🔍 Current filter:', filter);
-  console.log('[FeedModule] 👤 Selected user ID:', selectedUserId);
-  console.log('[FeedModule] 👤 Selected user name:', selectedUser?.display_name);
-  console.log('[FeedModule] 📞 Calling useFeed with:', { organizationId, filter, userId: selectedUserId });
-
   const {
     posts,
     loading,
@@ -66,8 +61,6 @@ export default function FeedModule() {
   useEffect(() => {
     if (!organizationId) return;
 
-    console.log('[FeedModuleV2] Setting up real-time subscription for org:', organizationId);
-
     const channel = supabase
       .channel('feed_posts_realtime')
       .on(
@@ -79,7 +72,6 @@ export default function FeedModule() {
           filter: `organization_id=eq.${organizationId}`
         },
         (payload) => {
-          console.log('[FeedModuleV2] Real-time update:', payload.eventType);
           // Refresh feed on any change (insert, update, delete)
           refresh();
           
@@ -92,12 +84,9 @@ export default function FeedModule() {
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[FeedModuleV2] Subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      console.log('[FeedModuleV2] Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [organizationId, refresh]);

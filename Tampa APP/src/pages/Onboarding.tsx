@@ -131,26 +131,18 @@ export default function Onboarding() {
   };
 
   const handleRegistrationNext = () => {
-    // Validation happens in the step component
-    console.log('Registration data:', registrationData);
     goToNextStep('registration');
   };
 
   const handleCompanyInfoNext = () => {
-    // Validation happens in the step component
-    console.log('Company data:', companyData);
     goToNextStep('company-info');
   };
 
   const handleProductsNext = () => {
-    // Validation happens in the step component
-    console.log('Products data:', productsData);
     goToNextStep('products');
   };
 
   const handleTeamMembersNext = () => {
-    // Validation happens in the step component
-    console.log('Team members data:', teamMembersData);
     goToNextStep('team-members');
   };
 
