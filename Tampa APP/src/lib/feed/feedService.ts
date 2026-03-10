@@ -564,27 +564,16 @@ export async function createMentions(
   commentId: string | null,
   mentionedById: string
 ) {
-  console.log('[createMentions] 📝 Content:', content);
-  console.log('[createMentions] 📌 Post ID:', postId);
-  console.log('[createMentions] 💬 Comment ID:', commentId);
-  console.log('[createMentions] 👤 Mentioned by ID:', mentionedById);
-  
   // Extract @mentions using regex: @[Name](id)
   const mentionRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
   const mentions: string[] = [];
   let match;
 
   while ((match = mentionRegex.exec(content)) !== null) {
-    console.log('[createMentions] 🎯 Found mention:', match[1], '→ ID:', match[2]);
     mentions.push(match[2]); // Extract user_id
   }
 
-  console.log('[createMentions] 📋 Total mentions extracted:', mentions.length);
-
-  if (mentions.length === 0) {
-    console.log('[createMentions] ⚠️ No mentions found in content');
-    return;
-  }
+  if (mentions.length === 0) return;
 
   // Create mention records
   // CRITICAL FIX: Either post_id OR comment_id, NOT BOTH (constraint: mention_target_check)
@@ -595,19 +584,14 @@ export async function createMentions(
     mentioned_by_id: mentionedById,
   }));
 
-  console.log('[createMentions] 💾 Inserting records:', mentionRecords);
-
   const { error } = await supabase
     .from('feed_mentions')
     .insert(mentionRecords);
 
   if (error) {
-    console.error('[createMentions] ❌ Error inserting mentions:', error);
-    console.error('[createMentions] ❌ Mention records:', mentionRecords);
+    console.error('createMentions: Error inserting mentions:', error);
     throw error;
   }
-  
-  console.log(`[createMentions] ✅ Created ${mentions.length} mention(s) successfully`);
 }
 
 /**

@@ -100,7 +100,7 @@ export function QRScanner({ open, onClose, onScan }: QRScannerProps) {
         const barcodeDetector = new (window as any).BarcodeDetector({
           formats: ['qr_code']
         });
-        const barcodes = await barcodeDetector.detect(imageData);
+        const barcodes = await barcodeDetector.detect(canvas);
 
         if (barcodes.length > 0) {
           const qrCode = barcodes[0].rawValue;

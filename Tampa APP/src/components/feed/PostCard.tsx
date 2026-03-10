@@ -20,6 +20,11 @@ import type { FeedPost } from '@/lib/feed/feedService';
 import ReactionPicker from './ReactionPicker';
 import { CommentsList } from './CommentsList';
 import { renderMentionsInText } from '@/lib/feed/mentionUtils';
+import { supabase } from '@/integrations/supabase/client';
+
+// Convert Supabase storage path to full public URL
+const getFeedAttachmentUrl = (storagePath: string): string =>
+  supabase.storage.from('feed-attachments').getPublicUrl(storagePath).data.publicUrl;
 
 // Helper: Get emoji for reaction type
 const getReactionEmoji = (type: string): string => {
@@ -168,7 +173,7 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
             <div key={attachment.id} className="relative rounded overflow-hidden bg-gray-100">
               {attachment.file_type.startsWith('image/') ? (
                 <img
-                  src={attachment.storage_path}
+                  src={getFeedAttachmentUrl(attachment.storage_path)}
                   alt={attachment.file_name}
                   className="w-full h-auto"
                   loading="lazy"

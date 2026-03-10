@@ -46,17 +46,12 @@ export default function PostComposer({ selectedUser, onClose, onSuccess }: PostC
     setError('');
 
     try {
-      // Create post using the selected team member ID
-      // Debug logging
       const postData = {
         organization_id: context.organization_id,
         author_id: selectedUser.id, // Use team member ID, not auth user ID
         content: content.trim(),
         content_type: contentType,
       };
-      
-      console.log('[PostComposer] Creating post with data:', postData);
-      console.log('[PostComposer] Selected user:', selectedUser);
       
       const newPost = await createPost(postData);
 

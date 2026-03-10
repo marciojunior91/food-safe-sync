@@ -5,10 +5,20 @@ import { LabelPreview } from "@/components/labels/LabelPreview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Printer, Download, Share2, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { ArrowLeft, Printer, Download, Share2, Loader2, CalendarClock, Trash2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePrinter } from "@/hooks/usePrinter";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
 
 interface LabelData {
   id: string;
@@ -24,6 +34,7 @@ interface LabelData {
   quantity: string;
   unit: string;
   created_at: string;
+  status: string | null;
 }
 
 export default function LabelPreviewPage() {
@@ -35,6 +46,13 @@ export default function LabelPreviewPage() {
   const [label, setLabel] = useState<LabelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Action dialog state
+  const [actionOpen, setActionOpen] = useState(false);
+  const [actionType, setActionType] = useState<'extend' | 'discard' | 'consume' | null>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [newExpiryDate, setNewExpiryDate] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -62,7 +80,8 @@ export default function LabelPreviewPage() {
           expiry_date,
           quantity,
           unit,
-          created_at
+          created_at,
+          status
         `)
         .eq("id", labelId)
         .single();
@@ -85,6 +104,47 @@ export default function LabelPreviewPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAction = (type: 'extend' | 'discard' | 'consume') => {
+    setActionType(type);
+    setActionReason('');
+    setNewExpiryDate(
+      label ? format(addDays(new Date(label.expiry_date), 1), 'yyyy-MM-dd') : ''
+    );
+    setActionOpen(true);
+  };
+
+  const handleSubmitAction = async () => {
+    if (!label || !actionType) return;
+    setIsSubmitting(true);
+    try {
+      let updates: Record<string, any> = {};
+      if (actionType === 'consume') updates = { status: 'used' };
+      else if (actionType === 'discard') updates = { status: 'wasted' };
+      else if (actionType === 'extend') {
+        if (!newExpiryDate) {
+          toast({ variant: 'destructive', title: 'Date required', description: 'Please select a new expiry date.' });
+          return;
+        }
+        updates = { expiry_date: newExpiryDate, status: 'active' };
+      }
+
+      const { error: updateError } = await supabase
+        .from('printed_labels')
+        .update(updates)
+        .eq('id', label.id);
+
+      if (updateError) throw updateError;
+
+      setLabel(prev => prev ? { ...prev, ...updates } : prev);
+      setActionOpen(false);
+      toast({ title: 'Updated', description: `Label marked as ${actionType === 'consume' ? 'consumed' : actionType === 'discard' ? 'discarded' : 'extended'}.` });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Error', description: err.message || 'Failed to update label.' });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -234,6 +294,36 @@ export default function LabelPreviewPage() {
           <Download className="w-4 h-4" />
           Export as PDF
         </Button>
+
+        <Button
+          onClick={() => handleAction('consume')}
+          variant="outline"
+          className="gap-2"
+          disabled={label.status === 'used' || label.status === 'wasted'}
+        >
+          <CheckCircle2 className="w-4 h-4" />
+          Consumed
+        </Button>
+
+        <Button
+          onClick={() => handleAction('extend')}
+          variant="outline"
+          className="gap-2"
+          disabled={label.status === 'used' || label.status === 'wasted'}
+        >
+          <CalendarClock className="w-4 h-4" />
+          Extend
+        </Button>
+
+        <Button
+          onClick={() => handleAction('discard')}
+          variant="outline"
+          className="gap-2 text-destructive hover:text-destructive"
+          disabled={label.status === 'used' || label.status === 'wasted'}
+        >
+          <Trash2 className="w-4 h-4" />
+          Discard
+        </Button>
       </div>
 
       {/* Label Preview */}
@@ -246,8 +336,9 @@ export default function LabelPreviewPage() {
         expiryDate={label.expiry_date}
         quantity={label.quantity}
         unit={label.unit}
-        batchNumber={label.id.slice(0, 8)} // Use label ID first 8 chars as batch
+        batchNumber={label.id.slice(0, 8)}
         productId={label.product_id}
+        labelId={label.id}
       />
 
       {/* Label Details Card */}
@@ -280,6 +371,55 @@ export default function LabelPreviewPage() {
           </div>
         </CardContent>
       </Card>
+      {/* Action Dialog */}
+      <Dialog open={actionOpen} onOpenChange={setActionOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === 'extend' ? 'Extend Expiry Date' :
+               actionType === 'discard' ? 'Discard Label' : 'Mark as Consumed'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {actionType === 'extend' && (
+              <div className="space-y-2">
+                <Label htmlFor="new-expiry">New Expiry Date</Label>
+                <Input
+                  id="new-expiry"
+                  type="date"
+                  value={newExpiryDate}
+                  onChange={e => setNewExpiryDate(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="action-reason">Reason <span className="text-muted-foreground text-xs">(Optional)</span></Label>
+              <Textarea
+                id="action-reason"
+                placeholder="e.g. Used in preparation..."
+                value={actionReason}
+                onChange={e => setActionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setActionOpen(false)} disabled={isSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitAction}
+              disabled={isSubmitting || (actionType === 'extend' && !newExpiryDate)}
+              variant={actionType === 'discard' ? 'destructive' : 'default'}
+            >
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              {actionType === 'extend' ? 'Extend' : actionType === 'discard' ? 'Discard' : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

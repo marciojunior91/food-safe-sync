@@ -384,15 +384,28 @@ export default function ExpiringSoon() {
 
   // QR Code handling
   const handleQRScan = (qrData: string) => {
-    // Extract label ID from QR code
+    // Handle full URL format: https://app.com/labels/{id}/preview
+    const urlMatch = qrData.match(/\/labels\/([^/]+)\/preview/);
+    if (urlMatch) {
+      navigate(`/labels/${urlMatch[1]}/preview`);
+      return;
+    }
+    // Handle label-{id} prefix format
     if (qrData.startsWith('label-')) {
       const labelId = qrData.replace('label-', '');
-      // Navigate directly to the QR Label Action page
-      navigate(`/qr-label-action/${labelId}`);
-    } else {
-      // Try to use as direct label ID
-      navigate(`/qr-label-action/${qrData}`);
+      navigate(`/labels/${labelId}/preview`);
+      return;
     }
+    // Try JSON format (QR codes that contain productId etc.)
+    try {
+      const parsed = JSON.parse(qrData);
+      if (parsed.labelId) {
+        navigate(`/labels/${parsed.labelId}/preview`);
+        return;
+      }
+    } catch {}
+    // Fallback: treat as raw label ID
+    navigate(`/labels/${qrData}/preview`);
   };
 
   // Navigate to QR Label Action page
@@ -491,7 +504,7 @@ export default function ExpiringSoon() {
         >
           <CardHeader className="pb-3">
             <CardDescription className={getUrgencyColor('upcoming').text}>
-              🟢 Upcoming (3-7 Days)
+              🟢 Upcoming
             </CardDescription>
             <CardTitle className="text-3xl">
               {urgencyCounts.upcoming}
@@ -627,111 +640,108 @@ export default function ExpiringSoon() {
             
             return (
               <Card key={itemKey} className={`${colors.bg} ${colors.border} ${isSelected ? 'ring-2 ring-primary' : ''}`}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start gap-4">
-                    {/* Checkbox for multi-selection */}
+                <CardContent className="py-4 px-4">
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
                     <Checkbox
                       checked={isSelected}
                       onCheckedChange={() => toggleSelectItem(itemKey)}
-                      className="mt-1"
+                      className="mt-1 flex-shrink-0"
                     />
-                    
-                    {/* Left: Item Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className={`p-2 rounded-lg ${colors.badge}`}>
+
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      {/* Name row */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className={`p-1.5 rounded-lg ${colors.badge} flex-shrink-0`}>
                           {getItemIcon(item.type)}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-lg truncate">{item.name}</h3>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-                            <Badge variant="outline" className="capitalize">
-                              {item.type}
-                            </Badge>
-                            {item.status && item.type === 'label' && (
-                              <Badge variant={
-                                item.status === 'used' ? 'default' :
-                                item.status === 'wasted' ? 'destructive' :
-                                item.status === 'expired' ? 'destructive' :
-                                item.status === 'near_expiry' ? 'secondary' : 'outline'
-                              }>
-                                {item.status.replace('_', ' ')}
-                              </Badge>
-                            )}
-                            {item.location && (
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                {item.location}
-                              </span>
-                            )}
-                            {item.quantity && (
-                              <span>
-                                {item.quantity} {item.unit}
-                              </span>
-                            )}
-
-                          </div>
-                        </div>
+                        <h3 className="font-semibold text-base leading-tight truncate">{item.name}</h3>
                       </div>
-                      
-                      {/* Urgency Badge */}
-                      <div className="flex items-center gap-2 mt-3 flex-wrap">
-                        <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+
+                      {/* Badges row */}
+                      <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+                        <Badge variant="outline" className="capitalize text-xs">
+                          {item.type}
+                        </Badge>
+                        {item.status && item.type === 'label' && (
+                          <Badge className="text-xs" variant={
+                            item.status === 'used' ? 'default' :
+                            item.status === 'wasted' ? 'destructive' :
+                            item.status === 'expired' ? 'destructive' :
+                            item.status === 'near_expiry' ? 'secondary' : 'outline'
+                          }>
+                            {item.status.replace('_', ' ')}
+                          </Badge>
+                        )}
+                        {item.location && (
+                          <span className="flex items-center gap-1 text-xs">
+                            <MapPin className="w-3 h-3" />
+                            {item.location}
+                          </span>
+                        )}
+                        {item.quantity && (
+                          <span className="text-xs">{item.quantity} {item.unit}</span>
+                        )}
+                      </div>
+
+                      {/* Urgency + Date row */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className={`w-2 h-2 rounded-full ${colors.dot} flex-shrink-0`} />
                         <span className={`text-sm font-medium ${colors.text}`}>
                           {getUrgencyLabel(item.urgency, item.daysUntilExpiry)}
                         </span>
-                        <span className="text-sm text-muted-foreground">
-                          • Expires {format(item.expiryDate, 'MMM dd, yyyy')}
+                        <span className="text-xs text-muted-foreground">
+                          · {item.daysUntilExpiry < 0 ? 'Expired' : 'Expires'} {format(item.expiryDate, 'MMM dd, yyyy')}
                         </span>
                       </div>
-                    </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-                      {/* Preview button - only for labels */}
-                      {item.type === 'label' && (
+                      {/* Actions row — wraps naturally on all screen sizes */}
+                      <div className="flex gap-1.5 flex-wrap pt-1">
+                        {item.type === 'label' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/labels/${item.id}/preview`)}
+                            className="h-7 gap-1.5 text-xs px-2"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            Preview
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => navigate(`/labels/${item.id}/preview`)}
-                          className="gap-2"
+                          onClick={() => handleAction('consume', item)}
+                          className="h-7 gap-1.5 text-xs px-2"
+                          disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
                         >
-                          <Eye className="w-4 h-4" />
-                          <span className="hidden sm:inline">Preview</span>
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          Consumed
                         </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAction('consume', item)}
-                        className="gap-2"
-                        disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
-                      >
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Consumed</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAction('extend', item)}
-                        className="gap-2"
-                        disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
-                      >
-                        <CalendarClock className="w-4 h-4" />
-                        <span className="hidden sm:inline">Extend</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAction('discard', item)}
-                        className="gap-2 text-destructive hover:text-destructive"
-                        disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Discard</span>
-                      </Button>
-                    </div>
-                  </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAction('extend', item)}
+                          className="h-7 gap-1.5 text-xs px-2"
+                          disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
+                        >
+                          <CalendarClock className="w-3.5 h-3.5" />
+                          Extend
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAction('discard', item)}
+                          className="h-7 gap-1.5 text-xs px-2 text-destructive hover:text-destructive"
+                          disabled={item.type === 'label' && (item.status === 'used' || item.status === 'wasted')}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Discard
+                        </Button>
+                      </div>{/* end actions row */}
+                    </div>{/* end content */}
+                  </div>{/* end outer flex */}
                 </CardContent>
               </Card>
             );
@@ -879,7 +889,7 @@ export default function ExpiringSoon() {
             {/* Reason */}
             <div className="space-y-2">
               <Label htmlFor="reason">
-                Reason {actionDialog.action === 'consume' ? '(Optional)' : '(Required)'}
+                Reason (Optional)
               </Label>
               <Textarea
                 id="reason"
@@ -909,8 +919,7 @@ export default function ExpiringSoon() {
               onClick={handleSubmitAction}
               disabled={
                 isSubmitting ||
-                (actionDialog.action === 'extend' && (!newExpiryDate || !actionReason)) ||
-                (actionDialog.action === 'discard' && !actionReason)
+                (actionDialog.action === 'extend' && !newExpiryDate)
               }
               variant={actionDialog.action === 'discard' ? 'destructive' : 'default'}
             >

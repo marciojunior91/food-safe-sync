@@ -18,6 +18,7 @@ interface LabelPreviewProps {
   unit: string;
   batchNumber: string;
   productId?: string;
+  labelId?: string;
   templateType?: "default" | "recipe" | "allergen" | "blank";
   templateName?: string; // To detect "Blank" template
   isBlankTemplate?: boolean; // Direct flag for blank templates
@@ -43,6 +44,7 @@ export function LabelPreview({
   unit,
   batchNumber,
   productId,
+  labelId,
   templateType = "default",
   templateName,
   isBlankTemplate = false,
@@ -75,15 +77,17 @@ export function LabelPreview({
     }
   };
 
-  // Generate QR code data
-  const qrData = JSON.stringify({
-    productId: productId || "",
-    productName,
-    prepDate,
-    expiryDate,
-    batchNumber,
-    timestamp: new Date().toISOString(),
-  });
+  // Generate QR code data — URL when labelId available, JSON fallback
+  const qrData = labelId
+    ? `${window.location.origin}/labels/${labelId}/preview`
+    : JSON.stringify({
+        productId: productId || "",
+        productName,
+        prepDate,
+        expiryDate,
+        batchNumber,
+        timestamp: new Date().toISOString(),
+      });
 
   // Format dates for display
   const formattedPrepDate = prepDate ? format(new Date(prepDate), "MMM dd, yyyy") : "";
