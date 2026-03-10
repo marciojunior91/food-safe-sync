@@ -27,7 +27,7 @@ const navigation = [{
   icon: Tags
 }, {
   name: "Expiring Alerts",
-  href: "/expiring-soon",
+  href: "/expiring-alerts",
   icon: AlertTriangle
 }, {
   name: "Inventory",

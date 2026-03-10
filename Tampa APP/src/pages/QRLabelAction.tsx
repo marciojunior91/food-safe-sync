@@ -72,7 +72,7 @@ export default function QRLabelAction() {
       });
 
       // Navigate back to expiring soon or dashboard
-      navigate('/expiring-soon');
+      navigate('/expiring-alerts');
     } catch (error) {
       console.error('Error updating label:', error);
       toast({
@@ -106,7 +106,7 @@ export default function QRLabelAction() {
             <p className="text-muted-foreground mb-4">
               The QR code doesn't match any active label in the system.
             </p>
-            <Button onClick={() => navigate('/expiring-soon')}>
+            <Button onClick={() => navigate('/expiring-alerts')}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Expiring Soon
             </Button>
@@ -124,7 +124,7 @@ export default function QRLabelAction() {
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => navigate('/expiring-soon')}>
+          <Button variant="outline" size="sm" onClick={() => navigate('/expiring-alerts')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>

@@ -23,8 +23,9 @@ export async function renderPdfLabel(
   // Page margins (A4 standard)
   const margin = 40;
   const labelWidth = width - (margin * 2);
-  const labelHeight = 780; // Increased from 680 to 780px to ensure QR code and Label ID fit completely
-  const labelY = margin + 50;
+  // Dynamic height: fills available canvas space instead of fixed 780px
+  const labelHeight = height - margin * 2 - 50; // 50 = top header gap, leaves bottom margin
+  const labelY = margin + 30;
 
   // Paper border
   ctx.strokeStyle = '#e9ecef';

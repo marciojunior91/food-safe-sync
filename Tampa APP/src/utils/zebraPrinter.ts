@@ -47,140 +47,178 @@ export interface LabelPrintData {
 /**
  * Generate ZPL code from label data
  * Designed for BOPP (Biaxially Oriented Polypropylene) labels
- * Following Suflex label layout pattern
+ * Mirrors the LabelPreview card layout for BOPP on Zebra thermal printers.
+ * Layout (top→bottom):
+ *   [Header box: product name left, quantity right]
+ *   [Separator]
+ *   [Condition uppercase]
+ *   [Separator]
+ *   [Left col: Prep Date / Expiry / Batch / Category | Right col: QR code]
+ *   [Separator]
+ *   [Allergens (if any)]
+ *   [Separator]
+ *   [Prepared By]
+ *   [Separator]
+ *   [Org footer: phone / address]
+ *   [Label ID bottom-left]
  */
 const generateZPL = (data: LabelPrintData): string => {
-  const { 
-    labelId, 
-    productName, 
-    categoryName, 
-    condition, 
-    prepDate, 
-    expiryDate, 
-    preparedByName, 
-    quantity, 
-    unit, 
+  const {
+    labelId,
+    productName,
+    categoryName,
+    condition,
+    prepDate,
+    expiryDate,
+    preparedByName,
+    quantity,
+    unit,
     allergens,
-    organizationDetails 
+    organizationDetails,
   } = data;
-  
-  // Generate QR Code data - includes labelId for product lifecycle tracking
-  const qrData = JSON.stringify({
-    labelId: labelId || null,
-    product: productName,
-    prep: prepDate,
-    exp: expiryDate,
-    batch: data.batchNumber,
-    by: preparedByName,
-  });
-  
-  // Format allergen text
+
+  // QR code URL — matches LabelPreview's qrData when labelId is present
+  const qrValue = labelId
+    ? `https://app.tampaapp.com.br/labels/${labelId}/preview`
+    : JSON.stringify({ product: productName, prep: prepDate, exp: expiryDate, batch: data.batchNumber });
+
+  // Allergen text
   const allergenText = allergens && allergens.length > 0
     ? allergens.map(a => a.name).join(', ')
     : '';
-  
-  // Format address - handle JSON format
-  let addressText = '';
+
+  // Address lines
+  let addrLine1 = '';
+  let addrLine2 = '';
   if (organizationDetails?.address) {
     try {
-      const addr = typeof organizationDetails.address === 'string' 
+      const addr = typeof organizationDetails.address === 'string'
         ? JSON.parse(organizationDetails.address)
         : organizationDetails.address;
-      addressText = `${addr.street || ''}, ${addr.number || ''}\n${addr.city || ''} - ${addr.state || ''}, ${addr.postalCode || ''}`;
+      addrLine1 = `${addr.street || ''}, ${addr.number || ''}`.trim();
+      addrLine2 = `${addr.city || ''} - ${addr.state || ''}, ${addr.postalCode || ''}`.trim();
     } catch {
-      addressText = String(organizationDetails.address);
+      addrLine1 = String(organizationDetails.address);
     }
   }
-  
-  // Professional ZPL layout
-  const zpl = `
-^XA
-^CF0,30
-~TA000
-~JSN
-^LT0
-^MNW
-^MTT
-^PON
-^PMN
-^LH0,0
-^JMA
-^PR4,4
-~SD15
-^JUS
-^LRN
-^CI27
-^PA0,1,1,0
-^XZ
 
-^XA
+  // ── Dynamic-position builder ──────────────────────────────────────────────
+  // PW=812 dots (102mm @ 203dpi), each row step = 40 dots
+  const PW = 812;   // label width
+  const ML = 30;    // left margin
+  const MR = 30;    // right margin
+  const CW = PW - ML - MR; // content width = 752
+  const QR_SIZE = 5; // ^BQH magnification (5 → ~140 dots)
+  const QR_W = 150;  // approximate pixel width of QR block
+  const LEFT_W = CW - QR_W - 20; // left column width
+
+  const rows: string[] = [];
+  let y = 20; // current vertical position
+
+  const sep = (y: number) => `^FO${ML},${y}^GB${CW},2,2^FS`;
+  const advance = (n = 40) => { y += n; };
+
+  // ── Header box: product name left, quantity right ─────────────────────────
+  rows.push(`^FO${ML},${y}^GB${CW},70,3^FS`);
+  rows.push(`^FO${ML + 10},${y + 15}^A0N,45,45^FW^FD${productName}^FS`);
+  if (quantity && unit) {
+    rows.push(`^FO${ML + LEFT_W},${y + 18}^A0N,38,38^FD${quantity} ${unit}^FS`);
+  }
+  advance(75);
+
+  // ── Separator ─────────────────────────────────────────────────────────────
+  rows.push(sep(y)); advance(18);
+
+  // ── Condition ─────────────────────────────────────────────────────────────
+  rows.push(`^FO${ML + 10},${y}^A0N,34,34^FD${(condition || '').toUpperCase()}^FS`);
+  advance(44);
+
+  // ── Separator + main content block start ─────────────────────────────────
+  rows.push(sep(y)); advance(18);
+
+  const contentStartY = y;
+
+  // ── Left column: dates ────────────────────────────────────────────────────
+  rows.push(`^FO${ML + 10},${y}^A0N,22,22^FDPREP DATE^FS`);
+  rows.push(`^FO${ML + 10},${y + 24}^A0N,28,28^FWB^FD${prepDate || 'N/A'}^FS`);
+  advance(62);
+
+  rows.push(`^FO${ML + 10},${y}^A0N,22,22^FDUSE BY^FS`);
+  rows.push(`^FO${ML + 10},${y + 24}^A0N,28,28^FWB^FD${expiryDate || 'N/A'}^FS`);
+  advance(62);
+
+  if (data.batchNumber) {
+    rows.push(`^FO${ML + 10},${y}^A0N,22,22^FDBATCH #^FS`);
+    rows.push(`^FO${ML + 10},${y + 24}^A0N,26,26^FD${data.batchNumber}^FS`);
+    advance(54);
+  }
+
+  if (categoryName && categoryName !== 'Quick Print') {
+    rows.push(`^FO${ML + 10},${y}^A0N,22,22^FDCATEGORY^FS`);
+    rows.push(`^FO${ML + 10},${y + 24}^A0N,26,26^FD${categoryName}^FS`);
+    advance(54);
+  }
+
+  // ── Right column: QR code (anchored to contentStartY) ────────────────────
+  const qrX = ML + LEFT_W + 10;
+  rows.push(`^FO${qrX},${contentStartY}^BQH,2,${QR_SIZE}^FDQA,${qrValue}^FS`);
+
+  // ── Separator after content block ─────────────────────────────────────────
+  rows.push(sep(y)); advance(18);
+
+  // ── Allergens (if any) ────────────────────────────────────────────────────
+  if (allergenText) {
+    rows.push(`^FO${ML + 10},${y}^A0N,22,22^FDALLERGENS^FS`); advance(28);
+    // Wrap allergen text at ~60 chars
+    const words = allergenText.split(', ');
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line}, ${word}` : word;
+      if (test.length > 58 && line) {
+        rows.push(`^FO${ML + 10},${y}^A0N,24,24^FD${line}^FS`); advance(30);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) { rows.push(`^FO${ML + 10},${y}^A0N,24,24^FD${line}^FS`); advance(34); }
+    rows.push(sep(y)); advance(18);
+  }
+
+  // ── Prepared By ───────────────────────────────────────────────────────────
+  rows.push(`^FO${ML + 10},${y}^A0N,28,28^FDPREPARED BY: ${(preparedByName || '').toUpperCase()}^FS`);
+  advance(40);
+  rows.push(sep(y)); advance(18);
+
+  // ── Org footer ────────────────────────────────────────────────────────────
+  if (organizationDetails?.phone) {
+    rows.push(`^FO${ML + 10},${y}^A0N,22,22^FDTel: ${organizationDetails.phone}^FS`); advance(28);
+  }
+  if (addrLine1) {
+    rows.push(`^FO${ML + 10},${y}^A0N,20,20^FD${addrLine1}^FS`); advance(26);
+  }
+  if (addrLine2) {
+    rows.push(`^FO${ML + 10},${y}^A0N,20,20^FD${addrLine2}^FS`); advance(26);
+  }
+
+  // ── Label ID bottom-left ──────────────────────────────────────────────────
+  if (labelId) {
+    advance(10);
+    rows.push(`^FO${ML + 10},${y}^A0N,18,18^FD#${labelId.substring(0, 8).toUpperCase()}^FS`);
+    advance(24);
+  }
+
+  // Final label height (with 20px bottom margin)
+  const labelHeight = y + 20;
+
+  const zpl = `^XA
 ^MMT
-^PW812  // 4 inches = 812 dots at 203 DPI (102mm)
-^LL1218 // 6 inches = 1218 dots at 203 DPI (152mm)
+^PW${PW}
+^LL${labelHeight}
 ^LS0
-
-// Product Name Header (bold, centered)
-^FO30,30^GB752,80,3^FS
-^FO50,45^A0N,50,50^FD${productName}^FS
-
-^FO30,120^GB752,2,2^FS
-
-// Condition & Quantity
-^FO50,140^A0N,35,35^FD${condition.toUpperCase()}${quantity ? ` / ${quantity} ${unit || ''}` : ''}^FS
-
-^FO30,190^GB752,2,2^FS
-
-// Prep & Expiry Dates
-^FO50,210^A0N,30,30^FDPrep Date:^FS
-^FO350,210^A0N,30,30^FD${prepDate}^FS
-
-^FO50,260^A0N,30,30^FDExpiry:^FS
-^FO350,260^A0N,30,30^FD${expiryDate}^FS
-
-${data.batchNumber ? `
-^FO50,310^A0N,28,28^FDBatch:^FS
-^FO250,310^A0N,28,28^FD${data.batchNumber}^FS
-` : ''}
-
-${categoryName && categoryName !== 'Quick Print' ? `
-^FO50,${data.batchNumber ? '360' : '310'}^A0N,28,28^FDCategory:^FS
-^FO250,${data.batchNumber ? '360' : '310'}^A0N,28,28^FD${categoryName}^FS
-` : ''}
-
-^FO30,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '410' : '360') : (data.batchNumber ? '360' : '310')}^GB752,2,2^FS
-
-${allergens && allergens.length > 0 ? `
-^FO50,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '430' : '380') : (data.batchNumber ? '380' : '330')}^A0N,26,26^FDAllergens:^FS
-^FO50,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '470' : '420') : (data.batchNumber ? '420' : '370')}^A0N,24,24^FD${allergenText.length > 45 ? allergenText.substring(0, 45) + '...' : allergenText}^FS
-^FO30,${categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '510' : '460') : (data.batchNumber ? '460' : '410')}^GB752,2,2^FS
-` : ''}
-
-// Prepared By
-^FO50,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '530' : '480') : (data.batchNumber ? '480' : '430')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '430' : '380') : (data.batchNumber ? '380' : '330'))
-}^A0N,28,28^FDPrepared By: ${preparedByName.toUpperCase()}^FS
-
-^FO30,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '570' : '520') : (data.batchNumber ? '520' : '470')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '470' : '420') : (data.batchNumber ? '420' : '370'))
-}^GB752,2,2^FS
-
-${labelId ? `^FO50,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '590' : '540') : (data.batchNumber ? '540' : '490')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '490' : '440') : (data.batchNumber ? '440' : '390'))
-}^A0N,20,20^FDLabel ID: #${labelId.substring(0, 8).toUpperCase()}^FS` : ''}
-
-// QR Code (bottom right, HIGH error correction for maximum reliability)
-// Sprint 4 - T9.1: Changed from ^BQN (normal) to ^BQH (high) error correction
-// ^BQH,2,6 = High error correction, model 2, magnification 6
-^FO600,${allergens && allergens.length > 0 ? 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '950' : '900') : (data.batchNumber ? '900' : '850')) : 
-  (categoryName && categoryName !== 'Quick Print' ? (data.batchNumber ? '850' : '800') : (data.batchNumber ? '800' : '750'))
-}^BQH,2,6^FDQA,${qrData}^FS
-
-^XZ
-`;
+^CI28
+${rows.join('\n')}
+^XZ`;
 
   return zpl;
 };
@@ -460,9 +498,9 @@ export const printLabel = async (
   console.log('🏷️  ============================================\n');
 
   try {
-    // 1. Save to database first to get the labelId
+    // 1. Save to database first to get the labelId (skip if already provided)
     console.log('💾 [STEP 1/3] Saving label to database...');
-    const labelId = await saveLabelToDatabase(data);
+    const labelId = data.labelId ?? await saveLabelToDatabase(data);
     console.log(`✅ [STEP 1/3] Label saved! ID: ${labelId}\n`);
 
     // 2. Generate ZPL with labelId included in QR code

@@ -296,20 +296,46 @@ export function PrintQueue() {
       const preparedBy = overridePreparedBy || item.user_id;
       const preparedByName = overridePreparedByName || item.prepared_by_name;
 
+      // Fetch allergens for the product
+      let productAllergens: Array<{ id: string; name: string; icon: string | null; severity: string }> = [];
+      if (item.product_id) {
+        try {
+          const { data: allergenData } = await supabase
+            .from("product_allergens")
+            .select(`
+              allergen_id,
+              allergens (
+                id,
+                name,
+                icon,
+                severity
+              )
+            `)
+            .eq("product_id", item.product_id);
+
+          productAllergens = (allergenData || [])
+            .map((pa: any) => pa.allergens)
+            .filter(Boolean);
+        } catch {
+          // Non-critical: continue without allergens
+        }
+      }
+
       // Print the label using the unified printer system
       const success = await print({
         productId: item.product_id || "",
         productName: item.product?.name || "Unknown Product",
         categoryId: item.category_id || "",
         categoryName: item.product?.category?.name || "",
-        preparedDate: item.prep_date,
-        useByDate: item.expiry_date,
+        prepDate: item.prep_date,
+        expiryDate: item.expiry_date,
         preparedBy,
         preparedByName,
         condition: item.condition,
         quantity: item.quantity || "",
         unit: item.unit || "",
         batchNumber: item.batch_number,
+        allergens: productAllergens,
       });
 
       if (!success) {

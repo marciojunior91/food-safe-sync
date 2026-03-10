@@ -108,7 +108,7 @@ export function LabelPreview({
             Label Preview
           </CardTitle>
           <Badge variant="secondary" className="text-xs font-mono">
-            60mm × 60mm
+            50mm × 50mm
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
@@ -227,6 +227,16 @@ export function LabelPreview({
             </div>
           </div>
 
+              {/* Allergen Warning Box — inside label border */}
+              {productId && allergens.length > 0 && (
+                <div className="mt-2">
+                  <AllergenWarningBox allergens={allergens} />
+                </div>
+              )}
+              {productId && loadingAllergens && (
+                <p className="text-xs text-muted-foreground text-center animate-pulse mt-2">Loading allergens...</p>
+              )}
+
               {/* Footer - Template Type Badge */}
               <div className="border-t-2 border-gray-200 dark:border-gray-800 pt-3 flex justify-between items-center">
                 <Badge variant="outline" className="text-xs">
@@ -239,20 +249,6 @@ export function LabelPreview({
             </>
           )}
         </div>
-
-        {/* Allergen Warning Box */}
-        {productId && allergens.length > 0 && (
-          <div className="mt-4">
-            <AllergenWarningBox allergens={allergens} />
-          </div>
-        )}
-
-        {/* Loading State for Allergens */}
-        {productId && loadingAllergens && (
-          <div className="mt-4 text-sm text-muted-foreground text-center animate-pulse">
-            Loading allergen information...
-          </div>
-        )}
 
         {/* Info Note */}
         <div className="mt-4 text-xs text-muted-foreground text-center">

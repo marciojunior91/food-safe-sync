@@ -17,8 +17,6 @@ import {
   Plus,
   Eye,
   EyeOff,
-  ZoomIn,
-  ZoomOut,
   Minus
 } from "lucide-react";
 import {
@@ -36,7 +34,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { LabelPreview } from "./LabelPreview";
-import { LabelPreviewCanvas, type LabelFormat, type PreviewScale } from "./LabelPreviewCanvas";
 import { AllergenSelectorEnhanced } from "./AllergenSelectorEnhanced";
 import { 
   calculateExpiryDate, 
@@ -51,7 +48,6 @@ import { usePrinter } from "@/hooks/usePrinter";
 import { usePrintQueue } from "@/hooks/usePrintQueue";
 import { saveLabelToDatabase } from "@/utils/zebraPrinter";
 import { Settings } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
 
 export interface LabelData {
   labelId?: string; // UUID from printed_labels table - for lifecycle tracking
@@ -185,7 +181,6 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   
   // Canvas preview states
   const [showCanvasPreview, setShowCanvasPreview] = useState(false);
-  const [previewScale, setPreviewScale] = useState<PreviewScale>(1);
   
   // Organization details for label preview
   const [organizationDetails, setOrganizationDetails] = useState<{
@@ -797,7 +792,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
     // Save label to database first
     try {
-      await saveLabelToDatabase({
+      const savedLabelId = await saveLabelToDatabase({
         productId: labelData.productId,
         productName: labelData.productName,
         categoryId: labelData.categoryId === "all" ? null : labelData.categoryId,
@@ -812,6 +807,7 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         unit: labelData.unit,
         batchNumber: labelData.batchNumber,
         organizationId: organizationId || "", // Required for RLS
+        allergens: selectedAllergensForPreview,
       });
 
       // Print using the new printer system
@@ -819,11 +815,15 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         productName: labelData.productName,
         categoryName: labelData.categoryName,
         subcategoryName: labelData.subcategoryName,
-        preparedDate: labelData.prepDate,
-        useByDate: labelData.expiryDate,
-        allergens: [], // Will be fetched from DB if needed
-        storageInstructions: `Condition: ${labelData.condition}`,
-        barcode: labelData.batchNumber,
+        prepDate: labelData.prepDate,
+        expiryDate: labelData.expiryDate,
+        condition: labelData.condition,
+        preparedByName: labelData.preparedByName,
+        quantity: labelData.quantity,
+        unit: labelData.unit,
+        allergens: selectedAllergensForPreview,
+        batchNumber: labelData.batchNumber,
+        labelId: savedLabelId || undefined,
       });
 
       if (success && onPrint) {
@@ -1422,103 +1422,18 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         
         {showCanvasPreview && (
           <CardContent className="space-y-4">
-            {/* Preview Controls */}
-            <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/50 rounded-lg">
-              {/* Current Printer Info */}
-              <div className="flex-1 space-y-2">
-                <Label className="text-xs font-medium">Current Printer</Label>
-                <div className="flex items-center gap-3 p-3 bg-background rounded-md border">
-                  <Printer className="w-5 h-5 text-primary flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm">{settings?.name || 'No printer selected'}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {settings?.paperWidth}mm × {settings?.paperHeight}mm
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Zoom Control */}
-              <div className="flex-1 space-y-2">
-                <Label className="text-xs font-medium flex items-center justify-between">
-                  <span>Zoom</span>
-                  <span className="text-muted-foreground">{Math.round(previewScale * 100)}%</span>
-                </Label>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => {
-                      const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
-                      const currentIndex = scales.indexOf(previewScale);
-                      if (currentIndex > 0) {
-                        setPreviewScale(scales[currentIndex - 1]);
-                      }
-                    }}
-                    disabled={previewScale <= 0.5}
-                  >
-                    <ZoomOut className="w-4 h-4" />
-                  </Button>
-                  <Slider
-                    value={[previewScale * 100]}
-                    onValueChange={([value]) => {
-                      const scale = value / 100;
-                      if (scale >= 0.5 && scale <= 1.5) {
-                        // Round to nearest valid scale
-                        const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
-                        const closest = scales.reduce((prev, curr) => 
-                          Math.abs(curr - scale) < Math.abs(prev - scale) ? curr : prev
-                        );
-                        setPreviewScale(closest);
-                      }
-                    }}
-                    min={50}
-                    max={150}
-                    step={25}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => {
-                      const scales: PreviewScale[] = [0.5, 0.75, 1, 1.25, 1.5];
-                      const currentIndex = scales.indexOf(previewScale);
-                      if (currentIndex < scales.length - 1) {
-                        setPreviewScale(scales[currentIndex + 1]);
-                      }
-                    }}
-                    disabled={previewScale >= 1.5}
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Canvas Preview - Sprint 4 T7.1: Removed min-h to prevent cutting label */}
-            <LabelPreviewCanvas
-              labelData={{
-                ...labelData,
-                allergens: selectedAllergensForPreview, // Add selected allergens to preview
-                organizationDetails, // Add organization details for preview
-              }}
-              format={(settings?.type as LabelFormat) || 'generic'}
-              scale={previewScale}
-              className="w-full"
+            <LabelPreview
+              productName={labelData.productName}
+              categoryName={labelData.categoryName}
+              condition={labelData.condition}
+              preparedByName={labelData.preparedByName}
+              prepDate={labelData.prepDate}
+              expiryDate={labelData.expiryDate}
+              quantity={labelData.quantity}
+              unit={labelData.unit}
+              batchNumber={labelData.batchNumber}
+              productId={labelData.productId || undefined}
             />
-
-            {/* Format Info */}
-            <div className="text-xs text-muted-foreground text-center p-4 bg-muted/30 rounded-lg">
-              <p>
-                All labels use the same professional layout. 
-                {settings?.type === 'pdf' && ' This preview shows how it will appear on A4 paper (210mm × 297mm).'}
-                {settings?.type === 'zebra' && ' This preview shows how it will appear on thermal printer labels (60mm × 60mm).'}
-                {settings?.type === 'generic' && ' This preview shows how it will appear on standard label paper (60mm × 60mm).'}
-                {!settings && ' Select a printer to see the label preview with appropriate dimensions.'}
-              </p>
-            </div>
           </CardContent>
         )}
       </Card>

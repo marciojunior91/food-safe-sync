@@ -348,8 +348,8 @@ export class UniversalPrinter implements PrinterDriver {
       // Convert to LabelPrintData format
       const printData = await this.convertToLabelPrintData(labelData);
       
-      // Save to database first (get labelId for QR code)
-      const labelId = await saveLabelToDatabase(printData);
+      // Save to database first (get labelId for QR code) — skip if already provided
+      const labelId = printData.labelId ?? await saveLabelToDatabase(printData);
       if (!labelId) {
         throw new Error('Failed to save label to database');
       }
@@ -608,6 +608,7 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
     }
 
     return {
+      labelId: labelData.labelId,
       productId: labelData.productId,
       productName: labelData.productName,
       categoryId: labelData.categoryId,

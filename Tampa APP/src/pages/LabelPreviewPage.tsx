@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { LabelPreview } from "@/components/labels/LabelPreview";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +17,7 @@ import {
 import { ArrowLeft, Printer, Download, Share2, Loader2, CalendarClock, Trash2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePrinter } from "@/hooks/usePrinter";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, addDays } from "date-fns";
 
 interface LabelData {
@@ -41,11 +41,13 @@ export default function LabelPreviewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { print, isLoading: isPrinting } = usePrinter('label-preview');
+  const { print, printer, changePrinter, isLoading: isPrinting } = usePrinter('label-preview');
+  const [selectedPrinter, setSelectedPrinter] = useState<string>(printer?.type || 'zebra');
   
   const [label, setLabel] = useState<LabelData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [labelAllergens, setLabelAllergens] = useState<Array<{ id: string; name: string; icon: string | null; severity: string }>>([]);
 
   // Action dialog state
   const [actionOpen, setActionOpen] = useState(false);
@@ -94,6 +96,31 @@ export default function LabelPreviewPage() {
       }
 
       setLabel(data as LabelData);
+
+      // Fetch allergens for this product
+      if (data.product_id) {
+        try {
+          const { data: allergenData } = await supabase
+            .from('product_allergens')
+            .select(`
+              allergen_id,
+              allergens (
+                id,
+                name,
+                icon,
+                severity
+              )
+            `)
+            .eq('product_id', data.product_id);
+
+          const allergens = (allergenData || [])
+            .map((pa: any) => pa.allergens)
+            .filter(Boolean) as Array<{ id: string; name: string; icon: string | null; severity: string }>;
+          setLabelAllergens(allergens);
+        } catch {
+          // Non-critical: allergens fall back to empty
+        }
+      }
     } catch (err: any) {
       console.error("Error fetching label:", err);
       setError(err.message || "Failed to load label");
@@ -156,11 +183,14 @@ export default function LabelPreviewPage() {
         productName: label.product_name,
         categoryName: label.category_name,
         subcategoryName: undefined,
-        preparedDate: label.prep_date,
-        useByDate: label.expiry_date,
-        allergens: [],
-        storageInstructions: `Condition: ${label.condition}`,
-        barcode: label.id, // Use label ID as barcode
+        prepDate: label.prep_date,
+        expiryDate: label.expiry_date,
+        condition: label.condition,
+        preparedByName: label.prepared_by_name,
+        quantity: label.quantity,
+        unit: label.unit,
+        allergens: labelAllergens,
+        labelId: label.id,
       });
 
       if (success) {
@@ -260,8 +290,35 @@ export default function LabelPreviewPage() {
         {/* No status badge since it's not in the database */}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex gap-3 flex-wrap">
+      {/* Printer selector + Action Buttons */}
+      <div className="flex flex-col gap-3">
+        {/* Printer selection row */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Print via:</span>
+          <Select
+            value={selectedPrinter}
+            onValueChange={(value) => {
+              setSelectedPrinter(value);
+              changePrinter(value as any);
+            }}
+            disabled={import.meta.env.PROD}
+          >
+            <SelectTrigger className="w-52">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="zebra">🦓 Zebra Thermal Printer</SelectItem>
+              <SelectItem value="generic">🖨️ Generic Printer</SelectItem>
+              <SelectItem value="pdf">📄 PDF Export</SelectItem>
+            </SelectContent>
+          </Select>
+          {import.meta.env.PROD && (
+            <span className="text-xs text-muted-foreground">Zebra locked in production</span>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3 flex-wrap">
         <Button 
           onClick={handlePrint} 
           disabled={isPrinting}
@@ -324,6 +381,7 @@ export default function LabelPreviewPage() {
           <Trash2 className="w-4 h-4" />
           Discard
         </Button>
+        </div>
       </div>
 
       {/* Label Preview */}
@@ -349,14 +407,6 @@ export default function LabelPreviewPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Label ID</p>
-              <p className="font-mono text-sm">{label.id.slice(0, 8)}...</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Product ID</p>
-              <p className="font-mono text-sm">{label.product_id.slice(0, 8)}...</p>
-            </div>
-            <div>
               <p className="text-sm text-muted-foreground">Condition</p>
               <p className="text-sm font-medium uppercase">{label.condition}</p>
             </div>
@@ -367,6 +417,18 @@ export default function LabelPreviewPage() {
             <div>
               <p className="text-sm text-muted-foreground">Quantity</p>
               <p className="text-sm font-medium">{label.quantity} {label.unit}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Prepared By</p>
+              <p className="text-sm font-medium">{label.prepared_by_name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Prep Date</p>
+              <p className="text-sm font-medium">{format(new Date(label.prep_date), 'MMM dd, yyyy')}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Use By</p>
+              <p className="text-sm font-medium">{format(new Date(label.expiry_date), 'MMM dd, yyyy')}</p>
             </div>
           </div>
         </CardContent>

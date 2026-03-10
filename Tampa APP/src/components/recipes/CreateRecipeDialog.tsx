@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { X, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,6 +47,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
   const [newPrepStep, setNewPrepStep] = useState("");
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
   const [customAllergen, setCustomAllergen] = useState("");
+  const [customDietary, setCustomDietary] = useState("");
   const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
@@ -90,6 +90,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
     setNewPrepStep("");
     setSelectedAllergens([]);
     setCustomAllergen("");
+    setCustomDietary("");
     setSelectedDietary([]);
   };
 
@@ -138,6 +139,13 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
     );
   };
 
+  const addCustomDietary = () => {
+    if (customDietary.trim() && !selectedDietary.includes(customDietary.trim())) {
+      setSelectedDietary([...selectedDietary, customDietary.trim()]);
+      setCustomDietary("");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -167,7 +175,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
         prep_steps: prepSteps,
         allergens: selectedAllergens,
         dietary_requirements: selectedDietary,
-        yield_amount: parseInt(formData.yieldAmount) || 1,
+        yield_amount: parseFloat(formData.yieldAmount) || 1,
         yield_unit: formData.yieldUnit,
         hold_time_days: parseInt(formData.holdTimeDays) || 3,
         category: formData.category,
@@ -272,11 +280,11 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
               <div className="flex gap-2">
                 <Input
                   id="yield"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={formData.yieldAmount}
                   onChange={(e) => setFormData({ ...formData, yieldAmount: e.target.value })}
                   placeholder="Amount"
-                  min="1"
                   required
                 />
                 <Select value={formData.yieldUnit} onValueChange={(value) => setFormData({ ...formData, yieldUnit: value })}>
@@ -286,8 +294,11 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                   <SelectContent className="bg-background opacity-100">
                     <SelectItem value="servings" className="bg-background opacity-100">servings</SelectItem>
                     <SelectItem value="portions" className="bg-background opacity-100">portions</SelectItem>
-                    <SelectItem value="litres" className="bg-background opacity-100">litres</SelectItem>
                     <SelectItem value="kg" className="bg-background opacity-100">kg</SelectItem>
+                    <SelectItem value="g" className="bg-background opacity-100">g</SelectItem>
+                    <SelectItem value="litres" className="bg-background opacity-100">l</SelectItem>
+                    <SelectItem value="ml" className="bg-background opacity-100">ml</SelectItem>
+                    <SelectItem value="mg" className="bg-background opacity-100">mg</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -301,17 +312,6 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                 onChange={(e) => setFormData({ ...formData, estimatedPrepMinutes: e.target.value })}
                 placeholder="30"
                 min="1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="serviceGap">Service Gap (minutes)</Label>
-              <Input
-                id="serviceGap"
-                type="number"
-                value={formData.serviceGapMinutes}
-                onChange={(e) => setFormData({ ...formData, serviceGapMinutes: e.target.value })}
-                placeholder="0"
-                min="0"
               />
             </div>
           </div>
@@ -405,23 +405,35 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
           {/* Dietary Requirements */}
           <div>
             <Label>Dietary Requirements</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="flex flex-wrap gap-2 mt-2 mb-4">
               {dietaryRequirements.map((dietary) => (
-                <div key={dietary} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={dietary}
-                    checked={selectedDietary.includes(dietary)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedDietary([...selectedDietary, dietary]);
-                      } else {
-                        setSelectedDietary(selectedDietary.filter(d => d !== dietary));
-                      }
-                    }}
-                  />
-                  <Label htmlFor={dietary} className="text-sm font-normal">{dietary}</Label>
-                </div>
+                <Button
+                  key={dietary}
+                  type="button"
+                  variant={selectedDietary.includes(dietary) ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => toggleDietary(dietary)}
+                >
+                  {dietary}
+                </Button>
               ))}
+              {selectedDietary.filter(d => !dietaryRequirements.includes(d)).map((custom) => (
+                <Badge key={custom} variant="secondary" className="gap-1">
+                  {custom}
+                  <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedDietary(selectedDietary.filter(d => d !== custom))} />
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={customDietary}
+                onChange={(e) => setCustomDietary(e.target.value)}
+                placeholder="Add custom dietary requirement"
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCustomDietary())}
+              />
+              <Button type="button" onClick={addCustomDietary} size="sm" variant="outline">
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
           </div>
 

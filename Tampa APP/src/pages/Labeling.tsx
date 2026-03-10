@@ -388,20 +388,21 @@ export default function Labeling() {
     };
 
     try {
-      // Save to database first
-      await saveLabelToDatabase(labelData);
+      // Save to database first — capture labelId for QR code URL
+      const savedLabelId = await saveLabelToDatabase(labelData);
       
       // Print using new printer system - pass complete label data with CORRECT field names
       const success = await print({
         productName: product.name,
         categoryName: product.label_categories?.name || "Quick Print",
-        prepDate: prepDate,          // ✅ FIXED: was "preparedDate"
-        expiryDate: expiryDate,      // ✅ FIXED: was "useByDate"
+        prepDate: prepDate,
+        expiryDate: expiryDate,
         preparedByName: selectedUserData.display_name || "Unknown",
-        allergens: productAllergens,  // ✅ FIXED: pass full allergen objects, not just names
+        allergens: productAllergens,
         condition: details?.condition || "REFRIGERATED",
         quantity: details?.quantity || "1",
         unit: details?.unit || product.measuring_units?.abbreviation || "Unit",
+        labelId: savedLabelId || undefined,
       });
       
       if (success) {

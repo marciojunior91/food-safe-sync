@@ -231,6 +231,7 @@ export class ZebraPrinter implements PrinterDriver {
     
     // Build LabelPrintData object
     const printData: LabelPrintData = {
+      labelId: labelData.labelId,
       productId: labelData.productId || null, // Use null instead of empty string for UUID field
       productName: labelData.productName,
       categoryId: labelData.categoryId || null,
@@ -243,13 +244,12 @@ export class ZebraPrinter implements PrinterDriver {
       organizationId,
       quantity: labelData.quantity,
       unit: labelData.unit,
-      batchNumber: labelData.barcode || '',
-      allergens: labelData.allergens?.map(name => ({
-        id: '',
-        name: typeof name === 'string' ? name : (name as any).name || '',
-        icon: null,
-        severity: 'low'
-      }))
+      batchNumber: labelData.batchNumber || labelData.barcode || '',
+      allergens: labelData.allergens?.map((a: any) =>
+        typeof a === 'string'
+          ? { id: '', name: a, icon: null, severity: 'low' }
+          : { id: a.id || '', name: a.name || '', icon: a.icon ?? null, severity: a.severity || 'low' }
+      )
     };
     
     console.log('✅ LabelPrintData created successfully');

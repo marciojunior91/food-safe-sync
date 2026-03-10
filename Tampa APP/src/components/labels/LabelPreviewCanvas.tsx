@@ -43,13 +43,12 @@ export function LabelPreviewCanvas({
 
     if (format === 'pdf') {
       // A4 dimensions in pixels at 96 DPI (reduced for preview)
-      baseWidth = 600;  // Scaled down from 794
-      baseHeight = 848; // Scaled down from 1123
-    } else if (format === 'zebra' || format === 'generic') {
-      // Thermal and generic labels use same dimensions as PDF to fit the full layout
-      // The unified layout requires this height to display all content without cutting
       baseWidth = 600;
       baseHeight = 848;
+    } else if (format === 'zebra' || format === 'generic') {
+      // Compact size for thermal/generic: removes excess blank space
+      baseWidth = 600;
+      baseHeight = 620;
     }
 
     // Apply scale

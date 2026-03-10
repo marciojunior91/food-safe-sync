@@ -46,7 +46,7 @@ export const STORAGE_CONDITION_LABELS: Record<StorageCondition, string> = {
   frozen: 'Frozen',
   dry: 'Dry Storage',
   refrigerated: 'Refrigerated',
-  ambient: 'Ambient',
+  ambient: 'Room Temperature',
   hot: 'Hot',
   thawed: 'Thawed',
 };

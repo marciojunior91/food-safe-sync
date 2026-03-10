@@ -45,24 +45,27 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
   
   // Form state
   const [batchMultiplier, setBatchMultiplier] = useState(1);
+  const [batchCustom, setBatchCustom] = useState('');
   const [manufacturingDate, setManufacturingDate] = useState(new Date());
   const [storageCondition, setStorageCondition] = useState<StorageCondition>('refrigerated');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('');
-  const [batchNumber, setBatchNumber] = useState('');
   
   // Category IDs for "Prepared Foods → Recipes"
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   
-  // Calculate expiry date - recalculates when storage condition or date changes
-  const shelfLifeDays = recipe.shelf_life_days || 3; // Default 3 days (baseline)
+  // Calculate expiry date - recalculates reactively when storageCondition or date changes
+  const baseShelfLifeDays = recipe.shelf_life_days || 3;
+  const shelfLifeDays = baseShelfLifeDays;
   const expiryDateString = calculateExpiryDate(
     format(manufacturingDate, 'yyyy-MM-dd'),
     storageCondition,
     shelfLifeDays
   );
-  const expiryDate = parseISO(expiryDateString);
+  const expiryDate = expiryDateString ? parseISO(expiryDateString) : new Date();
+  const CONDITION_MULTIPLIERS: Record<string, number> = { fresh: 0.33, cooked: 1, frozen: 4, dry: 10, refrigerated: 1, ambient: 0.5, hot: 0.05, thawed: 0.33 };
+  const effectiveDays = Math.max(Math.ceil(shelfLifeDays * (CONDITION_MULTIPLIERS[storageCondition] ?? 1)), 1);
 
   // Update selectedUser when initialUser changes
   useEffect(() => {
@@ -128,11 +131,16 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
     try {
       // Prepare label data matching printer expectations (IncomingLabelData interface)
       const labelData = {
-        productName: `${recipe.name}${batchMultiplier > 1 ? ` (${batchMultiplier}x)` : ''}`,
-        preparedDate: format(manufacturingDate, 'yyyy-MM-dd'),
-        useByDate: format(expiryDate, 'yyyy-MM-dd'),
+        productName: `${recipe.name}${batchMultiplier !== 1 ? ` (${batchMultiplier === 0 ? batchCustom : batchMultiplier}x)` : ''}`,
+        prepDate: format(manufacturingDate, 'yyyy-MM-dd'),
+        expiryDate: format(expiryDate, 'yyyy-MM-dd'),
         condition: storageCondition,
-        allergens: (recipe.allergens || []).map(a => a.name),
+        allergens: (recipe.allergens || []).map(a => ({
+          id: a.id,
+          name: a.name,
+          icon: null as string | null,
+          severity: 'moderate',
+        })),
         preparedByName: selectedUser.display_name,
         categoryId,
         subcategoryId,
@@ -140,10 +148,6 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
         subcategoryName: 'Recipes',
         quantity: quantity || undefined,
         unit: unit || undefined,
-        batchNumber: batchNumber || undefined,
-        storageInstructions: storageCondition === 'refrigerated' ? 'Keep refrigerated' : 
-                           storageCondition === 'frozen' ? 'Keep frozen' : 
-                           'Store in cool, dry place',
       };
 
 
@@ -178,7 +182,7 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Print Recipe Label</DialogTitle>
             <DialogDescription>
@@ -201,10 +205,18 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
                   <SelectItem value="1">1x (Standard)</SelectItem>
                   <SelectItem value="2">2x (Double)</SelectItem>
                   <SelectItem value="3">3x (Triple)</SelectItem>
-                  <SelectItem value="4">4x (Quadruple)</SelectItem>
-                  <SelectItem value="5">5x</SelectItem>
+                  <SelectItem value="0">Other...</SelectItem>
                 </SelectContent>
               </Select>
+              {batchMultiplier === 0 && (
+                <Input
+                  type="number"
+                  min="1"
+                  placeholder="Enter batch multiplier"
+                  value={batchCustom}
+                  onChange={(e) => setBatchCustom(e.target.value)}
+                />
+              )}
             </div>
 
             {/* Prep Date */}
@@ -243,7 +255,7 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
                 className="bg-muted"
               />
               <p className="text-xs text-muted-foreground">
-                Based on {shelfLifeDays} day shelf life
+                {effectiveDays} day{effectiveDays !== 1 ? 's' : ''} shelf life under {storageCondition === 'ambient' ? 'room temperature' : storageCondition} conditions
               </p>
             </div>
 
@@ -258,7 +270,7 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ambient">Ambient</SelectItem>
+                  <SelectItem value="ambient">Room Temperature</SelectItem>
                   <SelectItem value="refrigerated">Refrigerated</SelectItem>
                   <SelectItem value="frozen">Frozen</SelectItem>
                   <SelectItem value="hot">Hot</SelectItem>
@@ -288,16 +300,6 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
                   onChange={(e) => setUnit(e.target.value)}
                 />
               </div>
-            </div>
-
-            {/* Optional: Batch Number */}
-            <div className="space-y-2">
-              <Label>Batch Number (Optional)</Label>
-              <Input
-                placeholder="e.g., B2026-001"
-                value={batchNumber}
-                onChange={(e) => setBatchNumber(e.target.value)}
-              />
             </div>
 
             {/* Selected User Display */}

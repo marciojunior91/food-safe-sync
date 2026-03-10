@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Clock, Users, AlertTriangle, ChefHat, Filter, Edit, Trash2, MessageSquare, Calendar, User } from "lucide-react";
+import { Plus, Search, Clock, Users, AlertTriangle, ChefHat, Filter, Edit, Trash2, Grid3X3, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +11,9 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useToast } from "@/hooks/use-toast";
 import { usePlanEnforcement } from "@/hooks/usePlanEnforcement";
 import { CreateRecipeDialog } from "@/components/recipes/CreateRecipeDialog";
-import { PrepareRecipeDialog } from "@/components/recipes/PrepareRecipeDialog";
 import { RecipePrintButton } from "@/components/recipes/RecipePrintButton";
 import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { RecipeDetailDialog } from "@/components/recipes/RecipeDetailDialog";
-import { format } from "date-fns";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,20 +51,27 @@ interface Recipe {
   } | null;
 }
 
-const recipeCategories = [
-  "All Categories", "Entrees", "Mains", "Desserts", "Sides", "Sauces", "Beverages", "Bakery", "Other"
-];
+const CATEGORY_EMOJIS: Record<string, string> = {
+  Entrees: '🥗',
+  Mains: '🍽️',
+  Desserts: '🍰',
+  Sides: '🥕',
+  Sauces: '🫙',
+  Beverages: '🥤',
+  Bakery: '🥖',
+  Other: '📂',
+};
 
 export default function Recipes() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [pageView, setPageView] = useState<'categories' | 'recipes'>('categories');
+  const [selectedCategoryView, setSelectedCategoryView] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isPrepareDialogOpen, setIsPrepareDialogOpen] = useState(false);
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [selectedRecipeDetail, setSelectedRecipeDetail] = useState<Recipe | null>(null);
   const [recipeToDelete, setRecipeToDelete] = useState<Recipe | null>(null);
   const [recipeToEdit, setRecipeToEdit] = useState<Recipe | null>(null);
-  const [selectedRecipeDetail, setSelectedRecipeDetail] = useState<Recipe | null>(null);
   const [sortBy, setSortBy] = useState<string>("name-asc");
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
@@ -222,11 +227,6 @@ export default function Recipes() {
     }
   };
 
-  const handlePrepareRecipe = (recipe: Recipe) => {
-    setSelectedRecipe(recipe);
-    setIsPrepareDialogOpen(true);
-  };
-
   const filteredRecipes = recipes
     .filter(recipe => {
       const matchesSearch = recipe.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -237,11 +237,15 @@ export default function Recipes() {
           dietary.toLowerCase().includes(searchTerm.toLowerCase())
         );
       
-      // BUGFIX RECIPES-5: Case-insensitive category comparison
+      // BUGFIX RECIPES-5: Case-insensitive + trimmed category comparison
       const matchesCategory = selectedCategory === "All Categories" || 
-        recipe.category?.toLowerCase() === selectedCategory.toLowerCase();
+        recipe.category?.trim().toLowerCase() === selectedCategory.trim().toLowerCase();
       
-      return matchesSearch && matchesCategory;
+      // Also apply category view filter
+      const matchesCategoryView = !selectedCategoryView ||
+        recipe.category?.trim().toLowerCase() === selectedCategoryView.trim().toLowerCase();
+      
+      return matchesSearch && matchesCategory && matchesCategoryView;
     })
     .sort((a, b) => {
       // BUG-017: Add sorting logic
@@ -308,32 +312,19 @@ export default function Recipes() {
         )}
       </div>
 
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
           <Input
-            placeholder="Search"
+            placeholder="Search recipes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-12"
+            className="pl-10"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-background opacity-100">
-              {recipeCategories.map((category) => (
-                <SelectItem key={category} value={category} className="bg-background opacity-100">{category}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {/* ENHANCEMENT 9: Sort dropdown */}
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-44">
             <SelectValue placeholder="Sort by..." />
           </SelectTrigger>
           <SelectContent className="bg-background opacity-100">
@@ -341,235 +332,199 @@ export default function Recipes() {
             <SelectItem value="name-desc">Name (Z-A)</SelectItem>
             <SelectItem value="created-desc">Newest First</SelectItem>
             <SelectItem value="created-asc">Oldest First</SelectItem>
-            <SelectItem value="prep-asc">Prep Time (Low to High)</SelectItem>
-            <SelectItem value="prep-desc">Prep Time (High to Low)</SelectItem>
+            <SelectItem value="prep-asc">Prep Time ↑</SelectItem>
+            <SelectItem value="prep-desc">Prep Time ↓</SelectItem>
           </SelectContent>
         </Select>
+        {/* View toggle */}
+        <div className="flex border rounded-md overflow-hidden">
+          <Button
+            size="sm"
+            variant={pageView === 'categories' ? 'default' : 'ghost'}
+            className="rounded-none px-3"
+            onClick={() => { setPageView('categories'); setSelectedCategoryView(null); }}
+          >
+            <Grid3X3 className="w-4 h-4 mr-1" />
+            Categories
+          </Button>
+          <Button
+            size="sm"
+            variant={pageView === 'recipes' ? 'default' : 'ghost'}
+            className="rounded-none px-3"
+            onClick={() => setPageView('recipes')}
+          >
+            <List className="w-4 h-4 mr-1" />
+            All Recipes
+          </Button>
+        </div>
       </div>
 
-      {filteredRecipes.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
-                <Clock className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">No recipes found</h3>
-                <p className="text-muted-foreground">
-                  {/* BUG-014: Better empty state messages */}
-                  {searchTerm || selectedCategory !== "All Categories" 
-                    ? "No recipes match your current filters" 
-                    : canManageRecipes 
-                      ? "Get started by creating your first recipe" 
-                      : "No recipes available yet"}
-                </p>
-              </div>
-              {/* BUG-014: Show clear filters if filters are active, else show create button */}
-              {searchTerm || selectedCategory !== "All Categories" ? (
-                <Button 
-                  variant="outline"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedCategory("All Categories");
-                  }}
-                >
-                  Clear Filters
-                </Button>
-              ) : !searchTerm && canManageRecipes && (
-                <Button onClick={() => {
-                  setRecipeToEdit(null);
-                  setIsCreateDialogOpen(true);
-                }}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Recipe
-                </Button>
-              )}
+      {/* ── CATEGORIES VIEW ── */}
+      {pageView === 'categories' && !selectedCategoryView && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {Object.entries(CATEGORY_EMOJIS).map(([cat, emoji]) => {
+            const count = recipes.filter(r => r.category?.trim().toLowerCase() === cat.toLowerCase()).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => { setSelectedCategoryView(cat); setPageView('recipes'); }}
+                className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
+              >
+                <span className="text-5xl">{emoji}</span>
+                <span className="font-semibold text-sm">{cat}</span>
+                <Badge variant="secondary" className="text-xs">{count} recipe{count !== 1 ? 's' : ''}</Badge>
+              </button>
+            );
+          })}
+          {/* All Recipes tile */}
+          <button
+            onClick={() => { setSelectedCategoryView(null); setPageView('recipes'); }}
+            className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
+          >
+            <span className="text-5xl">📋</span>
+            <span className="font-semibold text-sm">All Recipes</span>
+            <Badge variant="outline" className="text-xs">{recipes.length} total</Badge>
+          </button>
+        </div>
+      )}
+
+      {/* ── RECIPES LIST VIEW ── */}
+      {pageView === 'recipes' && (
+        <>
+          {/* Back breadcrumb when viewing a category */}
+          {selectedCategoryView && (
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setSelectedCategoryView(null); setPageView('categories'); }}>
+                ← Categories
+              </Button>
+              <span className="text-muted-foreground">/</span>
+              <span className="font-medium">{CATEGORY_EMOJIS[selectedCategoryView] || '📂'} {selectedCategoryView}</span>
             </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRecipes.map((recipe) => (
-            <Card 
-              key={recipe.id} 
-              className="hover:shadow-card transition-shadow cursor-pointer"
-              onClick={() => setSelectedRecipeDetail(recipe)}
-            >
-              <CardHeader>
-                <CardTitle className="flex items-start justify-between">
-                  <span className="line-clamp-2">{recipe.name}</span>
-                  {(recipe.allergens || []).length > 0 && (
-                    <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 ml-2" />
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="text-xs">
-                    {recipe.category}
-                  </Badge>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    <span>{(recipe.estimated_prep_minutes || 0) + (recipe.service_gap_minutes || 0)}min</span>
-                  </div>
-                </div>
+          )}
 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
-                    <span>{recipe.yield_amount} {recipe.yield_unit}</span>
+          {filteredRecipes.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto">
+                    <ChefHat className="w-8 h-8 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{(recipe.prep_steps as string[])?.length || 0} steps</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>{recipe.hold_time_days}d hold</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-medium text-sm mb-2">Ingredients ({(recipe.ingredients as string[])?.length || 0})</h4>
-                  <div className="text-sm text-muted-foreground">
-                    {(recipe.ingredients as string[])?.slice(0, 3)?.join(", ")}
-                    {(recipe.ingredients as string[])?.length > 3 && (
-                      <span> + {(recipe.ingredients as string[]).length - 3} more</span>
-                    )}
-                  </div>
-                </div>
-
-                {(recipe.allergens || []).length > 0 && (
                   <div>
-                    <h4 className="font-medium text-sm mb-2 text-red-600">Allergens</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {/* BUG-017: Add allergen warning icons */}
-                      {(recipe.allergens || []).map((allergen) => (
-                        <Badge key={allergen} variant="destructive" className="text-xs font-bold">
-                          ⚠️ {allergen}
-                        </Badge>
-                      ))}
-                    </div>
+                    <h3 className="font-semibold text-lg">No recipes found</h3>
+                    <p className="text-muted-foreground">
+                      {searchTerm || selectedCategoryView
+                        ? "No recipes match your current filters"
+                        : canManageRecipes
+                          ? "Get started by creating your first recipe"
+                          : "No recipes available yet"}
+                    </p>
                   </div>
-                )}
-
-                {(recipe.dietary_requirements || []).length > 0 && (
-                  <div>
-                    <h4 className="font-medium text-sm mb-2 text-green-600">Dietary</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {(recipe.dietary_requirements || []).map((dietary) => (
-                        <Badge key={dietary} variant="secondary" className="text-xs">
-                          {dietary}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Recipe Metadata */}
-                <div className="pt-2 border-t space-y-2 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-3 h-3" />
-                    <span className="font-medium">Created at:</span>
-                    <span>{format(new Date(recipe.created_at), "MMM dd, yyyy 'at' HH:mm")}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <User className="w-3 h-3" />
-                    <span className="font-medium">Created by:</span>
-                    <span>{recipe.creator?.display_name || 'Unknown'}</span>
-                  </div>
-                  {recipe.updated_by && recipe.updated_at !== recipe.created_at && (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3 h-3" />
-                        <span className="font-medium">Last Updated:</span>
-                        <span>{format(new Date(recipe.updated_at), "MMM dd, yyyy 'at' HH:mm")}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <User className="w-3 h-3" />
-                        <span className="font-medium">Last Updated by:</span>
-                        <span>{recipe.updater?.display_name || 'Unknown'}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="pt-2 space-y-2">
-                  <Button 
-                    size="sm" 
-                    onClick={() => handlePrepareRecipe(recipe)}
-                    className="w-full"
-                  >
-                    <ChefHat className="w-4 h-4 mr-2" />
-                    Prepare Recipe
-                  </Button>
-                  
-                  {/* Print Label Button */}
-                  <RecipePrintButton
-                    recipe={{
-                      id: recipe.id,
-                      name: recipe.name,
-                      shelf_life_days: recipe.hold_time_days,
-                      allergens: recipe.allergens?.map((name, index) => ({ 
-                        id: `allergen-${index}`, 
-                        name 
-                      }))
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                  />
-                  
-                  <div className="flex gap-2">
-                    {/* Comments button - available to all users */}
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        // TODO: Implement comments dialog
-                        toast({
-                          title: "Coming Soon",
-                          description: "Recipe comments feature will be available soon",
-                        });
-                      }}
-                    >
-                      <MessageSquare className="w-4 h-4 mr-2" />
-                      Notes
+                  {(searchTerm || selectedCategoryView) ? (
+                    <Button variant="outline" onClick={() => { setSearchTerm(""); setSelectedCategoryView(null); }}>
+                      Clear Filters
                     </Button>
-                    
-                    {/* Edit/Delete buttons - only for admins and leader_chef */}
-                    {canManageRecipes && (
-                      <>
-                        <Button 
-                          size="sm" 
-                          variant="outline"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditRecipe(recipe);
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setRecipeToDelete(recipe);
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                  ) : canManageRecipes && (
+                    <Button onClick={() => { setRecipeToEdit(null); setIsCreateDialogOpen(true); }}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Recipe
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredRecipes.map((recipe) => (
+                <Card
+                  key={recipe.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer flex flex-col"
+                  onClick={() => setSelectedRecipeDetail(recipe)}
+                >
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-lg">{CATEGORY_EMOJIS[recipe.category] || '📂'}</p>
+                        <CardTitle className="text-sm font-semibold leading-tight line-clamp-2 mt-1">
+                          {recipe.name}
+                        </CardTitle>
+                      </div>
+                      {(recipe.allergens || []).length > 0 && (
+                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-1" />
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0 flex flex-col gap-2 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="text-xs">{recipe.category}</Badge>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" />{recipe.estimated_prep_minutes || 0}m
+                      </span>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Users className="w-3 h-3" />{recipe.yield_amount} {recipe.yield_unit}
+                      </span>
+                    </div>
+                    {(recipe.allergens || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {(recipe.allergens || []).slice(0, 3).map(a => (
+                          <Badge key={a} variant="destructive" className="text-xs">⚠️ {a}</Badge>
+                        ))}
+                        {(recipe.allergens || []).length > 3 && (
+                          <Badge variant="secondary" className="text-xs">+{(recipe.allergens || []).length - 3}</Badge>
+                        )}
+                      </div>
+                    )}
+                    {/* Actions */}
+                    <div className="mt-auto pt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setSelectedRecipeDetail(recipe)}
+                      >
+                        <ChefHat className="w-3 h-3 mr-1" />
+                        View
+                      </Button>
+                      <RecipePrintButton
+                        recipe={{
+                          id: recipe.id,
+                          name: recipe.name,
+                          shelf_life_days: recipe.hold_time_days,
+                          allergens: recipe.allergens?.map((name, index) => ({
+                            id: `allergen-${index}`,
+                            name
+                          }))
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                      />
+                      {canManageRecipes && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="px-2"
+                            onClick={(e) => { e.stopPropagation(); handleEditRecipe(recipe); }}
+                          >
+                            <Edit className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="px-2 text-destructive hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); setRecipeToDelete(recipe); }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <CreateRecipeDialog
@@ -585,13 +540,7 @@ export default function Recipes() {
         recipeToEdit={recipeToEdit}
       />
 
-      <PrepareRecipeDialog
-        open={isPrepareDialogOpen}
-        onOpenChange={setIsPrepareDialogOpen}
-        recipe={selectedRecipe}
-      />
-
-      {/* Recipe Detail Dialog - ENHANCEMENT 7 */}
+      {/* Recipe Detail Dialog */}
       <RecipeDetailDialog
         recipe={selectedRecipeDetail}
         open={!!selectedRecipeDetail}

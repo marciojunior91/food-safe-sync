@@ -56,7 +56,7 @@ const App = () => (
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="compliance" element={<Compliance />} />
                 <Route path="labeling" element={<Labeling />} />
-                <Route path="expiring-soon" element={<ExpiringSoon />} />
+                <Route path="expiring-alerts" element={<ExpiringSoon />} />
                 
                 {/* Label Preview Route - Bloco 8 T8.2 */}
                 <Route path="labels/:id/preview" element={<LabelPreviewPage />} />
