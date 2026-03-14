@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, User, AlertCircle, Camera, Repeat, Plus, X } from "lucide-react";
+import { CalendarIcon, Clock, AlertCircle, Camera, Repeat, Plus, X, Users } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +33,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox as UICheckbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,7 +76,7 @@ const taskFormSchema = z.object({
   ] as const),
   custom_task_type: z.string().optional(),
   priority: z.enum(["critical", "important", "normal"] as const),
-  assigned_to: z.string().min(1, "Please assign this task to someone"),
+  assigned_to: z.array(z.string()).min(1, "Please assign this task to at least one person"),
   scheduled_date: z.date({
     required_error: "Please select a date",
   }),
@@ -102,7 +105,7 @@ interface TaskFormProps {
   onSubmit: (data: CreateTaskInput) => Promise<void>;
   onCancel?: () => void;
   defaultValues?: Partial<TaskFormValues>;
-  users?: Array<{ user_id: string; display_name: string }>;
+  users?: Array<{ user_id: string; display_name: string; role_type?: string }>;
   isLoading?: boolean;
   isEditing?: boolean; // New prop to determine if we're editing
   taskId?: string; // Task ID when editing (for attachments)
@@ -226,7 +229,7 @@ export function TaskForm({
       task_type: defaultValues?.task_type || "others",
       custom_task_type: "",
       priority: defaultValues?.priority || "normal",
-      assigned_to: defaultValues?.assigned_to || "",
+      assigned_to: defaultValues?.assigned_to ? [defaultValues.assigned_to] : [],
       scheduled_date: defaultValues?.scheduled_date || new Date(),
       scheduled_time: defaultValues?.scheduled_time || "",
       estimated_minutes: defaultValues?.estimated_minutes || 30,
@@ -274,16 +277,15 @@ export function TaskForm({
         };
       }
 
-      // Convert to CreateTaskInput format
-      const taskInput: CreateTaskInput = {
+      // Convert to CreateTaskInput format — one task per assigned user
+      const baseTaskInput = {
         title: data.title,
         description: data.task_type === "others" && data.custom_task_type
           ? `[${data.custom_task_type}] ${data.description || ""}`
           : data.description,
-        subtasks: subtasks.length > 0 ? subtasks : undefined, // Include subtasks if any
+        subtasks: subtasks.length > 0 ? subtasks : undefined,
         task_type: data.task_type,
         priority: data.priority,
-        team_member_id: data.assigned_to, // Send as team_member_id (new field)
         scheduled_date: format(data.scheduled_date, "yyyy-MM-dd"),
         scheduled_time: data.scheduled_time || undefined,
         estimated_minutes: data.estimated_minutes,
@@ -291,7 +293,13 @@ export function TaskForm({
         recurrence_pattern: recurrencePattern,
       };
 
-      await onSubmit(taskInput);
+      for (const userId of data.assigned_to) {
+        const taskInput: CreateTaskInput = {
+          ...baseTaskInput,
+          team_member_id: userId,
+        };
+        await onSubmit(taskInput);
+      }
 
       // Don't show toast here - let the parent component handle it
       form.reset();
@@ -507,75 +515,138 @@ export function TaskForm({
           />
         )}
 
-        {/* Assign To User - MANDATORY FIELD */}
+        {/* Assign To Users - MULTI-SELECT */}
         <FormField
           control={form.control}
           name="assigned_to"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="flex items-center gap-1">
-                Assign To
-                <span className="text-destructive">*</span>
-              </FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+          render={({ field }) => {
+            const selected: string[] = field.value ?? [];
+
+            const toggleUser = (userId: string) => {
+              const next = selected.includes(userId)
+                ? selected.filter((id) => id !== userId)
+                : [...selected, userId];
+              field.onChange(next);
+            };
+
+            const selectGroup = (roleTypes: string[]) => {
+              const groupIds = users
+                .filter((u) => u.role_type && roleTypes.includes(u.role_type))
+                .map((u) => u.user_id);
+              const merged = Array.from(new Set([...selected, ...groupIds]));
+              field.onChange(merged);
+            };
+
+            const selectAll = () => field.onChange(users.map((u) => u.user_id));
+            const clearAll = () => field.onChange([]);
+
+            return (
+              <FormItem>
+                <FormLabel className="flex items-center gap-1">
+                  <Users className="w-4 h-4" />
+                  Assign To
+                  <span className="text-destructive">*</span>
+                </FormLabel>
+
+                {/* Group preset buttons */}
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
+                    onClick={() => selectGroup(['cook', 'leader_chef'])}>
+                    🍳 Kitchen
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
+                    onClick={() => selectGroup(['barista'])}>
+                    🍹 Bar
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
+                    onClick={() => selectGroup(['manager', 'admin'])}>
+                    👔 Management
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
+                    onClick={selectAll}>
+                    👥 All Staff
+                  </Button>
+                  {selected.length > 0 && (
+                    <Button type="button" size="sm" variant="ghost" className="h-7 text-xs px-2 text-muted-foreground"
+                      onClick={clearAll}>
+                      Clear
+                    </Button>
+                  )}
+                </div>
+
+                {/* Selected badges */}
+                {selected.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {selected.map((id) => {
+                      const user = users.find((u) => u.user_id === id);
+                      return user ? (
+                        <Badge key={id} variant="secondary" className="gap-1">
+                          {user.display_name}
+                          <button type="button" onClick={() => toggleUser(id)} className="ml-1 text-muted-foreground hover:text-foreground">×</button>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+
+                {/* User checklist */}
                 <FormControl>
-                  <SelectTrigger 
+                  <div
                     data-testid="assign-to-select"
                     className={cn(
-                      !field.value && "border-destructive focus:ring-destructive"
+                      "rounded-md border max-h-48 overflow-y-auto divide-y",
+                      selected.length === 0 && "border-destructive"
                     )}
                   >
-                    <SelectValue placeholder="Select a team member">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        <span>
-                          {field.value && field.value !== "unassigned"
-                            ? users.find((u) => u.user_id === field.value)
-                                ?.display_name || "Select user"
-                            : "Select a team member"}
-                        </span>
+                    {users.length === 0 ? (
+                      <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
+                        <p className="font-medium">No team members found</p>
+                        <p className="text-xs mt-1">Please add team members first</p>
                       </div>
-                    </SelectValue>
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {users.length === 0 ? (
-                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                      <AlertCircle className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
-                      <p className="font-medium">No team members found</p>
-                      <p className="text-xs mt-1">Please add team members first</p>
-                    </div>
-                  ) : (
-                    users.map((user) => (
-                      <SelectItem key={user.user_id} value={user.user_id}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-                            <span className="text-xs font-medium">
+                    ) : (
+                      users.map((user) => (
+                        <label
+                          key={user.user_id}
+                          className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
+                        >
+                          <UICheckbox
+                            checked={selected.includes(user.user_id)}
+                            onCheckedChange={() => toggleUser(user.user_id)}
+                          />
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <span className="text-xs font-semibold">
                               {user.display_name.charAt(0).toUpperCase()}
                             </span>
                           </div>
-                          {user.display_name}
-                        </div>
-                      </SelectItem>
-                    ))
+                          <span className="text-sm">{user.display_name}</span>
+                          {user.role_type && (
+                            <span className="ml-auto text-xs text-muted-foreground capitalize">{user.role_type.replace('_', ' ')}</span>
+                          )}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </FormControl>
+
+                <FormDescription>
+                  {selected.length === 0 ? (
+                    <span className="text-destructive flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      Select at least one person
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {selected.length === 1
+                        ? `1 person assigned — creates 1 task`
+                        : `${selected.length} people selected — creates ${selected.length} tasks`}
+                    </span>
                   )}
-                </SelectContent>
-              </Select>
-              <FormDescription>
-                {!field.value ? (
-                  <span className="text-destructive flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    This field is required
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">
-                    Task assigned to {users.find((u) => u.user_id === field.value)?.display_name}
-                  </span>
-                )}
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            );
+          }}
         />
 
         {/* Date and Time - Side by Side */}
@@ -723,12 +794,10 @@ export function TaskForm({
                   </FormDescription>
                 </div>
                 <FormControl>
-                  <input
+                  <Switch
                     data-testid="is-recurring-checkbox"
-                    type="checkbox"
                     checked={field.value}
-                    onChange={field.onChange}
-                    className="h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                    onCheckedChange={field.onChange}
                   />
                 </FormControl>
               </FormItem>
@@ -969,12 +1038,12 @@ export function TaskForm({
             <Button 
               data-testid="submit-button"
               type="submit" 
-              disabled={isSubmitting || isLoading || !form.watch("assigned_to")}
+              disabled={isSubmitting || isLoading || (form.watch("assigned_to") ?? []).length === 0}
               className={cn(
-                !form.watch("assigned_to") && "opacity-50 cursor-not-allowed"
+                (form.watch("assigned_to") ?? []).length === 0 && "opacity-50 cursor-not-allowed"
               )}
             >
-              {!form.watch("assigned_to") ? (
+              {(form.watch("assigned_to") ?? []).length === 0 ? (
                 <>
                   <AlertCircle className="w-4 h-4 mr-2" />
                   Assign Someone First

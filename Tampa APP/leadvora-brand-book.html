@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leadvora — Brand Identity Book</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:        #070D1A;
+      --navy-2:      #0B1628;
+      --navy-3:      #0F1E38;
+      --blue-dark:   #0A2FB6;
+      --blue-mid:    #1A5FE8;
+      --blue-light:  #3A9EFF;
+      --green-dark:  #00A86B;
+      --green-mid:   #18D68C;
+      --green-light: #5EEFC4;
+      --white:       #FFFFFF;
+      --off-white:   #EEF2FF;
+      --gray-400:    #94A3B8;
+      --gray-200:    #CBD5E1;
+
+      --grad-primary: linear-gradient(135deg, #0A2FB6 0%, #3A9EFF 60%, #18D68C 100%);
+      --grad-logo:    linear-gradient(135deg, #1A5FE8 0%, #18D68C 100%);
+      --grad-dark:    linear-gradient(160deg, #070D1A 0%, #0F1E38 100%);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--navy);
+      color: var(--white);
+      line-height: 1.6;
+    }
+
+    /* ── COVER ── */
+    .cover {
+      min-height: 100vh;
+      background: var(--grad-dark);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      padding: 4rem 2rem;
+    }
+    .cover::before {
+      content: '';
+      position: absolute;
+      width: 700px; height: 700px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(26,95,232,.18) 0%, transparent 70%);
+      top: -200px; left: -100px;
+      pointer-events: none;
+    }
+    .cover::after {
+      content: '';
+      position: absolute;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(24,214,140,.12) 0%, transparent 70%);
+      bottom: -100px; right: -80px;
+      pointer-events: none;
+    }
+    .cover-tag {
+      font-size: .75rem;
+      font-weight: 600;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--green-mid);
+      border: 1px solid rgba(24,214,140,.3);
+      padding: .35rem 1rem;
+      border-radius: 99px;
+      margin-bottom: 2.5rem;
+    }
+    .cover-logo {
+      display: flex;
+      align-items: center;
+      gap: 1.4rem;
+      margin-bottom: 1.5rem;
+    }
+    .logo-icon {
+      width: 80px; height: 80px;
+      position: relative;
+    }
+    .logo-icon svg { width: 100%; height: 100%; }
+    .cover-wordmark {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 5rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      background: var(--grad-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .cover-tagline {
+      font-size: .95rem;
+      font-weight: 500;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-bottom: 3rem;
+    }
+    .cover-tagline span { color: var(--green-mid); }
+    .cover-meta {
+      font-size: .78rem;
+      color: var(--gray-400);
+      letter-spacing: .1em;
+    }
+    .cover-divider {
+      width: 60px;
+      height: 2px;
+      background: var(--grad-logo);
+      margin: 1.5rem auto;
+      border-radius: 99px;
+    }
+
+    /* ── LAYOUT ── */
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 6rem 2.5rem;
+    }
+    .section-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: var(--green-mid);
+      margin-bottom: .75rem;
+    }
+    h2.section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.6rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      margin-bottom: 1rem;
+    }
+    .section-desc {
+      color: var(--gray-400);
+      font-size: 1rem;
+      max-width: 620px;
+      margin-bottom: 3.5rem;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid rgba(255,255,255,.06);
+      margin: 0;
+    }
+
+    /* ── GRID ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 1.5rem; }
+
+    /* ── CARD ── */
+    .card {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 16px;
+      padding: 2rem;
+    }
+    .card-sm { padding: 1.25rem 1.5rem; border-radius: 12px; }
+
+    /* ── BRAND NAME ── */
+    .brand-anatomy {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 20px;
+      padding: 4rem 3rem;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .anatomy-wordmark {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 5.5rem;
+      font-weight: 700;
+      letter-spacing: -.03em;
+      background: var(--grad-primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .anatomy-sub {
+      font-size: .85rem;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--gray-400);
+      margin-top: .5rem;
+    }
+
+    /* ── LOGO GRID ── */
+    .logo-card {
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 180px;
+      gap: 1rem;
+      flex-direction: column;
+    }
+    .logo-card .lc-label {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .logo-dark  { background: #070D1A; border: 1px solid rgba(255,255,255,.08); }
+    .logo-blue  { background: linear-gradient(135deg, #1A5FE8, #0A2FB6); }
+    .logo-white { background: #FFFFFF; }
+    .logo-green { background: linear-gradient(135deg, #00A86B, #18D68C); }
+
+    /* ── COLORS ── */
+    .color-swatch {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.07);
+    }
+    .swatch-color {
+      height: 90px;
+    }
+    .swatch-info {
+      padding: .9rem 1rem;
+      background: rgba(255,255,255,.04);
+    }
+    .swatch-name {
+      font-size: .82rem;
+      font-weight: 600;
+      margin-bottom: .25rem;
+    }
+    .swatch-hex {
+      font-size: .72rem;
+      font-family: 'Space Grotesk', monospace;
+      color: var(--gray-400);
+      letter-spacing: .05em;
+    }
+    .swatch-rgb {
+      font-size: .65rem;
+      color: var(--gray-400);
+      margin-top: .1rem;
+    }
+
+    /* ── GRADIENT SHOWCASE ── */
+    .gradient-bar {
+      height: 64px;
+      border-radius: 12px;
+      margin-bottom: .75rem;
+    }
+    .gradient-info { font-size: .78rem; color: var(--gray-400); }
+
+    /* ── TYPOGRAPHY ── */
+    .type-specimen {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 16px;
+      padding: 2rem 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .type-meta {
+      font-size: .7rem;
+      font-weight: 600;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--green-mid);
+      margin-bottom: 1rem;
+    }
+    .type-sample-h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 3.5rem;
+      font-weight: 700;
+      letter-spacing: -.03em;
+      line-height: 1.1;
+    }
+    .type-sample-h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 600;
+      letter-spacing: -.02em;
+    }
+    .type-sample-body {
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      color: var(--gray-400);
+      line-height: 1.7;
+    }
+    .type-sample-caption {
+      font-family: 'Inter', sans-serif;
+      font-size: .8rem;
+      font-weight: 500;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--green-mid);
+    }
+    .type-table { width: 100%; border-collapse: collapse; }
+    .type-table th, .type-table td {
+      text-align: left;
+      padding: .75rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      font-size: .85rem;
+    }
+    .type-table th { color: var(--gray-400); font-weight: 500; font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; }
+
+    /* ── ICONOGRAPHY / LOGO MARK ── */
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 1rem;
+    }
+    .icon-cell {
+      aspect-ratio: 1;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── SPACING ── */
+    .spacing-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+    }
+    .space-block {
+      background: rgba(26,95,232,.25);
+      border: 1px dashed rgba(26,95,232,.5);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .7rem;
+      color: var(--blue-light);
+      font-weight: 600;
+    }
+
+    /* ── VOICE ── */
+    .voice-card {
+      border-radius: 16px;
+      padding: 2rem;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+    }
+    .voice-icon {
+      font-size: 2rem;
+      margin-bottom: .75rem;
+    }
+    .voice-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: .5rem;
+    }
+    .voice-desc { font-size: .88rem; color: var(--gray-400); line-height: 1.6; }
+
+    /* ── DO / DON'T ── */
+    .do-dont {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    .do-card {
+      border-radius: 16px;
+      padding: 2rem;
+      border: 1px solid rgba(24,214,140,.2);
+      background: rgba(24,214,140,.05);
+    }
+    .dont-card {
+      border-radius: 16px;
+      padding: 2rem;
+      border: 1px solid rgba(255,80,80,.2);
+      background: rgba(255,80,80,.05);
+    }
+    .do-badge {
+      display: inline-flex;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      padding: .3rem .8rem;
+      border-radius: 99px;
+      margin-bottom: 1rem;
+    }
+    .do-badge.do   { background: rgba(24,214,140,.15); color: var(--green-mid); }
+    .do-badge.dont { background: rgba(255,80,80,.15);  color: #FF5050; }
+    .rule-item {
+      font-size: .88rem;
+      color: var(--gray-400);
+      padding: .4rem 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      display: flex;
+      gap: .6rem;
+      align-items: flex-start;
+    }
+    .rule-item:last-child { border-bottom: none; }
+
+    /* ── MOCKUPS ── */
+    .mockup-browser {
+      background: #0B1628;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .browser-bar {
+      background: #0F1E38;
+      padding: .7rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .browser-content {
+      padding: 2rem;
+      min-height: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+      background: var(--grad-dark);
+    }
+
+    /* ── BUTTONS ── */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.75rem;
+      background: var(--grad-logo);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: .9rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      letter-spacing: .01em;
+    }
+    .btn-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.75rem;
+      background: transparent;
+      color: var(--blue-light);
+      font-family: 'Inter', sans-serif;
+      font-size: .9rem;
+      font-weight: 600;
+      border: 1px solid rgba(58,158,255,.4);
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.75rem;
+      background: rgba(255,255,255,.06);
+      color: #fff;
+      font-family: 'Inter', sans-serif;
+      font-size: .9rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+    /* ── BADGE ── */
+    .tag {
+      display: inline-flex;
+      padding: .3rem .85rem;
+      border-radius: 99px;
+      font-size: .72rem;
+      font-weight: 600;
+      letter-spacing: .08em;
+    }
+    .tag-blue  { background: rgba(26,95,232,.18); color: var(--blue-light); border: 1px solid rgba(26,95,232,.3); }
+    .tag-green { background: rgba(24,214,140,.15); color: var(--green-mid);  border: 1px solid rgba(24,214,140,.3); }
+    .tag-navy  { background: rgba(255,255,255,.06); color: var(--gray-200);  border: 1px solid rgba(255,255,255,.1); }
+
+    /* ── TOC ── */
+    .toc {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    .toc-item {
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      text-decoration: none;
+      color: inherit;
+      transition: background .15s;
+    }
+    .toc-item:hover { background: rgba(255,255,255,.06); }
+    .toc-num {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .15em;
+      color: var(--green-mid);
+      margin-bottom: .4rem;
+    }
+    .toc-title { font-size: .9rem; font-weight: 600; }
+
+    /* ── SECTION BG ALT ── */
+    .bg-alt { background: #0B1628; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      .grid-2, .grid-3, .grid-4, .grid-2.logo-versions, .do-dont, .toc { grid-template-columns: 1fr; }
+      .icon-grid { grid-template-columns: repeat(3,1fr); }
+      .cover-wordmark { font-size: 3rem; }
+      .anatomy-wordmark { font-size: 3.5rem; }
+      h2.section-title { font-size: 1.9rem; }
+    }
+
+    /* ── PRINT ── */
+    @media print {
+      body { background: #fff; color: #000; }
+      .bg-alt { background: #f8f8f8; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════  COVER  ════════════════════════════ -->
+<section class="cover" id="cover">
+  <div class="cover-tag">Brand Identity Book — v1.0</div>
+
+  <div class="cover-logo">
+    <!-- Logo mark SVG -->
+    <div class="logo-icon">
+      <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="gB" x1="0" y1="80" x2="80" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#0A2FB6"/>
+            <stop offset="60%" stop-color="#3A9EFF"/>
+          </linearGradient>
+          <linearGradient id="gG" x1="40" y1="10" x2="70" y2="40" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#18D68C"/>
+            <stop offset="100%" stop-color="#00A86B"/>
+          </linearGradient>
+        </defs>
+        <!-- Main arrow body -->
+        <path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#gB)" opacity="0.95"/>
+        <!-- Green accent wing -->
+        <path d="M44 12 L72 22 L72 50 Z" fill="url(#gG)" opacity="0.9"/>
+        <!-- Inner highlight -->
+        <path d="M8 68 L44 12 L46 44 Z" fill="rgba(255,255,255,0.12)"/>
+      </svg>
+    </div>
+    <span class="cover-wordmark">Leadvora</span>
+  </div>
+
+  <div class="cover-tagline">Inteligência para <span>Prospecção B2B</span></div>
+
+  <div class="cover-divider"></div>
+  <div class="cover-meta">Documento Confidencial · Março 2026</div>
+
+  <!-- TOC -->
+  <div style="max-width:860px; width:100%; margin-top:4rem;">
+    <div style="font-size:.72rem; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:var(--gray-400); margin-bottom:1rem; text-align:center;">Conteúdo</div>
+    <nav class="toc">
+      <a href="#brand-story"   class="toc-item"><div class="toc-num">01</div><div class="toc-title">Brand Story</div></a>
+      <a href="#logo"          class="toc-item"><div class="toc-num">02</div><div class="toc-title">Logo & Marca</div></a>
+      <a href="#colors"        class="toc-item"><div class="toc-num">03</div><div class="toc-title">Paleta de Cores</div></a>
+      <a href="#typography"    class="toc-item"><div class="toc-num">04</div><div class="toc-title">Tipografia</div></a>
+      <a href="#iconography"   class="toc-item"><div class="toc-num">05</div><div class="toc-title">Iconografia</div></a>
+      <a href="#voice"         class="toc-item"><div class="toc-num">06</div><div class="toc-title">Tom de Voz</div></a>
+      <a href="#usage"         class="toc-item"><div class="toc-num">07</div><div class="toc-title">Uso Correto</div></a>
+      <a href="#components"    class="toc-item"><div class="toc-num">08</div><div class="toc-title">Componentes UI</div></a>
+      <a href="#motion"        class="toc-item"><div class="toc-num">09</div><div class="toc-title">Motion & Textura</div></a>
+    </nav>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  01 BRAND STORY  ════════════════════════════ -->
+<section id="brand-story">
+  <div class="page">
+    <div class="section-label">01 — Brand Story</div>
+    <h2 class="section-title">Quem é a Leadvora</h2>
+    <p class="section-desc">A identidade visual nasce de um propósito claro e de uma promessa de marca consistente.</p>
+
+    <div class="grid-3" style="margin-bottom:3rem;">
+      <div class="card">
+        <div style="font-size:1.6rem; margin-bottom:.75rem;">🎯</div>
+        <div style="font-size:.7rem; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--green-mid); margin-bottom:.5rem;">Missão</div>
+        <p style="font-size:.9rem; color:var(--gray-400); line-height:1.65;">Transformar a prospecção B2B em vantagem competitiva, entregando inteligência acionável para equipes comerciais de alta performance.</p>
+      </div>
+      <div class="card">
+        <div style="font-size:1.6rem; margin-bottom:.75rem;">🔭</div>
+        <div style="font-size:.7rem; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--green-mid); margin-bottom:.5rem;">Visão</div>
+        <p style="font-size:.9rem; color:var(--gray-400); line-height:1.65;">Ser a plataforma de inteligência de vendas mais confiada pelas empresas que crescem de forma consistente na América Latina.</p>
+      </div>
+      <div class="card">
+        <div style="font-size:1.6rem; margin-bottom:.75rem;">💎</div>
+        <div style="font-size:.7rem; font-weight:700; letter-spacing:.15em; text-transform:uppercase; color:var(--green-mid); margin-bottom:.5rem;">Valores</div>
+        <p style="font-size:.9rem; color:var(--gray-400); line-height:1.65;">Precisão, inovação, transparência e foco em resultado. Cada funcionalidade existe para converter esforço em receita.</p>
+      </div>
+    </div>
+
+    <div class="card" style="padding:3rem; background: linear-gradient(135deg, rgba(10,47,182,.15) 0%, rgba(24,214,140,.08) 100%); border-color: rgba(26,95,232,.2);">
+      <div style="font-size:.7rem; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:var(--green-mid); margin-bottom:1rem;">Brand Essence</div>
+      <p style="font-family:'Space Grotesk',sans-serif; font-size:1.6rem; font-weight:600; line-height:1.4; max-width:760px;">
+        "Leadvora devora dados para entregar leads. Somos a inteligência que transforma ruído de mercado em oportunidades reais de negócio."
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  02 LOGO  ════════════════════════════ -->
+<section id="logo" class="bg-alt">
+  <div class="page">
+    <div class="section-label">02 — Logo & Marca</div>
+    <h2 class="section-title">Sistema de Logo</h2>
+    <p class="section-desc">O logo Leadvora combina um símbolo dinâmico de seta 3D com a wordmark em Space Grotesk Bold.</p>
+
+    <!-- Primary logo -->
+    <div class="brand-anatomy">
+      <div class="cover-logo" style="justify-content:center;">
+        <div class="logo-icon" style="width:72px;height:72px;">
+          <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="gB2" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient>
+              <linearGradient id="gG2" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient>
+            </defs>
+            <path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#gB2)"/>
+            <path d="M44 12 L72 22 L72 50 Z" fill="url(#gG2)"/>
+            <path d="M8 68 L44 12 L46 44 Z" fill="rgba(255,255,255,0.12)"/>
+          </svg>
+        </div>
+        <span class="anatomy-wordmark">Leadvora</span>
+      </div>
+      <div class="anatomy-sub">Inteligência para Prospecção B2B</div>
+    </div>
+
+    <!-- Logo versions -->
+    <div class="grid-2" style="margin-bottom:3rem;">
+      <!-- Dark bg -->
+      <div class="logo-card logo-dark" style="min-height:200px;">
+        <div class="cover-logo" style="justify-content:center;">
+          <div class="logo-icon" style="width:48px;height:48px;">
+            <svg viewBox="0 0 80 80" fill="none"><defs><linearGradient id="gB3" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient><linearGradient id="gG3" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#gB3)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#gG3)"/><path d="M8 68 L44 12 L46 44 Z" fill="rgba(255,255,255,0.12)"/></svg>
+          </div>
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:700;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Leadvora</span>
+        </div>
+        <div class="lc-label" style="color:var(--gray-400);">Versão Principal — Fundo Escuro</div>
+      </div>
+
+      <!-- White bg -->
+      <div class="logo-card logo-white" style="min-height:200px;">
+        <div class="cover-logo" style="justify-content:center;">
+          <div class="logo-icon" style="width:48px;height:48px;">
+            <svg viewBox="0 0 80 80" fill="none"><defs><linearGradient id="gB4" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#1A5FE8"/></linearGradient><linearGradient id="gG4" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#gB4)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#gG4)"/></svg>
+          </div>
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:2.2rem;font-weight:700;color:#070D1A;">Leadvora</span>
+        </div>
+        <div class="lc-label" style="color:#475569;">Versão Invertida — Fundo Claro</div>
+      </div>
+    </div>
+
+    <!-- App icons -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Ícone de Aplicativo</div>
+    <div style="display:flex;gap:1.5rem;align-items:center;margin-bottom:3rem;">
+      <!-- Dark icon -->
+      <div style="width:90px;height:90px;background:#070D1A;border:1px solid rgba(255,255,255,.1);border-radius:22px;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <svg viewBox="0 0 80 80" fill="none"><defs><linearGradient id="i1b" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient><linearGradient id="i1g" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#i1b)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#i1g)"/><path d="M8 68 L44 12 L46 44 Z" fill="rgba(255,255,255,0.12)"/></svg>
+      </div>
+      <!-- Gradient icon -->
+      <div style="width:90px;height:90px;background:linear-gradient(135deg,#1A5FE8,#0A2FB6);border-radius:22px;display:flex;align-items:center;justify-content:center;padding:16px;">
+        <svg viewBox="0 0 80 80" fill="none"><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="rgba(255,255,255,.9)"/><path d="M44 12 L72 22 L72 50 Z" fill="rgba(94,239,196,.9)"/><path d="M8 68 L44 12 L46 44 Z" fill="rgba(255,255,255,0.2)"/></svg>
+      </div>
+      <!-- White bg icon -->
+      <div style="width:90px;height:90px;background:#fff;border-radius:22px;display:flex;align-items:center;justify-content:center;border:1px solid #e2e8f0;padding:16px;">
+        <svg viewBox="0 0 80 80" fill="none"><defs><linearGradient id="i3b" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#1A5FE8"/></linearGradient><linearGradient id="i3g" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#i3b)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#i3g)"/></svg>
+      </div>
+      <!-- Small 48px -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:.5rem;">
+        <div style="width:48px;height:48px;background:#070D1A;border:1px solid rgba(255,255,255,.1);border-radius:12px;display:flex;align-items:center;justify-content:center;padding:9px;">
+          <svg viewBox="0 0 80 80" fill="none"><defs><linearGradient id="i4b" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient><linearGradient id="i4g" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#i4b)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#i4g)"/></svg>
+        </div>
+        <div style="font-size:.65rem;color:var(--gray-400);">32px</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:.5rem;">
+        <div style="width:32px;height:32px;background:#070D1A;border:1px solid rgba(255,255,255,.1);border-radius:8px;display:flex;align-items:center;justify-content:center;padding:6px;">
+          <svg viewBox="0 0 80 80" fill="none"><defs><linearGradient id="i5b" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient><linearGradient id="i5g" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#i5b)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#i5g)"/></svg>
+        </div>
+        <div style="font-size:.65rem;color:var(--gray-400);">20px</div>
+      </div>
+    </div>
+
+    <!-- Clear space rule -->
+    <div class="card">
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--green-mid);margin-bottom:1.25rem;">Área de Proteção</div>
+      <div style="background:var(--navy-3);border-radius:12px;padding:2.5rem;display:flex;align-items:center;justify-content:center;position:relative;margin-bottom:1rem;">
+        <div style="border:1px dashed rgba(24,214,140,.4);padding:1.5rem 2.5rem;border-radius:8px;display:flex;align-items:center;gap:.75rem;">
+          <div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 80 80" fill="none" style="width:100%;height:100%;"><defs><linearGradient id="cB" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient><linearGradient id="cG" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#cB)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#cG)"/></svg>
+          </div>
+          <span style="font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:700;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Leadvora</span>
+        </div>
+      </div>
+      <p style="font-size:.85rem;color:var(--gray-400);">Mantenha uma área livre mínima de <strong style="color:var(--white);">1× a altura da letra "L"</strong> do wordmark em todos os lados do logo.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  03 COLORS  ════════════════════════════ -->
+<section id="colors">
+  <div class="page">
+    <div class="section-label">03 — Paleta de Cores</div>
+    <h2 class="section-title">Sistema de Cores</h2>
+    <p class="section-desc">Duas famílias de cor definem a identidade: Navy profundo para profissionalismo e confiança; Blue-to-Green para energia e crescimento.</p>
+
+    <!-- Primary -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1rem;">Primárias</div>
+    <div class="grid-4" style="margin-bottom:2.5rem;">
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#070D1A;"></div>
+        <div class="swatch-info"><div class="swatch-name">Navy Deep</div><div class="swatch-hex">#070D1A</div><div class="swatch-rgb">RGB 7, 13, 26</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#0B1628;"></div>
+        <div class="swatch-info"><div class="swatch-name">Navy Base</div><div class="swatch-hex">#0B1628</div><div class="swatch-rgb">RGB 11, 22, 40</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#0F1E38;"></div>
+        <div class="swatch-info"><div class="swatch-name">Navy Surface</div><div class="swatch-hex">#0F1E38</div><div class="swatch-rgb">RGB 15, 30, 56</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#1A2E52;"></div>
+        <div class="swatch-info"><div class="swatch-name">Navy Elevated</div><div class="swatch-hex">#1A2E52</div><div class="swatch-rgb">RGB 26, 46, 82</div></div>
+      </div>
+    </div>
+
+    <!-- Blue family -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1rem;">Azul</div>
+    <div class="grid-4" style="margin-bottom:2.5rem;">
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#0A2FB6;"></div>
+        <div class="swatch-info"><div class="swatch-name">Blue Dark</div><div class="swatch-hex">#0A2FB6</div><div class="swatch-rgb">RGB 10, 47, 182</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#1A5FE8;"></div>
+        <div class="swatch-info"><div class="swatch-name">Blue Mid</div><div class="swatch-hex">#1A5FE8</div><div class="swatch-rgb">RGB 26, 95, 232</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#3A9EFF;"></div>
+        <div class="swatch-info"><div class="swatch-name">Blue Light</div><div class="swatch-hex">#3A9EFF</div><div class="swatch-rgb">RGB 58, 158, 255</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#85C9FF;"></div>
+        <div class="swatch-info"><div class="swatch-name">Blue Soft</div><div class="swatch-hex">#85C9FF</div><div class="swatch-rgb">RGB 133, 201, 255</div></div>
+      </div>
+    </div>
+
+    <!-- Green family -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1rem;">Verde (Acento)</div>
+    <div class="grid-4" style="margin-bottom:3rem;">
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#00A86B;"></div>
+        <div class="swatch-info"><div class="swatch-name">Green Dark</div><div class="swatch-hex">#00A86B</div><div class="swatch-rgb">RGB 0, 168, 107</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#18D68C;"></div>
+        <div class="swatch-info"><div class="swatch-name">Green Mid</div><div class="swatch-hex">#18D68C</div><div class="swatch-rgb">RGB 24, 214, 140</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#5EEFC4;"></div>
+        <div class="swatch-info"><div class="swatch-name">Green Light</div><div class="swatch-hex">#5EEFC4</div><div class="swatch-rgb">RGB 94, 239, 196</div></div>
+      </div>
+      <div class="color-swatch">
+        <div class="swatch-color" style="background:#A8F7DC;"></div>
+        <div class="swatch-info"><div class="swatch-name">Green Soft</div><div class="swatch-hex">#A8F7DC</div><div class="swatch-rgb">RGB 168, 247, 220</div></div>
+      </div>
+    </div>
+
+    <!-- Gradients -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Gradientes</div>
+    <div class="grid-3">
+      <div class="card card-sm">
+        <div class="gradient-bar" style="background:linear-gradient(135deg,#0A2FB6,#3A9EFF,#18D68C);"></div>
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem;">Brand Gradient</div>
+        <div class="gradient-info">#0A2FB6 → #3A9EFF → #18D68C · 135°</div>
+      </div>
+      <div class="card card-sm">
+        <div class="gradient-bar" style="background:linear-gradient(135deg,#1A5FE8,#18D68C);"></div>
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem;">Logo Gradient</div>
+        <div class="gradient-info">#1A5FE8 → #18D68C · 135°</div>
+      </div>
+      <div class="card card-sm">
+        <div class="gradient-bar" style="background:linear-gradient(160deg,#070D1A,#0F1E38);"></div>
+        <div style="font-size:.82rem;font-weight:600;margin-bottom:.25rem;">Background Gradient</div>
+        <div class="gradient-info">#070D1A → #0F1E38 · 160°</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  04 TYPOGRAPHY  ════════════════════════════ -->
+<section id="typography" class="bg-alt">
+  <div class="page">
+    <div class="section-label">04 — Tipografia</div>
+    <h2 class="section-title">Sistema Tipográfico</h2>
+    <p class="section-desc">Duas famílias complementares criam hierarquia clara e caráter consistente.</p>
+
+    <div class="grid-2" style="margin-bottom:2rem;">
+      <div class="type-specimen">
+        <div class="type-meta">Display / Headline — Space Grotesk</div>
+        <div class="type-sample-h1">Prospecte<br/>com Dados</div>
+      </div>
+      <div class="type-specimen">
+        <div class="type-meta">Body / UI — Inter</div>
+        <div class="type-sample-body" style="font-size:1.05rem;">A Leadvora combina dados de mercado, sinais de intenção e IA para identificar os compradores certos no momento exato. Sua equipe fecha mais com menos esforço.</div>
+      </div>
+    </div>
+
+    <div class="type-specimen" style="margin-bottom:2rem;">
+      <div class="type-meta">Scale Completa</div>
+      <table class="type-table">
+        <thead>
+          <tr><th>Nome</th><th>Fonte</th><th>Peso</th><th>Tamanho</th><th>Uso</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Display</td><td>Space Grotesk</td><td>700</td><td>3.5–5rem</td><td>Hero, capa, destaque máximo</td></tr>
+          <tr><td>H1</td><td>Space Grotesk</td><td>700</td><td>2.6rem</td><td>Título de página</td></tr>
+          <tr><td>H2</td><td>Space Grotesk</td><td>600</td><td>2rem</td><td>Título de seção</td></tr>
+          <tr><td>H3</td><td>Space Grotesk</td><td>600</td><td>1.4rem</td><td>Subtítulo de bloco</td></tr>
+          <tr><td>Body L</td><td>Inter</td><td>400</td><td>1.0625rem</td><td>Texto longo, descrições</td></tr>
+          <tr><td>Body M</td><td>Inter</td><td>400</td><td>0.9375rem</td><td>Parágrafos, cards</td></tr>
+          <tr><td>Label</td><td>Inter</td><td>600</td><td>0.75rem</td><td>Labels, tags, botões</td></tr>
+          <tr><td>Caption</td><td>Inter</td><td>500</td><td>0.7rem · caps</td><td>Meta, seção labels</td></tr>
+          <tr><td>Mono</td><td>Space Grotesk</td><td>400</td><td>0.8rem</td><td>Códigos, hex, métricas</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-3">
+      <div class="card card-sm">
+        <div class="type-meta">Peso 300 Light</div>
+        <div style="font-family:'Inter';font-size:1.6rem;font-weight:300;">Leadvora</div>
+      </div>
+      <div class="card card-sm">
+        <div class="type-meta">Peso 400 Regular</div>
+        <div style="font-family:'Inter';font-size:1.6rem;font-weight:400;">Leadvora</div>
+      </div>
+      <div class="card card-sm">
+        <div class="type-meta">Peso 700 Bold</div>
+        <div style="font-family:'Space Grotesk';font-size:1.6rem;font-weight:700;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Leadvora</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  05 ICONOGRAPHY  ════════════════════════════ -->
+<section id="iconography">
+  <div class="page">
+    <div class="section-label">05 — Iconografia</div>
+    <h2 class="section-title">Ícones & Symbol Mark</h2>
+    <p class="section-desc">O símbolo da seta 3D representa velocidade, direção e movimento — core do produto. Ícones UI usam stroke de 1.5px, estilo outline arredondado.</p>
+
+    <div class="card" style="margin-bottom:2rem;padding:2.5rem;">
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--green-mid);margin-bottom:1.5rem;">Anatomy do Symbol Mark</div>
+      <div style="display:flex;gap:3rem;align-items:center;flex-wrap:wrap;">
+        <svg viewBox="0 0 140 140" fill="none" style="width:140px;height:140px;">
+          <defs>
+            <linearGradient id="aB" x1="0" y1="140" x2="140" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient>
+            <linearGradient id="aG" x1="77" y1="21" x2="126" y2="87"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient>
+          </defs>
+          <path d="M14 119 L77 21 L126 87 L80.5 77 Z" fill="url(#aB)"/>
+          <path d="M77 21 L126 38.5 L126 87 Z" fill="url(#aG)"/>
+          <path d="M14 119 L77 21 L80.5 77 Z" fill="rgba(255,255,255,0.12)"/>
+          <!-- annotations -->
+          <line x1="77" y1="21" x2="50" y2="5" stroke="rgba(24,214,140,.5)" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="12" y="8" fill="#18D68C" font-size="8" font-family="Inter">Pico (azul→verde)</text>
+          <line x1="14" y1="119" x2="2" y2="128" stroke="rgba(58,158,255,.5)" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="0" y="136" fill="#3A9EFF" font-size="8" font-family="Inter">Cauda</text>
+          <line x1="80.5" y1="77" x2="112" y2="102" stroke="rgba(255,255,255,.4)" stroke-width="1" stroke-dasharray="3,2"/>
+          <text x="103" y="113" fill="rgba(255,255,255,.6)" font-size="8" font-family="Inter">Face</text>
+        </svg>
+        <div style="flex:1;min-width:260px;">
+          <div class="rule-item"><span style="color:var(--blue-light);">●</span> <span><strong style="color:var(--white);">Corpo principal</strong> — gradiente Blue Dark → Blue Light, ângulo 135°</span></div>
+          <div class="rule-item"><span style="color:var(--green-mid);">●</span> <span><strong style="color:var(--white);">Asa verde</strong> — gradiente Green Mid → Green Dark, symboliza crescimento</span></div>
+          <div class="rule-item"><span style="color:var(--gray-400);">●</span> <span><strong style="color:var(--white);">Face interna</strong> — overlay branco 12%, cria efeito 3D de profundidade</span></div>
+          <div class="rule-item"><span style="color:var(--gray-400);">●</span> <span>A seta aponta para cima-direita: <strong style="color:var(--white);">crescimento + prospecção ativa</strong></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Icons sample -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Ícones de UI — Estilo Outline</div>
+    <div class="icon-grid">
+      <!-- Using SVG emoji-like icons in brand style -->
+      <div class="icon-cell" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#ig)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="ig" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#3A9EFF"/><stop offset="100%" stop-color="#18D68C"/></linearGradient></defs><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+      </div>
+      <div class="icon-cell" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#ig2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="ig2" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#3A9EFF"/><stop offset="100%" stop-color="#18D68C"/></linearGradient></defs><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div class="icon-cell" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#ig3)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="ig3" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#3A9EFF"/><stop offset="100%" stop-color="#18D68C"/></linearGradient></defs><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+      </div>
+      <div class="icon-cell" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#ig4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="ig4" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#3A9EFF"/><stop offset="100%" stop-color="#18D68C"/></linearGradient></defs><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      </div>
+      <div class="icon-cell" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#ig5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><defs><linearGradient id="ig5" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stop-color="#3A9EFF"/><stop offset="100%" stop-color="#18D68C"/></linearGradient></defs><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  06 VOICE  ════════════════════════════ -->
+<section id="voice" class="bg-alt">
+  <div class="page">
+    <div class="section-label">06 — Tom de Voz</div>
+    <h2 class="section-title">Personalidade & Linguagem</h2>
+    <p class="section-desc">A Leadvora fala como um parceiro estratégico de alto calibre — não como uma ferramenta, mas como um aliado de vendas.</p>
+
+    <div class="grid-4" style="margin-bottom:3rem;">
+      <div class="voice-card">
+        <div class="voice-icon">🎯</div>
+        <div class="voice-title">Preciso</div>
+        <div class="voice-desc">Dados, métricas e resultados concretos. Sem vagas promessas. Foca no que importa para a pipeline.</div>
+      </div>
+      <div class="voice-card">
+        <div class="voice-icon">⚡</div>
+        <div class="voice-title">Direto</div>
+        <div class="voice-desc">Frases curtas. Verbos de ação. Sem jargão desnecessário. Respeita o tempo do profissional de vendas.</div>
+      </div>
+      <div class="voice-card">
+        <div class="voice-icon">🧠</div>
+        <div class="voice-title">Inteligente</div>
+        <div class="voice-desc">Demonstra domínio do mercado B2B sem ser arrogante. Educa enquanto acelera decisões.</div>
+      </div>
+      <div class="voice-card">
+        <div class="voice-icon">🚀</div>
+        <div class="voice-title">Energético</div>
+        <div class="voice-desc">Transmite momentum e ambição. A marca acredita no crescimento e contagia quem usa o produto.</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--green-mid);margin-bottom:1rem;">Exemplos de Copy ✓</div>
+        <div style="font-size:.9rem;color:var(--gray-200);line-height:1.8;">
+          <p style="margin-bottom:.6rem;">"Encontre seus próximos 100 clientes hoje."</p>
+          <p style="margin-bottom:.6rem;">"Pipeline previsível. Receita consistente."</p>
+          <p style="margin-bottom:.6rem;">"Sinais de intenção em tempo real."</p>
+          <p>"Seu CRM nunca mais ficou desatualizado."</p>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(255,80,80,.1);">
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#FF5050;margin-bottom:1rem;">Evitar ✗</div>
+        <div style="font-size:.9rem;color:var(--gray-400);line-height:1.8;">
+          <p style="margin-bottom:.6rem;">"Solução disruptiva e inovadora para…" ← genérico</p>
+          <p style="margin-bottom:.6rem;">"Transforme seu negócio de forma holística" ← vago</p>
+          <p style="margin-bottom:.6rem;">"Nós ajudamos você a ter sucesso" ← fraco</p>
+          <p>"Plataforma de CRM integrado B2B SaaS" ← jargão</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  07 USAGE RULES  ════════════════════════════ -->
+<section id="usage">
+  <div class="page">
+    <div class="section-label">07 — Uso Correto</div>
+    <h2 class="section-title">O que Fazer e Não Fazer</h2>
+    <p class="section-desc">Regras claras garantem consistência em todos os pontos de contato da marca.</p>
+
+    <div class="do-dont">
+      <div class="do-card">
+        <div class="do-badge do">✓ Pode</div>
+        <div class="rule-item"><span style="color:var(--green-mid);">→</span> Usar o logo em versão colorida sobre fundos navy/escuros</div>
+        <div class="rule-item"><span style="color:var(--green-mid);">→</span> Usar versão monocromática escura sobre fundos brancos</div>
+        <div class="rule-item"><span style="color:var(--green-mid);">→</span> Aplicar o gradiente brand nos elementos de destaque</div>
+        <div class="rule-item"><span style="color:var(--green-mid);">→</span> Usar Space Grotesk para headlines e Inter para corpo</div>
+        <div class="rule-item"><span style="color:var(--green-mid);">→</span> Manter a tagline em caixa alta com kerning amplo</div>
+        <div class="rule-item"><span style="color:var(--green-mid);">→</span> Usar verde apenas como acento — nunca como cor dominante</div>
+      </div>
+      <div class="dont-card">
+        <div class="do-badge dont">✗ Não Pode</div>
+        <div class="rule-item"><span style="color:#FF5050;">→</span> Distorcer, rotacionar ou esticar o logo</div>
+        <div class="rule-item"><span style="color:#FF5050;">→</span> Aplicar sombra, brilho ou efeitos externos ao logo</div>
+        <div class="rule-item"><span style="color:#FF5050;">→</span> Usar o logo sobre fundos de baixo contraste</div>
+        <div class="rule-item"><span style="color:#FF5050;">→</span> Alterar as cores do logomark individualmente</div>
+        <div class="rule-item"><span style="color:#FF5050;">→</span> Usar fontes diferentes das definidas no sistema</div>
+        <div class="rule-item"><span style="color:#FF5050;">→</span> Criar versões "personalizadas" do symbol mark</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  08 COMPONENTS  ════════════════════════════ -->
+<section id="components" class="bg-alt">
+  <div class="page">
+    <div class="section-label">08 — Componentes UI</div>
+    <h2 class="section-title">Sistema de Componentes</h2>
+    <p class="section-desc">Peças reutilizáveis do design system com especificações visuais.</p>
+
+    <!-- Buttons -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Botões</div>
+    <div class="card" style="margin-bottom:2rem;">
+      <div class="btn-row">
+        <button class="btn-primary">Começar agora →</button>
+        <button class="btn-outline">Ver demonstração</button>
+        <button class="btn-ghost">Saiba mais</button>
+      </div>
+      <div style="margin-top:1.5rem;font-size:.78rem;color:var(--gray-400);line-height:1.9;">
+        <strong style="color:var(--white);">Primary</strong> — gradiente logo, usado para CTA principal. Padding 12×28px. Radius 10px.<br>
+        <strong style="color:var(--white);">Outline</strong> — borda 1px blue-light 40% opacity. Para ações secundárias.<br>
+        <strong style="color:var(--white);">Ghost</strong> — background rgba branco 6%. Para ações terciárias ou navegação.
+      </div>
+    </div>
+
+    <!-- Tags / Badges -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Tags & Badges</div>
+    <div class="card" style="margin-bottom:2rem;">
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <span class="tag tag-green">Pro</span>
+        <span class="tag tag-blue">B2B</span>
+        <span class="tag tag-navy">Beta</span>
+        <span class="tag tag-green">Novo</span>
+        <span class="tag tag-blue">Integração</span>
+      </div>
+      <div style="font-size:.78rem;color:var(--gray-400);">Radius 99px. Font Inter 700, 0.72rem, letter-spacing 0.08em. Três variantes: blue, green, navy.</div>
+    </div>
+
+    <!-- Input -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Campos de Input</div>
+    <div class="card" style="margin-bottom:2rem;">
+      <div style="display:flex;flex-direction:column;gap:1rem;max-width:420px;">
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--gray-400);margin-bottom:.4rem;letter-spacing:.04em;">E-mail corporativo</div>
+          <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.75rem 1rem;font-size:.9rem;color:var(--gray-400);">joao@empresa.com</div>
+        </div>
+        <div>
+          <div style="font-size:.75rem;font-weight:600;color:var(--green-mid);margin-bottom:.4rem;letter-spacing:.04em;">Empresa (foco ativo)</div>
+          <div style="background:rgba(26,95,232,.08);border:1px solid rgba(26,95,232,.5);border-radius:10px;padding:.75rem 1rem;font-size:.9rem;color:var(--white);">Acme Corp</div>
+        </div>
+      </div>
+      <div style="margin-top:1rem;font-size:.78rem;color:var(--gray-400);">Default: border rgba(255,255,255,.12). Focus: border blue-mid 50%, background rgba azul 8%.</div>
+    </div>
+
+    <!-- Cards -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Cards de Conteúdo</div>
+    <div class="grid-3">
+      <div class="card" style="position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--grad-logo);border-radius:2px 2px 0 0;"></div>
+        <span class="tag tag-green" style="margin-bottom:.75rem;display:inline-flex;">Destaque</span>
+        <div style="font-family:'Space Grotesk';font-size:1.1rem;font-weight:600;margin-bottom:.5rem;">Lead Score 94</div>
+        <div style="font-size:.85rem;color:var(--gray-400);">Alta probabilidade de conversão. 3 sinais de intenção ativos.</div>
+      </div>
+      <div class="card">
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--gray-400);margin-bottom:.5rem;">Empresa</div>
+        <div style="font-family:'Space Grotesk';font-size:1.1rem;font-weight:600;margin-bottom:.3rem;">TechCorp Ltda</div>
+        <div style="font-size:.8rem;color:var(--gray-400);margin-bottom:1rem;">SaaS · 200–500 func · São Paulo</div>
+        <button class="btn-outline" style="font-size:.78rem;padding:.5rem 1rem;border-radius:8px;">Ver perfil →</button>
+      </div>
+      <div class="card" style="background:linear-gradient(135deg, rgba(10,47,182,.15), rgba(24,214,140,.08));border-color:rgba(26,95,232,.2);">
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--green-mid);margin-bottom:.5rem;">Métrica</div>
+        <div style="font-family:'Space Grotesk';font-size:2.5rem;font-weight:700;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">+34%</div>
+        <div style="font-size:.85rem;color:var(--gray-400);">Taxa de conversão este mês</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  09 MOTION  ════════════════════════════ -->
+<section id="motion">
+  <div class="page">
+    <div class="section-label">09 — Motion & Textura</div>
+    <h2 class="section-title">Animação & Superfície</h2>
+    <p class="section-desc">Princípios de movimento e tratamento de superfícies para interfaces digitais.</p>
+
+    <div class="grid-2" style="margin-bottom:2.5rem;">
+      <div class="card">
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--green-mid);margin-bottom:1rem;">Easing</div>
+        <table class="type-table">
+          <thead><tr><th>Nome</th><th>Curva</th><th>Uso</th></tr></thead>
+          <tbody>
+            <tr><td>Ease Out</td><td>cubic-bezier(0,0,.3,1)</td><td>Entradas, expansões</td></tr>
+            <tr><td>Ease In</td><td>cubic-bezier(.4,0,1,1)</td><td>Saídas, colapsos</td></tr>
+            <tr><td>Spring</td><td>cubic-bezier(.34,1.56,.64,1)</td><td>Feedback de ação</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--green-mid);margin-bottom:1rem;">Duração</div>
+        <table class="type-table">
+          <thead><tr><th>Token</th><th>Valor</th><th>Uso</th></tr></thead>
+          <tbody>
+            <tr><td>fast</td><td>100ms</td><td>Hover, micro-interações</td></tr>
+            <tr><td>base</td><td>200ms</td><td>Transições gerais</td></tr>
+            <tr><td>slow</td><td>350ms</td><td>Modais, painéis</td></tr>
+            <tr><td>xslow</td><td>600ms</td><td>Page transitions, hero</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Texture / Surfaces -->
+    <div style="font-size:.7rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gray-400);margin-bottom:1.25rem;">Superfícies</div>
+    <div class="grid-4">
+      <div style="height:100px;border-radius:12px;background:#070D1A;border:1px solid rgba(255,255,255,.06);display:flex;align-items:flex-end;padding:.75rem;font-size:.72rem;color:var(--gray-400);">Base · #070D1A</div>
+      <div style="height:100px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);display:flex;align-items:flex-end;padding:.75rem;font-size:.72rem;color:var(--gray-400);">Surface 1 · rgba(.03)</div>
+      <div style="height:100px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);display:flex;align-items:flex-end;padding:.75rem;font-size:.72rem;color:var(--gray-400);">Surface 2 · rgba(.06)</div>
+      <div style="height:100px;border-radius:12px;background:rgba(26,95,232,.12);border:1px solid rgba(26,95,232,.22);display:flex;align-items:flex-end;padding:.75rem;font-size:.72rem;color:var(--gray-400);">Surface Blue</div>
+    </div>
+
+    <!-- Backdrop blur note -->
+    <div class="card" style="margin-top:1.5rem;">
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--green-mid);margin-bottom:.75rem;">Glass Morphism</div>
+      <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:.75rem;">
+        <span style="font-size:.9rem;">Painel com glass effect — backdrop-filter: blur(16px)</span>
+      </div>
+      <p style="font-size:.82rem;color:var(--gray-400);">Usar com moderação em overlays, tooltips e cards flutuantes. Requer fundo com gradiente ou imagem para efeito visível.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ════════════════════════════  FOOTER  ════════════════════════════ -->
+<footer style="background:#070D1A;padding:4rem 2.5rem;text-align:center;">
+  <div class="cover-logo" style="justify-content:center;margin-bottom:1rem;">
+    <div class="logo-icon" style="width:36px;height:36px;">
+      <svg viewBox="0 0 80 80" fill="none"><defs><linearGradient id="fB" x1="0" y1="80" x2="80" y2="0"><stop offset="0%" stop-color="#0A2FB6"/><stop offset="60%" stop-color="#3A9EFF"/></linearGradient><linearGradient id="fG" x1="44" y1="12" x2="72" y2="50"><stop offset="0%" stop-color="#18D68C"/><stop offset="100%" stop-color="#00A86B"/></linearGradient></defs><path d="M8 68 L44 12 L72 50 L46 44 Z" fill="url(#fB)"/><path d="M44 12 L72 22 L72 50 Z" fill="url(#fG)"/><path d="M8 68 L44 12 L46 44 Z" fill="rgba(255,255,255,0.1)"/></svg>
+    </div>
+    <span style="font-family:'Space Grotesk',sans-serif;font-size:1.5rem;font-weight:700;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Leadvora</span>
+  </div>
+  <p style="font-size:.75rem;color:var(--gray-400);letter-spacing:.1em;">Brand Identity Book v1.0 · Março 2026 · Documento Interno Confidencial</p>
+  <p style="font-size:.7rem;color:rgba(148,163,184,.4);margin-top:.5rem;">© 2026 Leadvora. Todos os direitos reservados.</p>
+</footer>
+
+</body>
+</html>

@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ArrowLeft, Printer, Download, Share2, Loader2, CalendarClock, Trash2, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Printer, Loader2, CalendarClock, Trash2, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePrinter } from "@/hooks/usePrinter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -168,6 +168,10 @@ export default function LabelPreviewPage() {
       setLabel(prev => prev ? { ...prev, ...updates } : prev);
       setActionOpen(false);
       toast({ title: 'Updated', description: `Label marked as ${actionType === 'consume' ? 'consumed' : actionType === 'discard' ? 'discarded' : 'extended'}.` });
+      // After discard, navigate back to expiring alerts
+      if (actionType === 'discard') {
+        navigate('/expiring-soon');
+      }
     } catch (err: any) {
       toast({ variant: 'destructive', title: 'Error', description: err.message || 'Failed to update label.' });
     } finally {
@@ -337,20 +341,6 @@ export default function LabelPreviewPage() {
             </>
           )}
         </Button>
-        
-        <Button onClick={handleShare} variant="outline" className="gap-2">
-          <Share2 className="w-4 h-4" />
-          Share
-        </Button>
-        
-        <Button 
-          onClick={() => window.print()} 
-          variant="outline" 
-          className="gap-2"
-        >
-          <Download className="w-4 h-4" />
-          Export as PDF
-        </Button>
 
         <Button
           onClick={() => handleAction('consume')}
@@ -444,17 +434,28 @@ export default function LabelPreviewPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {actionType === 'extend' && (
-              <div className="space-y-2">
-                <Label htmlFor="new-expiry">New Expiry Date</Label>
-                <Input
-                  id="new-expiry"
-                  type="date"
-                  value={newExpiryDate}
-                  onChange={e => setNewExpiryDate(e.target.value)}
-                />
+            {actionType === 'extend' ? (
+              <div className="space-y-3">
+                <p className="text-sm font-semibold">{label?.product_name}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Current expiry</p>
+                    <p className="font-semibold text-sm">
+                      {label && format(new Date(label.expiry_date), 'MMM dd, yyyy')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">New expiry</p>
+                    <input
+                      type="date"
+                      value={newExpiryDate}
+                      onChange={e => setNewExpiryDate(e.target.value)}
+                      className="block w-full text-sm font-semibold bg-transparent border-none outline-none p-0"
+                    />
+                  </div>
+                </div>
               </div>
-            )}
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="action-reason">Reason <span className="text-muted-foreground text-xs">(Optional)</span></Label>
               <Textarea

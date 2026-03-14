@@ -765,7 +765,7 @@ export default function TasksOverview() {
                 </DialogHeader>
                 <TaskForm
                   onSubmit={handleCreateTask}
-                  users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name }))}
+                  users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role_type: tm.role_type }))}
                   isLoading={teamMembersLoading}
                 />
               </DialogContent>
@@ -852,6 +852,10 @@ export default function TasksOverview() {
                       selected={selectedDate}
                       onSelect={(date) => date && setSelectedDate(date)}
                       initialFocus
+                      captionLayout="dropdown-buttons"
+                      fromYear={2020}
+                      toYear={2035}
+                      fixedWeeks
                     />
                   </PopoverContent>
                 </Popover>
@@ -1475,6 +1479,15 @@ export default function TasksOverview() {
                             onComplete={handleCompleteOccurrence}
                             onEdit={(o) => openOccModal(o, 'edit')}
                             onDelete={(o) => openOccModal(o, 'delete')}
+                            assignedUserName={
+                              teamMembers.find(tm => tm.id === occ.assigned_to)?.display_name
+                            }
+                            completedByName={
+                              occ.completed_by
+                                ? (users.find(u => u.user_id === occ.completed_by)?.display_name
+                                  ?? teamMembers.find(tm => tm.auth_role_id === occ.completed_by)?.display_name)
+                                : undefined
+                            }
                           />
                         ))}
                       </div>
@@ -1502,7 +1515,7 @@ export default function TasksOverview() {
             </DialogHeader>
             <TaskForm
               onSubmit={handleEditTask}
-              users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name }))}
+              users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role_type: tm.role_type }))}
               isLoading={teamMembersLoading}
               isEditing={true}
               taskId={taskToEdit.id}

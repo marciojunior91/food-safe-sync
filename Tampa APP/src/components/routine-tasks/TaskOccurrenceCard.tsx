@@ -66,6 +66,7 @@ interface TaskOccurrenceCardProps {
   selected?: boolean;
   onSelect?: (occurrenceId: string, selected: boolean) => void;
   assignedUserName?: string; // Display name for assigned user
+  completedByName?: string;  // Display name of user who completed the task
 }
 
 // ================================================================
@@ -159,6 +160,7 @@ export function TaskOccurrenceCard({
   selected = false,
   onSelect,
   assignedUserName,
+  completedByName,
 }: TaskOccurrenceCardProps) {
   const taskIcon = TASK_TYPE_ICONS[occurrence.task_type] || "📋";
   const statusColor = STATUS_COLORS[occurrence.status];
@@ -433,7 +435,12 @@ export function TaskOccurrenceCard({
         {/* Completion Info */}
         {isCompleted && occurrence.completed_at && (
           <div className="text-xs text-muted-foreground">
-            Completed {format(new Date(occurrence.completed_at), "MMM d 'at' h:mm a")}
+            ✓ Completed {format(new Date(occurrence.completed_at), "MMM d 'at' h:mm a")}
+            {completedByName && (
+              <span className="ml-1">
+                by <span className="font-semibold text-foreground">{completedByName}</span>
+              </span>
+            )}
           </div>
         )}
 

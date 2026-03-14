@@ -33,6 +33,8 @@ import type { TeamMember } from "@/types/teamMembers";
 import { supabase } from "@/integrations/supabase/client";
 import { saveLabelToDatabase } from "@/utils/zebraPrinter";
 import { getExpiryStatus, getStatusColor } from "@/utils/trafficLight";
+import { calculateExpiryDate } from "@/utils/dateCalculations";
+import type { StorageCondition } from "@/utils/dateCalculations";
 
 export default function Labeling() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -298,7 +300,7 @@ export default function Labeling() {
     // If no pending action, just close the dialog (user was selecting/changing their identity)
   };
 
-  const handleQuickPrintDetailsConfirmed = (details: { quantity: string; unit: string; condition: string }) => {
+  const handleQuickPrintDetailsConfirmed = (details: { quantity: string; unit: string; condition: string; customExpiryDate?: string }) => {
     if (pendingQuickPrint && selectedUser) {
       executeQuickPrint(pendingQuickPrint, selectedUser, details);
       setPendingQuickPrint(null);
@@ -309,7 +311,7 @@ export default function Labeling() {
   const executeQuickPrint = async (
     product: any, 
     selectedUserData: TeamMember,
-    details?: { quantity: string; unit: string; condition: string }
+    details?: { quantity: string; unit: string; condition: string; customExpiryDate?: string }
   ) => {
     if (!organizationId) {
       toast({
@@ -343,9 +345,19 @@ export default function Labeling() {
 
     const now = new Date();
     const prepDate = now.toISOString().split('T')[0];
-    const expiryDateObj = new Date(now);
-    expiryDateObj.setDate(now.getDate() + 3);
-    const expiryDate = expiryDateObj.toISOString().split('T')[0];
+
+    // Determine expiry date based on condition
+    let expiryDate: string;
+    if (details?.condition === 'custom' && details?.customExpiryDate) {
+      expiryDate = details.customExpiryDate;
+    } else if (details?.condition && details.condition !== 'custom') {
+      expiryDate = calculateExpiryDate(prepDate, details.condition as StorageCondition);
+    } else {
+      // Fallback: +3 days
+      const d = new Date(now);
+      d.setDate(now.getDate() + 3);
+      expiryDate = d.toISOString().split('T')[0];
+    }
 
     // Fetch allergens for the product
     let productAllergens: any[] = [];
@@ -379,7 +391,7 @@ export default function Labeling() {
       preparedByName: selectedUserData.display_name || "Unknown",
       prepDate: prepDate,
       expiryDate: expiryDate,
-      condition: details?.condition || "REFRIGERATED",
+      condition: details?.condition || "refrigerated",
       quantity: details?.quantity || "1",
       unit: details?.unit || product.measuring_units?.abbreviation || "Unit",
       batchNumber: "",
@@ -399,7 +411,7 @@ export default function Labeling() {
         expiryDate: expiryDate,
         preparedByName: selectedUserData.display_name || "Unknown",
         allergens: productAllergens,
-        condition: details?.condition || "REFRIGERATED",
+        condition: details?.condition || "refrigerated",
         quantity: details?.quantity || "1",
         unit: details?.unit || product.measuring_units?.abbreviation || "Unit",
         labelId: savedLabelId || undefined,
@@ -711,41 +723,6 @@ export default function Labeling() {
           products={products}
           onQuickPrint={handleQuickPrintFromGrid}
         />
-      </div>
-
-      {/* SECTION 2: Dashboard Stats */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 text-foreground">Today's Overview</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatsCard
-            title="Labels Today"
-            value={labelsToday}
-            change={`Total: ${totalLabels} labels`}
-            changeType="neutral"
-            icon={Printer}
-          />
-          <StatsCard
-            title="Recent Labels"
-            value={recentPrintedLabels.length}
-            change="Last 10 printed"
-            changeType="neutral"
-            icon={QrCode}
-          />
-          <StatsCard
-            title="Expiring Soon"
-            value={expiringCount}
-            change="Next 24 hours"
-            changeType={expiringCount > 10 ? "negative" : "neutral"}
-            icon={AlertTriangle}
-          />
-          <StatsCard
-            title="Compliance Rate"
-            value={totalLabels > 0 ? "Active" : "No Data"}
-            change={`${totalLabels} printed`}
-            changeType="positive"
-            icon={Calendar}
-          />
-        </div>
       </div>
 
       {/* SECTION 3: Recent Labels */}

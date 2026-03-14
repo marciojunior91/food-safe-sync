@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { QRCodeSVG } from "qrcode.react";
 import { format } from "date-fns";
 import { Eye } from "lucide-react";
-import { AllergenWarningBox } from "./AllergenBadge";
+
 import { useAllergens } from "@/hooks/useAllergens";
 
 interface LabelPreviewProps {
@@ -139,9 +139,9 @@ export function LabelPreview({
             <>
               {/* Header Section */}
               <div className="text-center border-b-2 border-gray-200 dark:border-gray-800 pb-4">
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{productName || "Product Name"}</h3>
+                <h3 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{productName || "Product Name"}</h3>
                 {categoryName && (
-                  <p className="text-sm text-muted-foreground mt-1">{categoryName}</p>
+                  <p className="text-base text-muted-foreground mt-1">{categoryName}</p>
                 )}
               </div>
 
@@ -163,7 +163,7 @@ export function LabelPreview({
               {preparedByName && (
                 <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">PREPARED BY</p>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{preparedByName}</p>
+                  <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{preparedByName}</p>
                 </div>
               )}
 
@@ -171,7 +171,7 @@ export function LabelPreview({
               {prepDate && (
                 <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">PREP DATE</p>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{formattedPrepDate}</p>
+                  <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{formattedPrepDate}</p>
                 </div>
               )}
 
@@ -179,7 +179,7 @@ export function LabelPreview({
               {expiryDate && (
                 <div>
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400">USE BY</p>
-                  <p className="text-sm font-bold text-red-600 dark:text-red-400">{formattedExpiryDate}</p>
+                  <p className="text-base font-bold text-red-600 dark:text-red-400">{formattedExpiryDate}</p>
                 </div>
               )}
 
@@ -193,12 +193,21 @@ export function LabelPreview({
                 </div>
               )}
 
-              {/* Batch Number */}
-              {batchNumber && (
+              {/* Allergens — inline with other label fields */}
+              {allergens.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">BATCH #</p>
-                  <p className="text-sm font-mono font-semibold text-gray-900 dark:text-gray-100">{batchNumber}</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">ALLERGENS</p>
+                  <div className="flex flex-wrap gap-1">
+                    {allergens.map((a: any) => (
+                      <span key={a.id} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold">
+                        ⚠️ {a.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
+              )}
+              {loadingAllergens && (
+                <p className="text-xs text-muted-foreground animate-pulse">Loading allergens...</p>
               )}
             </div>
 
@@ -208,12 +217,12 @@ export function LabelPreview({
                 <>
                   <QRCodeSVG
                     value={qrData}
-                    size={140}
+                    size={90}
                     level="H"
                     includeMargin={false}
                     className="border-2 border-gray-200 dark:border-gray-700 rounded"
                   />
-                  <p className="text-xs text-center text-muted-foreground mt-2">
+                  <p className="text-xs text-center text-muted-foreground mt-1">
                     Scan for details
                   </p>
                 </>
@@ -227,15 +236,7 @@ export function LabelPreview({
             </div>
           </div>
 
-              {/* Allergen Warning Box — inside label border */}
-              {productId && allergens.length > 0 && (
-                <div className="mt-2">
-                  <AllergenWarningBox allergens={allergens} />
-                </div>
-              )}
-              {productId && loadingAllergens && (
-                <p className="text-xs text-muted-foreground text-center animate-pulse mt-2">Loading allergens...</p>
-              )}
+
 
               {/* Footer - Template Type Badge */}
               <div className="border-t-2 border-gray-200 dark:border-gray-800 pt-3 flex justify-between items-center">

@@ -864,25 +864,35 @@ export default function ExpiringSoon() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Item Info */}
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="font-semibold">{actionDialog.item?.name}</p>
-              <p className="text-sm text-muted-foreground">
-                Current expiry: {actionDialog.item && format(actionDialog.item.expiryDate, 'MMM dd, yyyy')}
-              </p>
-            </div>
-
-            {/* New Expiry Date (for extend action) */}
-            {actionDialog.action === 'extend' && (
-              <div className="space-y-2">
-                <Label htmlFor="newExpiryDate">New Expiry Date</Label>
-                <Input
-                  id="newExpiryDate"
-                  type="date"
-                  value={newExpiryDate}
-                  onChange={(e) => setNewExpiryDate(e.target.value)}
-                  min={format(new Date(), 'yyyy-MM-dd')}
-                />
+            {/* Item Info / Date comparison for extend */}
+            {actionDialog.action === 'extend' ? (
+              <div className="space-y-3">
+                <p className="font-semibold">{actionDialog.item?.name}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Current expiry</p>
+                    <p className="font-semibold text-sm">
+                      {actionDialog.item && format(actionDialog.item.expiryDate, 'MMM dd, yyyy')}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">New expiry</p>
+                    <input
+                      type="date"
+                      value={newExpiryDate}
+                      onChange={(e) => setNewExpiryDate(e.target.value)}
+                      min={format(new Date(), 'yyyy-MM-dd')}
+                      className="block w-full text-sm font-semibold bg-transparent border-none outline-none p-0"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="font-semibold">{actionDialog.item?.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Expiry: {actionDialog.item && format(actionDialog.item.expiryDate, 'MMM dd, yyyy')}
+                </p>
               </div>
             )}
 

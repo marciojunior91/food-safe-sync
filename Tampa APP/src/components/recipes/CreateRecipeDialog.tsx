@@ -235,21 +235,22 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="md:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="md:col-span-2 space-y-1">
               <Label htmlFor="name">Recipe Name *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Enter recipe name"
+                className="h-10"
                 required
               />
             </div>
-            <div>
+            <div className="space-y-1">
               <Label htmlFor="category">Category</Label>
               <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-background opacity-100">
@@ -259,7 +260,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                 </SelectContent>
               </Select>
             </div>
-            <div>
+            <div className="space-y-1">
               <Label htmlFor="holdTime">Hold Time (days) *</Label>
               <Input
                 id="holdTime"
@@ -268,14 +269,15 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                 onChange={(e) => setFormData({ ...formData, holdTimeDays: e.target.value })}
                 placeholder="3"
                 min="1"
+                className="h-10"
                 required
               />
             </div>
           </div>
 
           {/* Yield and Timing */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+            <div className="space-y-1">
               <Label htmlFor="yield">Yield *</Label>
               <div className="flex gap-2">
                 <Input
@@ -285,10 +287,11 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                   value={formData.yieldAmount}
                   onChange={(e) => setFormData({ ...formData, yieldAmount: e.target.value })}
                   placeholder="Amount"
+                  className="flex-1 h-10"
                   required
                 />
                 <Select value={formData.yieldUnit} onValueChange={(value) => setFormData({ ...formData, yieldUnit: value })}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-28 h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-background opacity-100">
@@ -296,15 +299,15 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                     <SelectItem value="portions" className="bg-background opacity-100">portions</SelectItem>
                     <SelectItem value="kg" className="bg-background opacity-100">kg</SelectItem>
                     <SelectItem value="g" className="bg-background opacity-100">g</SelectItem>
-                    <SelectItem value="litres" className="bg-background opacity-100">l</SelectItem>
+                    <SelectItem value="litres" className="bg-background opacity-100">litres</SelectItem>
                     <SelectItem value="ml" className="bg-background opacity-100">ml</SelectItem>
                     <SelectItem value="mg" className="bg-background opacity-100">mg</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            <div>
-              <Label htmlFor="prepTime">Est. Prep Time (minutes)</Label>
+            <div className="space-y-1">
+              <Label htmlFor="prepTime">Est. Prep Time (min)</Label>
               <Input
                 id="prepTime"
                 type="number"
@@ -312,6 +315,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
                 onChange={(e) => setFormData({ ...formData, estimatedPrepMinutes: e.target.value })}
                 placeholder="30"
                 min="1"
+                className="h-10"
               />
             </div>
           </div>

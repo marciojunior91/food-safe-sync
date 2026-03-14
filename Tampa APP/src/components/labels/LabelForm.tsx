@@ -17,7 +17,10 @@ import {
   Plus,
   Eye,
   EyeOff,
-  Minus
+  Minus,
+  CalendarDays,
+  Lock,
+  Unlock
 } from "lucide-react";
 import {
   AlertDialog,
@@ -116,13 +119,16 @@ interface Product {
 }
 
 // Storage conditions using centralized utility
-const CONDITIONS: Array<{ value: StorageCondition; label: string; days: number }> = [
+const CONDITIONS: Array<{ value: string; label: string; days?: number }> = [
   { value: "fresh", label: STORAGE_CONDITION_LABELS.fresh, days: STORAGE_CONDITION_SHELF_LIFE.fresh },
   { value: "cooked", label: STORAGE_CONDITION_LABELS.cooked, days: STORAGE_CONDITION_SHELF_LIFE.cooked },
   { value: "frozen", label: STORAGE_CONDITION_LABELS.frozen, days: STORAGE_CONDITION_SHELF_LIFE.frozen },
   { value: "dry", label: STORAGE_CONDITION_LABELS.dry, days: STORAGE_CONDITION_SHELF_LIFE.dry },
   { value: "refrigerated", label: STORAGE_CONDITION_LABELS.refrigerated, days: STORAGE_CONDITION_SHELF_LIFE.refrigerated },
+  { value: "ambient", label: STORAGE_CONDITION_LABELS.ambient, days: STORAGE_CONDITION_SHELF_LIFE.ambient },
   { value: "hot", label: STORAGE_CONDITION_LABELS.hot, days: 1 }, // Display as 1 day (actually 4 hours)
+  { value: "thawed", label: STORAGE_CONDITION_LABELS.thawed, days: STORAGE_CONDITION_SHELF_LIFE.thawed },
+  { value: "custom", label: "Custom Date" },
 ];
 
 export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelFormProps) {
@@ -150,6 +156,9 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
   const [openCategory, setOpenCategory] = useState(false);
   const [openProduct, setOpenProduct] = useState(false);
   const [openCondition, setOpenCondition] = useState(false);
+  
+  // Custom expiry date toggle
+  const [customExpiryEnabled, setCustomExpiryEnabled] = useState(false);
   
   // Allergen state
   const [selectedAllergenIds, setSelectedAllergenIds] = useState<string[]>([]);
@@ -705,17 +714,16 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
 
   // Use centralized date calculation utility
   const handleConditionChange = (value: string) => {
-    setLabelData(prev => {
-      const expiry = calculateExpiryDate(
-        prev.prepDate, 
-        value as StorageCondition
-      );
-      return {
-        ...prev,
-        condition: value,
-        expiryDate: expiry
-      };
-    });
+    if (value === 'custom') {
+      setCustomExpiryEnabled(true);
+      setLabelData(prev => ({ ...prev, condition: value }));
+    } else {
+      setCustomExpiryEnabled(false);
+      setLabelData(prev => {
+        const expiry = calculateExpiryDate(prev.prepDate, value as StorageCondition);
+        return { ...prev, condition: value, expiryDate: expiry };
+      });
+    }
     setOpenCondition(false);
   };
 
@@ -1242,9 +1250,13 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
                           />
                           <div className="flex flex-col">
                             <span>{condition.label}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {condition.days} day{condition.days !== 1 ? 's' : ''} shelf life
-                            </span>
+                            {condition.days !== undefined ? (
+                              <span className="text-xs text-muted-foreground">
+                                {condition.days} day{condition.days !== 1 ? 's' : ''} shelf life
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Set any date manually</span>
+                            )}
                           </div>
                         </CommandItem>
                       ))}
@@ -1277,18 +1289,45 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
             />
           </div>
 
-          {/* Expiry Date - Auto Calculated */}
+          {/* Expiry Date - Auto Calculated or Custom */}
           <div className="space-y-2">
-            <Label htmlFor="expiry-date" className="text-base font-medium">Expiry Date</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="expiry-date" className="text-base font-medium">Expiry Date</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-xs px-2"
+                onClick={() => {
+                  setCustomExpiryEnabled(prev => {
+                    if (prev) {
+                      // Reverting to auto: recalculate from condition
+                      if (labelData.condition && labelData.prepDate) {
+                        const expiry = calculateExpiryDate(labelData.prepDate, labelData.condition as StorageCondition);
+                        setLabelData(p => ({ ...p, expiryDate: expiry }));
+                      }
+                    }
+                    return !prev;
+                  });
+                }}
+              >
+                {customExpiryEnabled ? (
+                  <><Unlock className="w-3.5 h-3.5" /> Custom</>                
+                ) : (
+                  <><Lock className="w-3.5 h-3.5" /> Auto</>                
+                )}
+              </Button>
+            </div>
             <Input
               id="expiry-date"
               type="date"
               value={labelData.expiryDate}
-              readOnly
-              className="bg-muted text-lg h-12"
+              readOnly={!customExpiryEnabled}
+              onChange={customExpiryEnabled ? (e) => setLabelData(prev => ({ ...prev, expiryDate: e.target.value })) : undefined}
+              className={customExpiryEnabled ? "border-primary text-lg h-12" : "bg-muted text-lg h-12"}
             />
             <p className="text-xs text-muted-foreground">
-              Automatically calculated based on condition
+              {customExpiryEnabled ? "Custom expiry date — enter any date" : "Automatically calculated based on condition"}
             </p>
           </div>
 

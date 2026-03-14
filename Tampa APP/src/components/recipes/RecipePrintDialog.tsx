@@ -44,12 +44,16 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
   const [selectedPrinter, setSelectedPrinter] = useState<string>(printer?.type || 'zebra');
   
   // Form state
-  const [batchMultiplier, setBatchMultiplier] = useState(1);
-  const [batchCustom, setBatchCustom] = useState('');
   const [manufacturingDate, setManufacturingDate] = useState(new Date());
-  const [storageCondition, setStorageCondition] = useState<StorageCondition>('refrigerated');
+  const [storageCondition, setStorageCondition] = useState<StorageCondition | 'custom'>('refrigerated');
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('');
+  // Custom expiry date (used when storageCondition === 'custom')
+  const [customExpiryDate, setCustomExpiryDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    return format(d, 'yyyy-MM-dd');
+  });
   
   // Category IDs for "Prepared Foods → Recipes"
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -58,14 +62,19 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
   // Calculate expiry date - recalculates reactively when storageCondition or date changes
   const baseShelfLifeDays = recipe.shelf_life_days || 3;
   const shelfLifeDays = baseShelfLifeDays;
-  const expiryDateString = calculateExpiryDate(
-    format(manufacturingDate, 'yyyy-MM-dd'),
-    storageCondition,
-    shelfLifeDays
-  );
+  const isCustomCondition = storageCondition === 'custom';
+  const expiryDateString = isCustomCondition
+    ? customExpiryDate
+    : calculateExpiryDate(
+        format(manufacturingDate, 'yyyy-MM-dd'),
+        storageCondition as StorageCondition,
+        shelfLifeDays
+      );
   const expiryDate = expiryDateString ? parseISO(expiryDateString) : new Date();
   const CONDITION_MULTIPLIERS: Record<string, number> = { fresh: 0.33, cooked: 1, frozen: 4, dry: 10, refrigerated: 1, ambient: 0.5, hot: 0.05, thawed: 0.33 };
-  const effectiveDays = Math.max(Math.ceil(shelfLifeDays * (CONDITION_MULTIPLIERS[storageCondition] ?? 1)), 1);
+  const effectiveDays = isCustomCondition
+    ? Math.round((expiryDate.getTime() - manufacturingDate.getTime()) / (1000 * 60 * 60 * 24))
+    : Math.max(Math.ceil(shelfLifeDays * (CONDITION_MULTIPLIERS[storageCondition] ?? 1)), 1);
 
   // Update selectedUser when initialUser changes
   useEffect(() => {
@@ -131,10 +140,10 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
     try {
       // Prepare label data matching printer expectations (IncomingLabelData interface)
       const labelData = {
-        productName: `${recipe.name}${batchMultiplier !== 1 ? ` (${batchMultiplier === 0 ? batchCustom : batchMultiplier}x)` : ''}`,
+        productName: recipe.name,
         prepDate: format(manufacturingDate, 'yyyy-MM-dd'),
         expiryDate: format(expiryDate, 'yyyy-MM-dd'),
-        condition: storageCondition,
+        condition: isCustomCondition ? 'custom' : storageCondition,
         allergens: (recipe.allergens || []).map(a => ({
           id: a.id,
           name: a.name,
@@ -191,34 +200,6 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Batch Multiplier */}
-            <div className="space-y-2">
-              <Label>Batch Size</Label>
-              <Select 
-                value={batchMultiplier.toString()} 
-                onValueChange={(v) => setBatchMultiplier(Number(v))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1x (Standard)</SelectItem>
-                  <SelectItem value="2">2x (Double)</SelectItem>
-                  <SelectItem value="3">3x (Triple)</SelectItem>
-                  <SelectItem value="0">Other...</SelectItem>
-                </SelectContent>
-              </Select>
-              {batchMultiplier === 0 && (
-                <Input
-                  type="number"
-                  min="1"
-                  placeholder="Enter batch multiplier"
-                  value={batchCustom}
-                  onChange={(e) => setBatchCustom(e.target.value)}
-                />
-              )}
-            </div>
-
             {/* Prep Date */}
             <div className="space-y-2">
               <Label>Prep Date</Label>
@@ -246,38 +227,67 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
               </Popover>
             </div>
 
-            {/* Expiry Date (Calculated) */}
-            <div className="space-y-2">
-              <Label>Expiry Date (Auto-calculated)</Label>
-              <Input
-                value={format(expiryDate, 'PPP')}
-                disabled
-                className="bg-muted"
-              />
-              <p className="text-xs text-muted-foreground">
-                {effectiveDays} day{effectiveDays !== 1 ? 's' : ''} shelf life under {storageCondition === 'ambient' ? 'room temperature' : storageCondition} conditions
-              </p>
-            </div>
-
             {/* Storage Condition */}
             <div className="space-y-2">
               <Label>Storage Condition</Label>
               <Select 
                 value={storageCondition} 
-                onValueChange={(v: StorageCondition) => setStorageCondition(v)}
+                onValueChange={(v) => setStorageCondition(v as StorageCondition | 'custom')}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ambient">Room Temperature</SelectItem>
-                  <SelectItem value="refrigerated">Refrigerated</SelectItem>
-                  <SelectItem value="frozen">Frozen</SelectItem>
-                  <SelectItem value="hot">Hot</SelectItem>
+                  <SelectItem value="fresh">🌿 Fresh</SelectItem>
+                  <SelectItem value="cooked">🍳 Cooked</SelectItem>
+                  <SelectItem value="frozen">❄️ Frozen</SelectItem>
+                  <SelectItem value="dry">🌾 Dry Storage</SelectItem>
+                  <SelectItem value="refrigerated">🧊 Refrigerated</SelectItem>
+                  <SelectItem value="ambient">🌡️ Room Temperature</SelectItem>
+                  <SelectItem value="hot">🔥 Hot</SelectItem>
+                  <SelectItem value="thawed">💧 Thawed</SelectItem>
+                  <SelectItem value="custom">📅 Custom (set date manually)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Changes shelf life calculation
+                {isCustomCondition ? "You can set any expiry date below" : "Changes shelf life calculation"}
+              </p>
+            </div>
+
+            {/* Expiry Date */}
+            <div className="space-y-2">
+              <Label>{isCustomCondition ? 'Expiry Date' : 'Expiry Date (Auto-calculated)'}</Label>
+              {isCustomCondition ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn('w-full justify-start text-left font-normal border-primary')}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {customExpiryDate ? format(parseISO(customExpiryDate), 'PPP') : <span>Pick expiry date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={customExpiryDate ? parseISO(customExpiryDate) : undefined}
+                      onSelect={(date) => date && setCustomExpiryDate(format(date, 'yyyy-MM-dd'))}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <Input
+                  value={format(expiryDate, 'PPP')}
+                  disabled
+                  className="bg-muted"
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                {isCustomCondition
+                  ? `${effectiveDays} day${effectiveDays !== 1 ? 's' : ''} from prep date`
+                  : `${effectiveDays} day${effectiveDays !== 1 ? 's' : ''} shelf life under ${storageCondition === 'ambient' ? 'room temperature' : storageCondition} conditions`}
               </p>
             </div>
 
@@ -286,10 +296,11 @@ export function RecipePrintDialog({ open, onOpenChange, recipe, initialUser }: R
               <div className="space-y-2">
                 <Label>Quantity (Optional)</Label>
                 <Input
-                  type="text"
+                  type="number"
+                  min="0"
                   placeholder="e.g., 500"
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  onChange={(e) => setQuantity(e.target.value.replace(/[^0-9.]/g, ''))}
                 />
               </div>
               <div className="space-y-2">

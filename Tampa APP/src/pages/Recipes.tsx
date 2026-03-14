@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Plus, Search, Clock, Users, AlertTriangle, ChefHat, Filter, Edit, Trash2, Grid3X3, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   Mains: '🍽️',
   Desserts: '🍰',
   Sides: '🥕',
-  Sauces: '🫙',
+  Sauces: '\uD83E\uDD63',
   Beverages: '🥤',
   Bakery: '🥖',
   Other: '📂',
@@ -474,11 +474,11 @@ export default function Recipes() {
                       </div>
                     )}
                     {/* Actions */}
-                    <div className="mt-auto pt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-auto pt-2 flex gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                         onClick={() => setSelectedRecipeDetail(recipe)}
                       >
                         <ChefHat className="w-3 h-3 mr-1" />
@@ -496,10 +496,10 @@ export default function Recipes() {
                         }}
                         variant="outline"
                         size="sm"
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                       />
                       {canManageRecipes && (
-                        <>
+                        <div className="flex gap-1">
                           <Button
                             size="sm"
                             variant="ghost"
@@ -516,7 +516,7 @@ export default function Recipes() {
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
-                        </>
+                        </div>
                       )}
                     </div>
                   </CardContent>

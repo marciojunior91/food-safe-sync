@@ -109,12 +109,14 @@ export function TaskTimeline({
             {/* Current Time Marker */}
             {isToday && currentTimePosition !== null && (
               <div
-                className="absolute left-0 right-0 z-20 border-t-2 border-red-500"
-                style={{ top: `${currentTimePosition}%` }}
+                className="absolute z-20"
+                style={{ top: `${currentTimePosition}%`, left: '80px', right: 0 }}
               >
-                <div className="absolute -left-1 -top-2 w-2 h-2 rounded-full bg-red-500" />
-                <div className="absolute left-2 -top-3 text-xs font-medium text-red-500">
-                  {format(now, "HH:mm")}
+                <div className="relative border-t-2 border-red-500 w-full">
+                  <div className="absolute -left-1.5 -top-1.5 w-3 h-3 rounded-full bg-red-500" />
+                  <div className="absolute left-2 -top-4 text-xs font-medium text-red-500 bg-white dark:bg-gray-950 px-1 rounded">
+                    {format(now, "HH:mm")}
+                  </div>
                 </div>
               </div>
             )}
