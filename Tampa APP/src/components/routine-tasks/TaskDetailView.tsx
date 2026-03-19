@@ -4,6 +4,7 @@ import {
   X,
   Clock,
   User,
+  Users,
   Calendar,
   CheckCircle2,
   AlertCircle,
@@ -38,6 +39,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { Progress } from "@/components/ui/progress";
 import { Checkbox as UICheckbox } from "@/components/ui/checkbox";
 
@@ -99,12 +101,73 @@ export function TaskDetailView({
   onAddNote,
 }: TaskDetailViewProps) {
   const { toast } = useToast();
+  const { teamMembers, fetchTeamMembers } = useTeamMembers();
   const [note, setNote] = useState("");
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
   const [subtasks, setSubtasks] = useState<Array<{id: string; title: string; completed: boolean}>>([]);
   const [savingSubtask, setSavingSubtask] = useState<string | null>(null);
+  const [dbAssigneeIds, setDbAssigneeIds] = useState<string[]>([]);
+
+  // Fetch the task's assignees directly from DB to ensure we always have the full list
+  useEffect(() => {
+    if (!open || !task.id) return;
+
+    const loadAssignees = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('routine_tasks')
+          .select('assignees, team_member_id')
+          .eq('id', task.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching task assignees:', error);
+          return;
+        }
+
+        if (data) {
+          const assigneesFromDb = data.assignees as string[] | null;
+          if (assigneesFromDb && Array.isArray(assigneesFromDb) && assigneesFromDb.length > 0) {
+            setDbAssigneeIds(assigneesFromDb);
+          } else if (data.team_member_id) {
+            setDbAssigneeIds([data.team_member_id as string]);
+          } else {
+            setDbAssigneeIds([]);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading task assignees:', err);
+      }
+    };
+
+    loadAssignees();
+  }, [open, task.id]);
+
+  // Resolve assigned member IDs: prefer DB-fetched assignees, fall back to task prop
+  const assignedMemberIds = dbAssigneeIds.length > 0
+    ? dbAssigneeIds
+    : task.assignees?.length
+    ? task.assignees
+    : task.team_member_id
+    ? [task.team_member_id]
+    : [];
+
+  // Load team members for name resolution (only when there are assignees)
+  useEffect(() => {
+    if (assignedMemberIds.length > 0) {
+      fetchTeamMembers({
+        organization_id: task.organization_id,
+        is_active: true,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id, dbAssigneeIds]);
+
+  const assignedMembers = assignedMemberIds
+    .map((id) => teamMembers.find((tm) => tm.id === id))
+    .filter(Boolean) as typeof teamMembers;
 
   // Sync subtasks only when a different task is opened — NOT on every parent re-render.
   // Depending on task.subtasks (object ref) caused the optimistic toggle to be
@@ -302,31 +365,42 @@ export function TaskDetailView({
               </CardContent>
             </Card>
 
-            {/* Assigned User */}
+            {/* Assigned User(s) */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <User className="w-4 h-4" />
+                  <Users className="w-4 h-4" />
                   Assigned To
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {task.assigned_to ? (
+                {assignedMembers.length > 0 ? (
+                  <div className="space-y-2">
+                    {assignedMembers.map((member) => (
+                      <div key={member.id} className="flex items-center gap-2">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="text-xs">
+                            {getInitials(member.display_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium">{member.display_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : task.assigned_user ? (
                   <div className="flex items-center gap-2">
                     <Avatar className="w-8 h-8">
-                      <AvatarImage src={task.assigned_user?.avatar_url} />
-                      <AvatarFallback>
-                        {task.assigned_user?.display_name
-                          ? getInitials(task.assigned_user.display_name)
-                          : "?"}
+                      <AvatarImage src={task.assigned_user.avatar_url} />
+                      <AvatarFallback className="text-xs">
+                        {getInitials(task.assigned_user.display_name)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-medium">
-                      {task.assigned_user?.display_name || "Unknown User"}
+                    <span className="text-sm font-medium">
+                      {task.assigned_user.display_name}
                     </span>
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">Unassigned</p>
+                  <p className="text-sm text-muted-foreground">Unassigned</p>
                 )}
               </CardContent>
             </Card>
@@ -559,16 +633,6 @@ export function TaskDetailView({
               >
                 <CheckCircle2 className="w-4 h-4 mr-2" />
                 Mark Complete
-              </Button>
-            )}
-
-            {task.status === "not_started" && (
-              <Button
-                onClick={() => handleStatusChange("in_progress")}
-                variant="outline"
-                className="flex-1 sm:flex-initial"
-              >
-                Start Task
               </Button>
             )}
 

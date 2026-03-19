@@ -22,6 +22,7 @@ interface LabelPreviewProps {
   templateType?: "default" | "recipe" | "allergen" | "blank";
   templateName?: string; // To detect "Blank" template
   isBlankTemplate?: boolean; // Direct flag for blank templates
+  allergens?: Array<{ id: string; name: string; icon?: string | null; severity?: string }>; // Pre-fetched allergens (overrides internal fetch)
 }
 
 const CONDITION_COLORS = {
@@ -48,19 +49,24 @@ export function LabelPreview({
   templateType = "default",
   templateName,
   isBlankTemplate = false,
+  allergens: allergensProp,
 }: LabelPreviewProps) {
   const { getProductAllergens } = useAllergens();
-  const [allergens, setAllergens] = useState<any[]>([]);
+  const [fetchedAllergens, setFetchedAllergens] = useState<any[]>([]);
   const [loadingAllergens, setLoadingAllergens] = useState(false);
 
-  // Load allergens when productId changes
+  // Use pre-fetched allergens if provided, otherwise load via productId
+  const allergens = allergensProp ?? fetchedAllergens;
+
+  // Only do internal fetch when no allergens were passed as prop
   useEffect(() => {
+    if (allergensProp !== undefined) return; // parent already supplied them
     if (productId) {
       loadAllergens();
     } else {
-      setAllergens([]);
+      setFetchedAllergens([]);
     }
-  }, [productId]);
+  }, [productId, allergensProp]);
 
   const loadAllergens = async () => {
     if (!productId) return;
@@ -68,10 +74,10 @@ export function LabelPreview({
     setLoadingAllergens(true);
     try {
       const productAllergens = await getProductAllergens(productId);
-      setAllergens(productAllergens);
+      setFetchedAllergens(productAllergens);
     } catch (error) {
       console.error("Error loading allergens for preview:", error);
-      setAllergens([]);
+      setFetchedAllergens([]);
     } finally {
       setLoadingAllergens(false);
     }
@@ -107,13 +113,7 @@ export function LabelPreview({
             <Eye className="w-5 h-5" />
             Label Preview
           </CardTitle>
-          <Badge variant="secondary" className="text-xs font-mono">
-            50mm × 50mm
-          </Badge>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Standard label dimensions for thermal printers
-        </p>
       </CardHeader>
       <CardContent>
         <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-6 space-y-4 bg-white dark:bg-gray-950">

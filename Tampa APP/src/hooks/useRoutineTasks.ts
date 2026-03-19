@@ -96,15 +96,27 @@ export function useRoutineTasks(organizationId?: string) {
   // Create a new task
   const createTask = async (input: CreateTaskInput): Promise<RoutineTask | null> => {
     try {
+      // Build insert payload explicitly to ensure all fields are included
+      const insertPayload: Record<string, any> = {
+        title: input.title,
+        description: input.description,
+        task_type: input.task_type,
+        priority: input.priority || 'normal',
+        scheduled_date: input.scheduled_date,
+        scheduled_time: input.scheduled_time || null,
+        estimated_minutes: input.estimated_minutes || null,
+        team_member_id: input.team_member_id || null,
+        assignees: input.assignees && input.assignees.length > 0 ? input.assignees : [],
+        subtasks: input.subtasks || [],
+        organization_id: organizationId,
+        status: 'not_started',
+        requires_approval: input.requires_approval || false,
+        recurrence_pattern: input.recurrence_pattern || null,
+      };
+
       const { data, error: createError } = await supabase
         .from('routine_tasks')
-        .insert({
-          ...input,
-          organization_id: organizationId,
-          status: 'not_started',
-          requires_approval: input.requires_approval || false,
-          recurrence_pattern: input.recurrence_pattern as any
-        } as any)
+        .insert(insertPayload as any)
         .select('*')
         .single();
 

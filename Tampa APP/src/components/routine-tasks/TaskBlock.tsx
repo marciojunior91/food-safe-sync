@@ -93,7 +93,7 @@ export const TaskBlock = memo(({ task, style, onClick, onComplete }: TaskBlockPr
             {/* Task Header */}
             <div className="flex items-start justify-between gap-2 mb-1">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
                   {/* Status Icon */}
                   {isCompleted && (
                     <Check className="w-3.5 h-3.5 flex-shrink-0 text-green-600" />
@@ -104,7 +104,7 @@ export const TaskBlock = memo(({ task, style, onClick, onComplete }: TaskBlockPr
                   
                   {/* Task Title */}
                   <h4 className={cn(
-                    "text-sm font-medium truncate",
+                    "text-sm font-medium truncate flex-1 min-w-0",
                     isCompleted && "line-through"
                   )}>
                     {task.title}

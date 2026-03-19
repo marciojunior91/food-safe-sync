@@ -126,6 +126,7 @@ export function CreateCategoryDialog({ open, onOpenChange, onSuccess }: CreateCa
             name: s.name.trim(),
             icon: s.icon.trim() || null,
             display_order: idx,
+            organization_id: organizationId,
           }));
 
         if (subcategoryRows.length > 0) {

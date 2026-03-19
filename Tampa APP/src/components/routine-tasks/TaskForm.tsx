@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
@@ -58,7 +58,7 @@ interface Subtask {
 
 // Form validation schema
 const taskFormSchema = z.object({
-  title: z.string().min(3, "Title must be at least 3 characters"),
+  title: z.string().min(3, "Title must be at least 3 characters").max(60, "Title must be 60 characters or less"),
   description: z.string().optional(),
   subtasks: z.array(z.object({
     id: z.string(),
@@ -241,6 +241,10 @@ export function TaskForm({
     },
   });
 
+  // Watch recurrence fields at component level for reliable conditional rendering
+  const isRecurring = useWatch({ control: form.control, name: "is_recurring" });
+  const watchRecurrenceFreq = useWatch({ control: form.control, name: "recurrence_frequency" });
+
   const handleSubmit = async (data: TaskFormValues) => {
     try {
       setIsSubmitting(true);
@@ -277,8 +281,8 @@ export function TaskForm({
         };
       }
 
-      // Convert to CreateTaskInput format — one task per assigned user
-      const baseTaskInput = {
+      // Convert to CreateTaskInput — ONE task shared among all assignees
+      const taskInput: CreateTaskInput = {
         title: data.title,
         description: data.task_type === "others" && data.custom_task_type
           ? `[${data.custom_task_type}] ${data.description || ""}`
@@ -291,15 +295,12 @@ export function TaskForm({
         estimated_minutes: data.estimated_minutes,
         requires_approval: data.requires_approval,
         recurrence_pattern: recurrencePattern,
+        // Primary assignee (for legacy compatibility) + full assignees list
+        team_member_id: data.assigned_to[0] || undefined,
+        assignees: data.assigned_to,
       };
 
-      for (const userId of data.assigned_to) {
-        const taskInput: CreateTaskInput = {
-          ...baseTaskInput,
-          team_member_id: userId,
-        };
-        await onSubmit(taskInput);
-      }
+      await onSubmit(taskInput);
 
       // Don't show toast here - let the parent component handle it
       form.reset();
@@ -328,9 +329,18 @@ export function TaskForm({
               <FormControl>
                 <Input
                   placeholder="e.g., Check refrigerator temperature"
+                  maxLength={60}
                   {...field}
                 />
               </FormControl>
+              <div className="flex justify-end">
+                <span className={cn(
+                  "text-xs",
+                  (field.value?.length ?? 0) >= 55 ? "text-destructive" : "text-muted-foreground"
+                )}>
+                  {field.value?.length ?? 0}/60
+                </span>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -638,8 +648,8 @@ export function TaskForm({
                   ) : (
                     <span className="text-muted-foreground">
                       {selected.length === 1
-                        ? `1 person assigned — creates 1 task`
-                        : `${selected.length} people selected — creates ${selected.length} tasks`}
+                        ? `1 person assigned`
+                        : `${selected.length} people assigned — 1 shared task`}
                     </span>
                   )}
                 </FormDescription>
@@ -805,7 +815,7 @@ export function TaskForm({
           />
 
           {/* Recurrence Frequency - Only show if recurring enabled */}
-          {form.watch("is_recurring") && (
+          {isRecurring && (
             <>
               <FormField
                 control={form.control}
@@ -900,7 +910,7 @@ export function TaskForm({
               />
 
               {/* Custom Period Input - Only show if "custom" is selected */}
-              {form.watch("recurrence_frequency") === "custom" && (
+              {watchRecurrenceFreq === "custom" && (
                 <FormField
                   control={form.control}
                   name="custom_period_days"

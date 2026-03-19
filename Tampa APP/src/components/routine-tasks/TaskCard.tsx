@@ -115,11 +115,11 @@ export function TaskCard({
 
             {/* Task Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-start gap-2 mb-1">
                 {/* Priority Indicator */}
                 <div
                   className={cn(
-                    "w-2 h-2 rounded-full flex-shrink-0",
+                    "w-2 h-2 rounded-full flex-shrink-0 mt-1.5",
                     priorityColor
                   )}
                   title={TASK_PRIORITY_LABELS[task.priority]}
@@ -128,7 +128,7 @@ export function TaskCard({
                 {/* Task Title */}
                 <h3
                   className={cn(
-                    "font-semibold text-base truncate",
+                    "font-semibold text-base break-words",
                     isCompleted && "line-through text-muted-foreground"
                   )}
                   title={task.title}
@@ -183,7 +183,7 @@ export function TaskCard({
       <CardContent className="pt-0">
         {/* Description (if present) */}
         {task.description && !isCompleted && (
-          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+          <p className="text-sm text-muted-foreground mb-3 line-clamp-2 overflow-hidden">
             {task.description}
           </p>
         )}
@@ -211,8 +211,8 @@ export function TaskCard({
         {/* Task Metadata */}
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
           {/* Scheduled Date/Time */}
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4" />
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <Clock className="w-4 h-4 flex-shrink-0" />
             <span>
               {format(new Date(task.scheduled_date), "MMM d, yyyy")}
               {task.scheduled_time && ` at ${task.scheduled_time}`}
@@ -221,15 +221,15 @@ export function TaskCard({
 
           {/* Assigned User */}
           {task.assigned_user && (
-            <div className="flex items-center gap-1.5">
-              <User className="w-4 h-4" />
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
+              <User className="w-4 h-4 flex-shrink-0" />
               <span>{task.assigned_user.display_name}</span>
             </div>
           )}
 
           {/* Estimated Time */}
           {task.estimated_minutes && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
               <span className="text-xs">⏱️ {task.estimated_minutes} min</span>
             </div>
           )}

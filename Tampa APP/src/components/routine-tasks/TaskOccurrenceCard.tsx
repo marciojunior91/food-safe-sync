@@ -234,11 +234,11 @@ export function TaskOccurrenceCard({
 
             {/* Task Info */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-start gap-2 mb-1">
                 {/* Priority Indicator */}
                 <div
                   className={cn(
-                    "w-2 h-2 rounded-full flex-shrink-0",
+                    "w-2 h-2 rounded-full flex-shrink-0 mt-1.5",
                     priorityColor
                   )}
                   title={TASK_PRIORITY_LABELS[occurrence.priority]}
@@ -247,7 +247,7 @@ export function TaskOccurrenceCard({
                 {/* Task Title */}
                 <h3
                   className={cn(
-                    "font-semibold text-base truncate",
+                    "font-semibold text-base break-words",
                     (isCompleted || isSkipped) && "line-through text-muted-foreground"
                   )}
                   title={occurrence.title}
@@ -353,8 +353,8 @@ export function TaskOccurrenceCard({
         {/* Task Metadata */}
         <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
           {/* Scheduled Date/Time */}
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4" />
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <Clock className="w-4 h-4 flex-shrink-0" />
             <span>
               {format(new Date(occurrence.scheduled_date), "MMM d, yyyy")}
               {occurrence.scheduled_time && ` at ${occurrence.scheduled_time}`}
@@ -363,7 +363,7 @@ export function TaskOccurrenceCard({
 
           {/* Assigned To */}
           {occurrence.assigned_to && occurrence.assigned_to.length > 0 && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
               <User className="w-4 h-4" />
               <span>
                 {assignedUserName || `${occurrence.assigned_to.length} assigned`}
@@ -373,7 +373,7 @@ export function TaskOccurrenceCard({
 
           {/* Estimated Time */}
           {occurrence.estimated_minutes && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
               <Clock className="w-4 h-4" />
               <span>{occurrence.estimated_minutes} min</span>
             </div>

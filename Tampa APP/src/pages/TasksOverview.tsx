@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight, FileText, Repeat } from "lucide-react";
+import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight, FileText, Repeat, CheckCircle2, User } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -10,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -45,7 +47,7 @@ import { TaskDetailView } from "@/components/routine-tasks/TaskDetailView";
 import { EditDeleteContextModal } from "@/components/routine-tasks/EditDeleteContextModal";
 import { TaskOccurrenceCard } from "@/components/routine-tasks/TaskOccurrenceCard";
 import { useRecurringTasks } from "@/hooks/useRecurringTasks";
-import type { TaskOccurrence } from "@/types/recurring-tasks";
+import type { TaskOccurrence, TaskSeries } from "@/types/recurring-tasks";
 import { TaskTimeline } from "@/components/routine-tasks/TaskTimeline";
 import { BulkActionsToolbar } from "@/components/routine-tasks/BulkActionsToolbar";
 import { TemplatesManagement } from "@/components/routine-tasks/TemplatesManagement";
@@ -93,6 +95,13 @@ export default function TasksOverview() {
     occ: TaskOccurrence;
     action: 'edit' | 'delete';
   } | null>(null);
+
+  // Active tab state (controlled)
+  const [activeTab, setActiveTab] = useState("today");
+
+  // Assignee picker for "Mark as Complete"
+  const [completingTask, setCompletingTask] = useState<RoutineTask | null>(null);
+  const [selectedCompleter, setSelectedCompleter] = useState<string>("");
 
   // Hook for new recurring system
   const recurringTasks = useRecurringTasks({
@@ -327,13 +336,32 @@ export default function TasksOverview() {
     }
   };
 
-  // Handle task completion
-  const handleCompleteTask = async (task: RoutineTask) => {
+  // Open assignee picker before completing a task
+  const handleCompleteTask = (task: RoutineTask) => {
+    const assignees = task.assignees && task.assignees.length > 0 ? task.assignees : null;
+    if (assignees && assignees.length > 1) {
+      setCompletingTask(task);
+      setSelectedCompleter(assignees[0]);
+    } else {
+      // Single assignee or unassigned — complete directly
+      executeCompleteTask(task, assignees?.[0] ?? undefined);
+    }
+  };
+
+  // Actually complete a task (called from picker dialog or directly)
+  const executeCompleteTask = async (task: RoutineTask, completedByMemberId?: string) => {
+    let completedById: string | undefined;
+    if (completedByMemberId) {
+      completedById = completedByMemberId;
+    } else {
+      const completingMember = teamMembers.find(tm => tm.auth_role_id === context?.user_id);
+      completedById = completingMember?.id || context?.user_id;
+    }
+
     // Detect virtual recurring instance (has _recurringInstanceDate from expandRecurringTask)
     const instanceDate = (task as any)._recurringInstanceDate as string | undefined;
     if (instanceDate && task.recurrence_pattern) {
-      // Only complete this single occurrence, not the whole series
-      const success = await completeRecurringOccurrence(task.id, instanceDate, context?.user_id);
+      const success = await completeRecurringOccurrence(task.id, instanceDate, completedById);
       if (success) {
         toast({
           title: "Occurrence Completed!",
@@ -346,7 +374,7 @@ export default function TasksOverview() {
     const success = await updateTaskStatus(
       task.id,
       "completed",
-      context?.user_id
+      completedById
     );
     if (success) {
       toast({
@@ -419,7 +447,9 @@ export default function TasksOverview() {
         const updates: any = { status: newStatus };
         if (newStatus === 'completed') {
           updates.completed_at = new Date().toISOString();
-          updates.completed_by = context?.user_id;
+          // Store team_member_id for score tracking (falls back to auth user_id)
+          const completingMember = teamMembers.find(tm => tm.auth_role_id === context?.user_id);
+          updates.completed_by = completingMember?.id || context?.user_id;
         } else if (newStatus === 'in_progress') {
           updates.started_at = new Date().toISOString();
         }
@@ -488,7 +518,8 @@ export default function TasksOverview() {
       title: data.title,
       description: data.description,
       priority: data.priority,
-      team_member_id: data.team_member_id, // Use team_member_id instead of assigned_to
+      team_member_id: data.team_member_id,
+      assignees: data.assignees,
       scheduled_date: data.scheduled_date,
       scheduled_time: data.scheduled_time,
     });
@@ -501,6 +532,7 @@ export default function TasksOverview() {
           description: data.description,
           priority: data.priority,
           team_member_id: data.team_member_id,
+          assignees: data.assignees,
           scheduled_time: data.scheduled_time,
           estimated_minutes: data.estimated_minutes,
         };
@@ -567,9 +599,11 @@ export default function TasksOverview() {
   };
 
   const handleBulkComplete = async () => {
+    const completingMember = teamMembers.find(tm => tm.auth_role_id === context?.user_id);
+    const completedById = completingMember?.id || context?.user_id;
     let successCount = 0;
     for (const taskId of selectedTaskIds) {
-      const success = await updateTaskStatus(taskId, "completed", context?.user_id);
+      const success = await updateTaskStatus(taskId, "completed", completedById);
       if (success) successCount++;
     }
     setSelectedTaskIds([]);
@@ -1152,8 +1186,11 @@ export default function TasksOverview() {
       {viewMode === 'list' && (
         <>
           {/* Stats Cards */}
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card
+          className={cn("cursor-pointer hover:shadow-md transition-shadow", activeTab === "today" && "ring-2 ring-primary")}
+          onClick={() => setActiveTab("today")}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Tasks</CardTitle>
             <CalendarIcon className="h-4 w-4 text-muted-foreground" />
@@ -1166,7 +1203,10 @@ export default function TasksOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={cn("cursor-pointer hover:shadow-md transition-shadow", activeTab === "overdue" && "ring-2 ring-destructive")}
+          onClick={() => setActiveTab("overdue")}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Overdue Tasks
@@ -1183,7 +1223,10 @@ export default function TasksOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={cn("cursor-pointer hover:shadow-md transition-shadow", activeTab === "in-progress" && "ring-2 ring-primary")}
+          onClick={() => setActiveTab("in-progress")}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">In Progress</CardTitle>
             <div className="h-4 w-4 rounded-full bg-blue-500" />
@@ -1194,7 +1237,10 @@ export default function TasksOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className={cn("cursor-pointer hover:shadow-md transition-shadow", activeTab === "completed" && "ring-2 ring-primary")}
+          onClick={() => setActiveTab("completed")}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
             <div className="h-4 w-4 rounded-full bg-green-500" />
@@ -1204,10 +1250,24 @@ export default function TasksOverview() {
             <p className="text-xs text-muted-foreground">Finished tasks</p>
           </CardContent>
         </Card>
+
+        <Card
+          className={cn("cursor-pointer hover:shadow-md transition-shadow", activeTab === "recurring" && "ring-2 ring-primary")}
+          onClick={() => setActiveTab("recurring")}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Recurring</CardTitle>
+            <Repeat className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{recurringTasks.series.length}</div>
+            <p className="text-xs text-muted-foreground">Active series</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tasks Tabs */}
-      <Tabs defaultValue="today" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-5 h-auto p-1">
           <TabsTrigger value="today" className="gap-2 py-2 px-3">
             <span>Today</span>
@@ -1233,13 +1293,13 @@ export default function TasksOverview() {
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="all" className="py-2 px-3">All Tasks</TabsTrigger>
+          <TabsTrigger value="completed" className="py-2 px-3">Completed</TabsTrigger>
           <TabsTrigger value="recurring" className="gap-2 py-2 px-3">
             <Repeat className="w-3 h-3" />
-            <span>Recurring</span>
-            {recurringTasks.occurrences.length > 0 && (
+            <span className="tracking-tight text-sm font-medium">Recurring</span>
+            {recurringTasks.series.length > 0 && (
               <Badge variant="secondary" className="ml-1 text-xs">
-                {recurringTasks.occurrences.length}
+                {recurringTasks.series.length}
               </Badge>
             )}
           </TabsTrigger>
@@ -1344,41 +1404,21 @@ export default function TasksOverview() {
           )}
         </TabsContent>
 
-        {/* All Tasks */}
-        <TabsContent value="all" className="space-y-4">
-          {filteredTasks.length === 0 ? (
+        {/* Completed Tasks */}
+        <TabsContent value="completed" className="space-y-4">
+          {completedTasks.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
-                {hasActiveFilters ? (
-                  <>
-                    <Filter className="w-12 h-12 text-muted-foreground mb-4" />
-                    <p className="text-lg font-medium">No tasks match your filters</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Try adjusting your search or filters
-                    </p>
-                    <Button onClick={clearFilters} variant="outline">
-                      <X className="w-4 h-4 mr-2" />
-                      Clear Filters
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-12 h-12 text-muted-foreground mb-4" />
-                    <p className="text-lg font-medium">No tasks yet</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Create your first task to get started
-                    </p>
-                    <Button onClick={() => setIsCreateDialogOpen(true)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create Task
-                    </Button>
-                  </>
-                )}
+                <CheckCircle2 className="w-12 h-12 text-muted-foreground mb-4" />
+                <p className="text-lg font-medium">No completed tasks</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Tasks you mark as complete will appear here
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredTasks.map((task) => (
+              {completedTasks.map((task) => (
                 <TaskCard
                   key={task.id}
                   task={task}
@@ -1395,70 +1435,161 @@ export default function TasksOverview() {
         </TabsContent>
 
         {/* ─── Recurring Tab ──────────────────────────────────── */}
-        <TabsContent value="recurring" className="space-y-4">
-          {/* Date range navigation */}
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => shiftRecurringRange('prev')}
-              className="gap-1"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Prev 7 days
-            </Button>
-            <span className="text-sm font-medium text-muted-foreground">
-              {format(new Date(recurringRange.start + 'T00:00:00'), 'MMM d')} –{' '}
-              {format(new Date(recurringRange.end + 'T00:00:00'), 'MMM d, yyyy')}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => shiftRecurringRange('next')}
-              className="gap-1"
-            >
-              Next 7 days
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+        <TabsContent value="recurring" className="space-y-6">
+
+          {/* ── Active Series ───────────────────────────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold">Active Series</h3>
+              <div className="flex-1 h-px bg-border" />
+              <Badge variant="outline" className="text-xs">
+                {recurringTasks.series.length} series
+              </Badge>
+            </div>
+
+            {recurringTasks.loading ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-36 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : recurringTasks.series.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Repeat className="w-12 h-12 text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">No recurring series</p>
+                  <p className="text-sm text-muted-foreground">
+                    Create a recurring task series to see it here
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {recurringTasks.series.map((s: TaskSeries) => {
+                  const RECURRENCE_LABELS: Record<string, string> = {
+                    daily: 'Daily',
+                    weekly: 'Weekly',
+                    fortnightly: 'Fortnightly',
+                    monthly: 'Monthly',
+                    custom_days: `Every ${s.recurrence_interval ?? '?'} days`,
+                    custom_weekdays: 'Custom weekdays',
+                    custom_monthday: `Monthly (day ${s.recurrence_monthday ?? '?'})`,
+                  };
+                  const assignedNames = s.assigned_to
+                    .map(id => teamMembers.find(tm => tm.id === id)?.display_name)
+                    .filter(Boolean) as string[];
+                  const nextOcc = recurringTasks.occurrences
+                    .filter(o => o.series_id === s.id && o.status !== 'completed' && o.status !== 'skipped')
+                    .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))[0];
+
+                  return (
+                    <Card key={s.id} className="hover:shadow-md transition-shadow">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-sm font-semibold leading-tight line-clamp-2">
+                            {s.title}
+                          </CardTitle>
+                          <Badge
+                            variant="outline"
+                            className="text-xs flex-shrink-0"
+                          >
+                            {TASK_TYPE_LABELS[s.task_type] ?? s.task_type}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Repeat className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {RECURRENCE_LABELS[s.recurrence_type] ?? s.recurrence_type}
+                          </span>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-2 pt-0">
+                        {/* Dates */}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <CalendarIcon className="w-3 h-3" />
+                          <span>From {format(new Date(s.series_start_date + 'T00:00:00'), 'MMM d, yyyy')}</span>
+                          {s.series_end_date && (
+                            <span>→ {format(new Date(s.series_end_date + 'T00:00:00'), 'MMM d, yyyy')}</span>
+                          )}
+                          {!s.series_end_date && (
+                            <span className="text-green-600 font-medium">· No end</span>
+                          )}
+                        </div>
+
+                        {/* Assigned */}
+                        {assignedNames.length > 0 && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <User className="w-3 h-3" />
+                            <span className="truncate">{assignedNames.join(', ')}</span>
+                          </div>
+                        )}
+
+                        {/* Next occurrence */}
+                        {nextOcc && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <Clock className="w-3 h-3 text-primary" />
+                            <span className="font-medium text-primary">
+                              Next: {format(new Date(nextOcc.scheduled_date + 'T00:00:00'), 'EEE, MMM d')}
+                            </span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-          {/* Series summary badge */}
-          {recurringTasks.series.length > 0 && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Repeat className="w-3 h-3" />
-              <span>{recurringTasks.series.length} active series</span>
+          {/* ── Upcoming Occurrences (7-day window) ─────────── */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold">Upcoming Occurrences</h3>
+              <div className="flex-1 h-px bg-border" />
             </div>
-          )}
 
-          {/* Loading */}
-          {recurringTasks.loading ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-40 w-full rounded-xl" />
-              ))}
+            {/* Date range navigation */}
+            <div className="flex items-center justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => shiftRecurringRange('prev')}
+                className="gap-1"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Prev 7 days
+              </Button>
+              <span className="text-sm font-medium text-muted-foreground">
+                {format(new Date(recurringRange.start + 'T00:00:00'), 'MMM d')} –{' '}
+                {format(new Date(recurringRange.end + 'T00:00:00'), 'MMM d, yyyy')}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => shiftRecurringRange('next')}
+                className="gap-1"
+              >
+                Next 7 days
+                <ChevronRight className="w-4 h-4" />
+              </Button>
             </div>
-          ) : recurringTasks.occurrences.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Repeat className="w-12 h-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium">No recurring tasks in this period</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Recurring tasks created via series will appear here
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            /* Group occurrences by date */
-            (() => {
-              const dates = [...new Set(
-                recurringTasks.occurrences.map(o => o.scheduled_date)
-              )].sort();
 
-              return (
-                <div className="space-y-6">
-                  {dates.map(date => (
+            {recurringTasks.loading ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-40 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : recurringTasks.occurrences.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No occurrences in this period
+              </p>
+            ) : (
+              <div className="space-y-6">
+                {[...new Set(recurringTasks.occurrences.map(o => o.scheduled_date))]
+                  .sort()
+                  .map(date => (
                     <div key={date} className="space-y-3">
-                      {/* Date header */}
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-semibold">
                           {format(new Date(date + 'T00:00:00'), 'EEEE, MMM d')}
@@ -1468,8 +1599,6 @@ export default function TasksOverview() {
                           {recurringTasks.getOccurrencesByDate(date).length} tasks
                         </Badge>
                       </div>
-
-                      {/* TaskOccurrenceCards for this date */}
                       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {recurringTasks.getOccurrencesByDate(date).map(occ => (
                           <TaskOccurrenceCard
@@ -1493,10 +1622,10 @@ export default function TasksOverview() {
                       </div>
                     </div>
                   ))}
-                </div>
-              );
-            })()
-          )}
+              </div>
+            )}
+          </div>
+
         </TabsContent>
 
       </Tabs>
@@ -1581,6 +1710,60 @@ export default function TasksOverview() {
           onDelete={handleDeleteTask}
           onAddNote={handleAddNote}
         />
+      )}
+
+      {/* Assignee Picker Dialog for Mark as Complete */}
+      {completingTask && (
+        <Dialog open={!!completingTask} onOpenChange={(open) => { if (!open) setCompletingTask(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Who completed this task?</DialogTitle>
+              <DialogDescription>
+                "{completingTask.title}" is shared. Select who is marking it complete.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2 py-2">
+              {completingTask.assignees?.map((memberId) => {
+                const member = teamMembers.find(tm => tm.id === memberId);
+                if (!member) return null;
+                return (
+                  <div
+                    key={memberId}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                      selectedCompleter === memberId
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-muted/50"
+                    )}
+                    onClick={() => setSelectedCompleter(memberId)}
+                  >
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback className="text-xs">
+                        {member.display_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium text-sm">{member.display_name}</span>
+                    {selectedCompleter === memberId && (
+                      <CheckCircle2 className="w-4 h-4 ml-auto text-primary" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setCompletingTask(null)}>Cancel</Button>
+              <Button
+                disabled={!selectedCompleter}
+                onClick={() => {
+                  executeCompleteTask(completingTask, selectedCompleter);
+                  setCompletingTask(null);
+                }}
+              >
+                Mark Complete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Bulk Actions Toolbar (floating) */}

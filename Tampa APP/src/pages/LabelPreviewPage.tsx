@@ -387,6 +387,7 @@ export default function LabelPreviewPage() {
         batchNumber={label.id.slice(0, 8)}
         productId={label.product_id}
         labelId={label.id}
+        allergens={labelAllergens}
       />
 
       {/* Label Details Card */}

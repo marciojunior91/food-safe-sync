@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { Plus, Search, Clock, Users, AlertTriangle, ChefHat, Filter, Edit, Trash2, Grid3X3, List } from "lucide-react";
+import { Plus, Search, Clock, Users, AlertTriangle, ChefHat, Filter, Edit, Trash2, Grid3X3, List, MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Recipe {
   id: string;
@@ -474,14 +480,14 @@ export default function Recipes() {
                       </div>
                     )}
                     {/* Actions */}
-                    <div className="mt-auto pt-2 flex gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-auto pt-2 flex gap-1" onClick={(e) => e.stopPropagation()}>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex-1 min-w-0"
+                        className="flex-1 whitespace-nowrap"
                         onClick={() => setSelectedRecipeDetail(recipe)}
                       >
-                        <ChefHat className="w-3 h-3 mr-1" />
+                        <ChefHat className="w-3 h-3 shrink-0 mr-1" />
                         View
                       </Button>
                       <RecipePrintButton
@@ -496,27 +502,29 @@ export default function Recipes() {
                         }}
                         variant="outline"
                         size="sm"
-                        className="flex-1 min-w-0"
+                        className="flex-1 whitespace-nowrap"
                       />
                       {canManageRecipes && (
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="px-2"
-                            onClick={(e) => { e.stopPropagation(); handleEditRecipe(recipe); }}
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="px-2 text-destructive hover:text-destructive"
-                            onClick={(e) => { e.stopPropagation(); setRecipeToDelete(recipe); }}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" className="px-2 shrink-0">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditRecipe(recipe)}>
+                              <Edit className="w-3 h-3 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setRecipeToDelete(recipe)}
+                            >
+                              <Trash2 className="w-3 h-3 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </div>
                   </CardContent>
