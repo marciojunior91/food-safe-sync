@@ -64,7 +64,8 @@ const navigation = [{
 }, {
   name: "Settings",
   href: "/settings",
-  icon: Settings
+  icon: Settings,
+  adminOnly: true
 }];
 export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -85,6 +86,13 @@ export function Layout() {
     department,
     loading: contextLoading
   } = useUserContext();
+
+  // Filter nav items based on role
+  const filteredNav = navigation.filter(item => {
+    if ('adminOnly' in item && item.adminOnly && role !== 'admin') return false;
+    return true;
+  });
+
   const handleSignOut = async () => {
     await signOut();
     toast({
@@ -107,7 +115,7 @@ export function Layout() {
             </Button>
           </div>
           <nav className="p-4 space-y-2">
-            {navigation.map(item => {
+            {filteredNav.map(item => {
             const isActive = location.pathname === item.href;
             return <a key={item.name} href={item.href} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
                   <item.icon className="w-5 h-5" />
@@ -126,7 +134,7 @@ export function Layout() {
             <h1 className="font-bold text-lg">Tampa APP</h1>
           </div>
           <nav className="flex-1 p-4 space-y-2">
-            {navigation.map(item => {
+            {filteredNav.map(item => {
             const isActive = location.pathname === item.href;
             return <a key={item.name} href={item.href} className={cn("flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground")}>
                   <item.icon className="w-5 h-5" />

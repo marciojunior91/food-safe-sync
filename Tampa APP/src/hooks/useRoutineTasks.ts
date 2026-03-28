@@ -293,7 +293,8 @@ export function useRoutineTasks(organizationId?: string) {
       description: template.description,
       task_type: template.task_type,
       scheduled_date: scheduledDate,
-      assigned_to: assignedTo,
+      team_member_id: assignedTo,
+      assignees: assignedTo ? [assignedTo] : [],
       priority: 'normal'
     });
   };

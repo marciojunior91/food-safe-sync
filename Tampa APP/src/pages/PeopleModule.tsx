@@ -12,7 +12,7 @@ import { usePeople } from "@/hooks/usePeople";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useUserContext } from "@/hooks/useUserContext";
 import { useUserRole } from "@/hooks/useUserRole";
-import { usePlanEnforcement } from "@/hooks/usePlanEnforcement";
+// Premium gate removed — all plans can add team members
 import { UserFilters, UserProfile } from "@/types/people";
 import { TeamMember } from "@/types/teamMembers";
 import PeopleList from "@/components/people/PeopleList";
@@ -22,7 +22,7 @@ import EditUserDialog from "@/components/people/EditUserDialog";
 import { TeamMemberEditDialog } from "@/components/people/TeamMemberEditDialog";
 import CreateUserDialog from "@/components/people/CreateUserDialog";
 import CreateTeamMemberDialog from "@/components/people/CreateTeamMemberDialog";
-import { UpgradeModal } from "@/components/billing/UpgradeModal";
+// UpgradeModal removed — no premium gate
 import { Plus, RefreshCw, Users, Briefcase, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -31,7 +31,7 @@ export default function People() {
   const { toast } = useToast();
   const { context, loading: contextLoading } = useUserContext();
   const { role, isAdmin, isManager, canManageTeamMembers } = useUserRole();
-  const { checkTeamMemberLimit, upgradeModalProps } = usePlanEnforcement();
+  // Premium gate removed
   const [filters, setFilters] = useState<UserFilters>({});
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editingTeamMember, setEditingTeamMember] = useState<TeamMember | null>(null);
@@ -88,10 +88,7 @@ export default function People() {
     setFilters({});
   };
 
-  // Handle view profile
-  const handleViewProfile = (user: UserProfile) => {
-    navigate(`/people/${user.user_id}`);
-  };
+  // View profile route removed — edit dialog is the only action
 
   // Handle edit user
   const handleEdit = (user: UserProfile) => {
@@ -149,21 +146,13 @@ export default function People() {
     });
   };
 
-  // Handle add user button click with limit check
+  // Handle add user button click
   const handleAddUserClick = () => {
-    const currentCount = users.length;
-    if (!checkTeamMemberLimit(currentCount)) {
-      return; // Modal will show automatically
-    }
     setCreateUserDialogOpen(true);
   };
 
-  // Handle add team member button click with limit check
+  // Handle add team member button click (no premium gate)
   const handleAddTeamMemberClick = () => {
-    const currentCount = teamMembers.length;
-    if (!checkTeamMemberLimit(currentCount)) {
-      return; // Modal will show automatically
-    }
     setCreateTeamMemberDialogOpen(true);
   };
 
@@ -176,7 +165,7 @@ export default function People() {
       member.display_name.toLowerCase().includes(searchLower) ||
       member.position?.toLowerCase().includes(searchLower) ||
       member.email?.toLowerCase().includes(searchLower) ||
-      member.role_type.toLowerCase().includes(searchLower)
+      (member.role || '').toLowerCase().includes(searchLower)
     );
   });
 
@@ -253,14 +242,14 @@ export default function People() {
 
       {/* Tabs for Users vs Team Members */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "users" | "team")} className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="team" className="flex items-center gap-2">
-            <Briefcase className="w-4 h-4" />
-            Team Members ({teamMembers.length})
+        <TabsList className="grid w-full grid-cols-2 h-12 sm:h-14">
+          <TabsTrigger value="team" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+            <Briefcase className="w-4 h-4 shrink-0" />
+            <span className="truncate">Team Members ({teamMembers.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Auth Users ({users.length})
+          <TabsTrigger value="users" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4">
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="truncate">Auth Users ({users.length})</span>
           </TabsTrigger>
         </TabsList>
 
@@ -268,9 +257,7 @@ export default function People() {
         <TabsContent value="team" className="space-y-6 mt-6">
           <Card>
             <CardContent className="p-6">
-              <p className="text-sm text-muted-foreground mb-4">
-                Operational team members with PIN-based access for daily work (cooking, serving, cleaning, etc.)
-              </p>
+
               
               {/* BUG-008 FIX: Search Input */}
               <div className="mb-4">
@@ -344,7 +331,7 @@ export default function People() {
                             <div className="flex items-center gap-3">
                               <h3 className="font-semibold">{member.display_name}</h3>
                               <span className="text-sm px-2 py-1 rounded bg-primary/10 text-primary">
-                                {member.role_type}
+                                {member.role || 'staff'}
                               </span>
                               {!member.is_active && (
                                 <span className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive">
@@ -357,7 +344,10 @@ export default function People() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-muted-foreground mt-1">{member.position}</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              {member.position_emoji && <span className="mr-1">{member.position_emoji}</span>}
+                              {member.position}
+                            </p>
                             {member.email && (
                               <p className="text-xs text-muted-foreground mt-1">{member.email}</p>
                             )}
@@ -418,7 +408,6 @@ export default function People() {
           <PeopleList
             users={users}
             loading={usersLoading}
-            onViewProfile={handleViewProfile}
             onEdit={handleEdit}
           />
         </TabsContent>
@@ -458,8 +447,7 @@ export default function People() {
         onSuccess={handleCreateTeamMemberSuccess}
       />
 
-      {/* Upgrade Modal for Plan Limits */}
-      <UpgradeModal {...upgradeModalProps} />
+
     </div>
   );
 }

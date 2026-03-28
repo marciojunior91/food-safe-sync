@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export type UserRole = "owner" | "manager" | "leader_chef" | "chef" | "staff" | null;
+export type UserRole = "admin" | "manager" | "staff" | null;
 
 export interface PermissionsState {
   userRole: UserRole;
@@ -13,15 +13,13 @@ export interface PermissionsState {
   canViewAnalytics: () => boolean;
   canManageRecipes: () => boolean;
   canPrintLabels: () => boolean;
-  isOwner: () => boolean;
+  isAdmin: () => boolean;
   isManager: () => boolean;
-  isLeaderChef: () => boolean;
-  isChef: () => boolean;
 }
 
 /**
  * Hook for managing user permissions based on their role
- * Roles hierarchy: owner > manager > leader_chef > chef > staff
+ * Roles hierarchy: admin > manager > staff
  */
 export function usePermissions(): PermissionsState {
   const [userRole, setUserRole] = useState<UserRole>(null);
@@ -73,27 +71,27 @@ export function usePermissions(): PermissionsState {
 
   // Permission checker functions
   const canManageCategories = () => {
-    return ["owner", "manager", "leader_chef"].includes(userRole || "");
+    return ["admin", "manager"].includes(userRole || "");
   };
 
   const canManageTemplates = () => {
-    return ["owner", "manager", "leader_chef"].includes(userRole || "");
+    return ["admin", "manager"].includes(userRole || "");
   };
 
   const canManageUsers = () => {
-    return ["owner", "manager"].includes(userRole || "");
+    return ["admin", "manager"].includes(userRole || "");
   };
 
   const canDeleteProducts = () => {
-    return ["owner", "manager"].includes(userRole || "");
+    return ["admin", "manager"].includes(userRole || "");
   };
 
   const canViewAnalytics = () => {
-    return ["owner", "manager", "leader_chef"].includes(userRole || "");
+    return ["admin", "manager"].includes(userRole || "");
   };
 
   const canManageRecipes = () => {
-    return ["owner", "manager", "leader_chef", "chef"].includes(userRole || "");
+    return ["admin", "manager"].includes(userRole || "");
   };
 
   const canPrintLabels = () => {
@@ -102,10 +100,8 @@ export function usePermissions(): PermissionsState {
   };
 
   // Role checker functions
-  const isOwner = () => userRole === "owner";
+  const isAdmin = () => userRole === "admin";
   const isManager = () => userRole === "manager";
-  const isLeaderChef = () => userRole === "leader_chef";
-  const isChef = () => userRole === "chef";
 
   return {
     userRole,
@@ -117,9 +113,7 @@ export function usePermissions(): PermissionsState {
     canViewAnalytics,
     canManageRecipes,
     canPrintLabels,
-    isOwner,
+    isAdmin,
     isManager,
-    isLeaderChef,
-    isChef,
   };
 }

@@ -155,7 +155,7 @@ export async function getPINSecurityDashboard(
   team_member_id: string;
   display_name: string;
   position: string | null;
-  role_type: string;
+  role: string;
   is_locked_out: boolean;
   lockout_until: string | null;
   failed_pin_attempts: number;

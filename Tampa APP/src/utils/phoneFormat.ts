@@ -1,7 +1,7 @@
-// Phone formatting utilities
+// Phone formatting utilities — Australian mobile format
 
 /**
- * Format phone number to (XXX) XXX-XXXX format
+ * Format phone number to Australian mobile format: 04XX XXX XXX
  * Removes non-numeric characters and formats
  */
 export function formatPhoneNumber(value: string): string {
@@ -10,12 +10,12 @@ export function formatPhoneNumber(value: string): string {
   
   // Format based on length
   if (phoneNumber.length === 0) return '';
-  if (phoneNumber.length <= 3) return phoneNumber;
-  if (phoneNumber.length <= 6) {
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`;
+  if (phoneNumber.length <= 4) return phoneNumber;
+  if (phoneNumber.length <= 7) {
+    return `${phoneNumber.slice(0, 4)} ${phoneNumber.slice(4)}`;
   }
-  // Full format: (XXX) XXX-XXXX
-  return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
+  // Full format: 04XX XXX XXX
+  return `${phoneNumber.slice(0, 4)} ${phoneNumber.slice(4, 7)} ${phoneNumber.slice(7, 10)}`;
 }
 
 /**
@@ -26,11 +26,11 @@ export function getRawPhoneNumber(formatted: string): string {
 }
 
 /**
- * Validate phone number (must be 10 digits for US format)
+ * Validate phone number (must be 10 digits for Australian mobile starting with 04)
  */
 export function isValidPhoneNumber(phoneNumber: string): boolean {
   const raw = getRawPhoneNumber(phoneNumber);
-  return raw.length === 10;
+  return raw.length === 10 && raw.startsWith('04');
 }
 
 /**

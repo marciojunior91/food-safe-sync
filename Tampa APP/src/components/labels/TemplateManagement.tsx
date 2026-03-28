@@ -69,8 +69,8 @@ export function TemplateManagement({ onCreateNew, onBack }: TemplateManagementPr
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   
-  // Check if user can manage templates (manager or leader_chef)
-  const canManageTemplates = hasAnyRole(['manager', 'leader_chef']);
+  // Check if user can manage templates (admin or manager)
+  const canManageTemplates = hasAnyRole(['admin', 'manager']);
   
   // Dialog states
   const [showCreateDialog, setShowCreateDialog] = useState(false);

@@ -14,12 +14,12 @@ export default function AddTeamMember() {
 
   const handleSuccess = () => {
     // Navigate back to people module after successful creation
-    navigate("/people");
+    navigate(-1);
   };
 
   const handleCancel = () => {
     // Navigate back if user cancels
-    navigate("/people");
+    navigate(-1);
   };
 
   return (
@@ -30,7 +30,7 @@ export default function AddTeamMember() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/people")}
+            onClick={() => navigate(-1)}
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>

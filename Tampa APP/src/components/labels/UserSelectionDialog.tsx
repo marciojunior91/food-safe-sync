@@ -215,11 +215,11 @@ export function UserSelectionDialog({
                         variant="secondary"
                         className="text-xs"
                         style={{
-                          backgroundColor: TEAM_MEMBER_ROLE_COLORS[user.role_type] + '20',
-                          color: TEAM_MEMBER_ROLE_COLORS[user.role_type],
+                          backgroundColor: TEAM_MEMBER_ROLE_COLORS[user.role as keyof typeof TEAM_MEMBER_ROLE_COLORS] + '20',
+                          color: TEAM_MEMBER_ROLE_COLORS[user.role as keyof typeof TEAM_MEMBER_ROLE_COLORS],
                         }}
                       >
-                        {TEAM_MEMBER_ROLE_LABELS[user.role_type]}
+                        {TEAM_MEMBER_ROLE_LABELS[user.role as keyof typeof TEAM_MEMBER_ROLE_LABELS]}
                       </Badge>
                     </div>
                   </div>

@@ -56,6 +56,7 @@ import { useRoutineTasks } from "@/hooks/useRoutineTasks";
 import { usePeople } from "@/hooks/usePeople";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useUserContext } from "@/hooks/useUserContext";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   RoutineTask,
   CreateTaskInput,
@@ -69,6 +70,8 @@ import {
 export default function TasksOverview() {
   const { toast } = useToast();
   const { context, loading: contextLoading } = useUserContext();
+  const { canManageTeamMembers } = useUserRole();
+  const canManageTasks = canManageTeamMembers; // admin, manager can create/edit/delete tasks
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<RoutineTask | null>(null);
@@ -260,10 +263,11 @@ export default function TasksOverview() {
       filtered = filtered.filter((task) => task.priority === filterPriority);
     }
 
-    // Assigned user filter (now using team_member_id instead of assigned_to)
+    // Assigned user filter (check assignees array, team_member_id, and legacy assigned_to)
     if (filterAssignedUser !== "all") {
       filtered = filtered.filter((task) => 
-        task.team_member_id === filterAssignedUser || 
+        task.assignees?.includes(filterAssignedUser) ||
+        task.team_member_id === filterAssignedUser ||
         task.assigned_to === filterAssignedUser // Fallback for legacy tasks
       );
     }
@@ -339,12 +343,13 @@ export default function TasksOverview() {
   // Open assignee picker before completing a task
   const handleCompleteTask = (task: RoutineTask) => {
     const assignees = task.assignees && task.assignees.length > 0 ? task.assignees : null;
-    if (assignees && assignees.length > 1) {
+    if (assignees && assignees.length >= 1) {
+      // Always show picker when there are assignees (even single)
       setCompletingTask(task);
       setSelectedCompleter(assignees[0]);
     } else {
-      // Single assignee or unassigned — complete directly
-      executeCompleteTask(task, assignees?.[0] ?? undefined);
+      // No assignees — complete directly using current user
+      executeCompleteTask(task, undefined);
     }
   };
 
@@ -785,8 +790,8 @@ export default function TasksOverview() {
             )}
           </ToggleGroup>
 
-          {/* Create Task Button (hidden in templates view) */}
-          {viewMode !== 'templates' && (
+          {/* Create Task Button (hidden in templates view, restricted to admin/manager) */}
+          {viewMode !== 'templates' && canManageTasks && (
             <>
               {isCreateDialogOpen && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -799,7 +804,7 @@ export default function TasksOverview() {
                 </DialogHeader>
                 <TaskForm
                   onSubmit={handleCreateTask}
-                  users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role_type: tm.role_type }))}
+                  users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role }))}
                   isLoading={teamMembersLoading}
                 />
               </DialogContent>
@@ -1315,6 +1320,7 @@ export default function TasksOverview() {
                 <p className="text-sm text-muted-foreground mb-4">
                   Create a new task to get started
                 </p>
+                {canManageTasks && (
                 <Button 
                   onClick={() => setIsCreateDialogOpen(true)}
                   className="gap-2"
@@ -1322,6 +1328,7 @@ export default function TasksOverview() {
                   <Plus className="w-4 h-4" />
                   Add Task
                 </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -1332,7 +1339,7 @@ export default function TasksOverview() {
                   task={task}
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
-                  onDelete={handleDeleteTask}
+                  onDelete={canManageTasks ? handleDeleteTask : undefined}
                   selectable={true}
                   selected={selectedTaskIds.includes(task.id)}
                   onSelect={handleSelectTask}
@@ -1362,7 +1369,7 @@ export default function TasksOverview() {
                   task={task}
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
-                  onDelete={handleDeleteTask}
+                  onDelete={canManageTasks ? handleDeleteTask : undefined}
                   selectable={true}
                   selected={selectedTaskIds.includes(task.id)}
                   onSelect={handleSelectTask}
@@ -1394,7 +1401,7 @@ export default function TasksOverview() {
                   task={task}
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
-                  onDelete={handleDeleteTask}
+                  onDelete={canManageTasks ? handleDeleteTask : undefined}
                   selectable={true}
                   selected={selectedTaskIds.includes(task.id)}
                   onSelect={handleSelectTask}
@@ -1424,7 +1431,7 @@ export default function TasksOverview() {
                   task={task}
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
-                  onDelete={handleDeleteTask}
+                  onDelete={canManageTasks ? handleDeleteTask : undefined}
                   selectable={true}
                   selected={selectedTaskIds.includes(task.id)}
                   onSelect={handleSelectTask}
@@ -1644,7 +1651,7 @@ export default function TasksOverview() {
             </DialogHeader>
             <TaskForm
               onSubmit={handleEditTask}
-              users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role_type: tm.role_type }))}
+              users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role }))}
               isLoading={teamMembersLoading}
               isEditing={true}
               taskId={taskToEdit.id}
@@ -1654,7 +1661,11 @@ export default function TasksOverview() {
                 description: taskToEdit.description || "",
                 task_type: taskToEdit.task_type,
                 priority: taskToEdit.priority,
-                assigned_to: taskToEdit.team_member_id || taskToEdit.assigned_to || "",
+                assigned_to: taskToEdit.assignees?.length
+                  ? taskToEdit.assignees
+                  : taskToEdit.team_member_id
+                    ? [taskToEdit.team_member_id]
+                    : [],
                 scheduled_date: new Date(taskToEdit.scheduled_date),
                 scheduled_time: taskToEdit.scheduled_time || "",
                 estimated_minutes: taskToEdit.estimated_minutes || 30,
@@ -1706,8 +1717,8 @@ export default function TasksOverview() {
           onOpenChange={(open) => !open && setSelectedTask(null)}
           onComplete={handleCompleteTask}
           onStatusChange={handleStatusChange}
-          onEdit={openEditDialog}
-          onDelete={handleDeleteTask}
+          onEdit={canManageTasks ? openEditDialog : undefined}
+          onDelete={canManageTasks ? handleDeleteTask : undefined}
           onAddNote={handleAddNote}
         />
       )}
@@ -1719,7 +1730,7 @@ export default function TasksOverview() {
             <DialogHeader>
               <DialogTitle>Who completed this task?</DialogTitle>
               <DialogDescription>
-                "{completingTask.title}" is shared. Select who is marking it complete.
+                Select who completed "{completingTask.title}".
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2 py-2">

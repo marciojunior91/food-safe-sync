@@ -198,11 +198,10 @@ export default function FeedModule() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
 
-            {/* Create Post Button - Only for admin/manager/leader_chef */}
+            {/* Create Post Button - Only for admin/manager */}
             {selectedUser && (
-              selectedUser.role_type === 'admin' || 
-              selectedUser.role_type === 'manager' || 
-              selectedUser.role_type === 'leader_chef'
+              selectedUser.role === 'admin' || 
+              selectedUser.role === 'manager'
             ) && (
               <Button onClick={() => setShowComposer(true)} className="bg-orange-600 hover:bg-orange-700">
                 <Plus className="w-4 h-4 mr-2" />
@@ -288,9 +287,8 @@ export default function FeedModule() {
             // Only show create button if user has permission
             onCreatePost={
               selectedUser && (
-                selectedUser.role_type === 'admin' || 
-                selectedUser.role_type === 'manager' || 
-                selectedUser.role_type === 'leader_chef'
+                selectedUser.role === 'admin' || 
+                selectedUser.role === 'manager'
               ) ? () => setShowComposer(true) : undefined
             }
           />

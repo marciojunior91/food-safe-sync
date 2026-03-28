@@ -23,6 +23,7 @@ import type { TeamMember, TeamMemberRole, UpdateTeamMemberInput } from '@/types/
 import { TEAM_MEMBER_ROLE_LABELS } from '@/types/teamMembers';
 import { Shield, Lock, User, Briefcase, Phone as PhoneIcon, Heart, FileText } from 'lucide-react';
 import { formatPhoneNumber, getRawPhoneNumber, formatTFN, getRawTFN } from '@/utils/phoneFormat';
+import { PositionEmojiPicker } from './PositionEmojiPicker';
 import { DocumentUpload } from './DocumentUpload';
 
 interface TeamMemberEditDialogProps {
@@ -57,6 +58,7 @@ export function TeamMemberEditDialog({
         email: teamMember.email,
         phone: teamMember.phone ? formatPhoneNumber(teamMember.phone) : teamMember.phone,
         position: teamMember.position,
+        position_emoji: teamMember.position_emoji,
         date_of_birth: teamMember.date_of_birth,
         address: teamMember.address,
         tfn_number: teamMember.tfn_number ? formatTFN(teamMember.tfn_number) : teamMember.tfn_number,
@@ -64,7 +66,7 @@ export function TeamMemberEditDialog({
         emergency_contact_phone: teamMember.emergency_contact_phone ? formatPhoneNumber(teamMember.emergency_contact_phone) : teamMember.emergency_contact_phone,
         emergency_contact_relationship: teamMember.emergency_contact_relationship,
         hire_date: teamMember.hire_date,
-        role_type: teamMember.role_type,
+        role: teamMember.role,
         is_active: teamMember.is_active,
       });
       setPinValidated(false);
@@ -257,15 +259,21 @@ export function TeamMemberEditDialog({
 
             {/* Employment Information Tab */}
             <TabsContent value="employment" className="space-y-4 py-4">
-              {/* Position */}
+              {/* Position with emoji picker */}
               <div className="space-y-2">
                 <Label htmlFor="position">Position</Label>
-                <Input
-                  id="position"
-                  value={formData.position || ''}
-                  onChange={(e) => handleFieldChange('position', e.target.value)}
-                  placeholder="Line Cook"
-                />
+                <div className="flex gap-2">
+                  <PositionEmojiPicker
+                    value={formData.position_emoji || ''}
+                    onChange={(emoji) => handleFieldChange('position_emoji', emoji)}
+                  />
+                  <Input
+                    id="position"
+                    value={formData.position || ''}
+                    onChange={(e) => handleFieldChange('position', e.target.value)}
+                    placeholder="e.g., Head Chef, Line Cook, Barista"
+                  />
+                </div>
               </div>
 
               {/* Hire Date */}
@@ -279,13 +287,13 @@ export function TeamMemberEditDialog({
                 />
               </div>
 
-              {/* Role Type (only for admin/manager) */}
+              {/* Role (only for admin/manager) */}
               {canEditWithoutPIN && (
                 <div className="space-y-2">
-                  <Label htmlFor="role_type">Role Type</Label>
+                  <Label htmlFor="role">Role</Label>
                   <Select
-                    value={formData.role_type}
-                    onValueChange={(value) => handleFieldChange('role_type', value as TeamMemberRole)}
+                    value={formData.role || 'staff'}
+                    onValueChange={(value) => handleFieldChange('role', value as TeamMemberRole)}
                   >
                     <SelectTrigger>
                       <SelectValue />

@@ -5,9 +5,6 @@
 export type UserRole = 
   | 'admin'
   | 'manager'
-  | 'leader_chef'
-  | 'cook'
-  | 'barista'
   | 'staff';
 
 export type EmploymentStatus = 
@@ -125,9 +122,6 @@ export interface UploadDocumentInput {
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   admin: 'Admin',
   manager: 'Manager',
-  leader_chef: 'Leader Chef',
-  cook: 'Cook',
-  barista: 'Barista',
   staff: 'Staff'
 };
 

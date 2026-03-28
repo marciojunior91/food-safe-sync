@@ -41,12 +41,6 @@ const AUTH_USER_ROLES = [
     icon: '📊',
     description: 'Manage operations, view reports, manage team'
   },
-  { 
-    value: 'leader_chef', 
-    label: 'Leader Chef', 
-    icon: '👨‍🍳',
-    description: 'Manage recipes, tasks, and kitchen operations'
-  },
 ];
 
 export default function InviteUsersStep({ data, onChange, onNext, onBack }: InviteUsersStepProps) {

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Loader2, Check, Printer, Package, Plus, Clock, AlertTriangle } from "lucide-react";
+import { Loader2, Check, Printer, Package, Plus, Clock, AlertTriangle, Pencil, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   NavigationLevel,
   getProductIcon,
@@ -61,6 +62,14 @@ interface QuickPrintCategoryViewProps {
   onSubcategorySelect: (subcategory: Subcategory) => void;
   onProductSelect: (product: Product) => void;
   className?: string;
+  // Edit mode props
+  editMode?: boolean;
+  onAddCategory?: (name: string, icon: string) => void;
+  onRenameCategory?: (id: string, newName: string) => void;
+  onDeleteCategory?: (id: string) => void;
+  onAddSubcategory?: (categoryId: string, name: string, icon: string) => void;
+  onRenameSubcategory?: (id: string, newName: string) => void;
+  onDeleteSubcategory?: (id: string) => void;
 }
 
 export function QuickPrintCategoryView({
@@ -76,10 +85,24 @@ export function QuickPrintCategoryView({
   onSubcategorySelect,
   onProductSelect,
   className,
+  editMode = false,
+  onAddCategory,
+  onRenameCategory,
+  onDeleteCategory,
+  onAddSubcategory,
+  onRenameSubcategory,
+  onDeleteSubcategory,
 }: QuickPrintCategoryViewProps) {
   const { user } = useAuth();
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
   const [quickAddDialogOpen, setQuickAddDialogOpen] = useState(false);
+  
+  // Inline edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
+  const [addingNew, setAddingNew] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newIcon, setNewIcon] = useState("📁");
 
   const handleQuickAdd = (e: React.MouseEvent, product: Product) => {
     e.stopPropagation(); // Prevent triggering onProductSelect
@@ -113,29 +136,118 @@ export function QuickPrintCategoryView({
     return (
       <div className={cn("space-y-4", className)}>
         <p className="text-sm text-muted-foreground">
-          Select a category to view products
+          {editMode ? "Edit categories — rename, delete, or add new" : "Select a category to view products"}
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {categories.map((category) => (
-            <Button
-              key={category.id}
-              variant="outline"
-              className="h-36 sm:h-40 flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
-              onClick={() => onCategorySelect(category)}
-            >
-              <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">
-                {category.icon || '📁'}
-              </div>
-              <span className="text-sm font-medium text-center line-clamp-2 leading-tight">
-                {category.name}
-              </span>
-              {category.product_count !== undefined && (
-                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
-                  {category.product_count} {category.product_count === 1 ? 'product' : 'products'}
-                </span>
+            <div key={category.id} className="relative">
+              {editMode && editingId === category.id ? (
+                <div className="h-36 sm:h-40 border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                  <Input
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    className="text-center text-sm h-8"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && editingName.trim()) {
+                        onRenameCategory?.(category.id, editingName.trim());
+                        setEditingId(null);
+                      }
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                  />
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
+                      if (editingName.trim()) {
+                        onRenameCategory?.(category.id, editingName.trim());
+                        setEditingId(null);
+                      }
+                    }}>Save</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingId(null)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="h-36 sm:h-40 w-full flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
+                  onClick={() => editMode ? undefined : onCategorySelect(category)}
+                >
+                  <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">
+                    {category.icon || '📁'}
+                  </div>
+                  <span className="text-sm font-medium text-center line-clamp-2 leading-tight">
+                    {category.name}
+                  </span>
+                  {!editMode && category.product_count !== undefined && (
+                    <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
+                      {category.product_count} {category.product_count === 1 ? 'product' : 'products'}
+                    </span>
+                  )}
+                </Button>
               )}
-            </Button>
+              {/* Edit overlay buttons */}
+              {editMode && editingId !== category.id && (
+                <div className="absolute top-1 right-1 flex gap-1 z-10">
+                  <Button size="icon" variant="secondary" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingId(category.id);
+                    setEditingName(category.name);
+                  }}>
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <Button size="icon" variant="destructive" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteCategory?.(category.id);
+                  }}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
           ))}
+          {/* Add New Category Button */}
+          {editMode && (
+            <div className="h-36 sm:h-40">
+              {addingNew ? (
+                <div className="h-full border-2 border-dashed border-primary/50 rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-primary/5">
+                  <Input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Category name"
+                    className="text-center text-sm h-8"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newName.trim()) {
+                        onAddCategory?.(newName.trim(), newIcon);
+                        setNewName("");
+                        setAddingNew(false);
+                      }
+                      if (e.key === "Escape") { setAddingNew(false); setNewName(""); }
+                    }}
+                  />
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
+                      if (newName.trim()) {
+                        onAddCategory?.(newName.trim(), newIcon);
+                        setNewName("");
+                        setAddingNew(false);
+                      }
+                    }}>Add</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setAddingNew(false); setNewName(""); }}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="h-full w-full border-2 border-dashed flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary"
+                  onClick={() => setAddingNew(true)}
+                >
+                  <Plus className="w-8 h-8" />
+                  <span className="text-sm font-medium">Add Category</span>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -177,29 +289,118 @@ export function QuickPrintCategoryView({
     return (
       <div className={cn("space-y-4", className)}>
         <p className="text-sm text-muted-foreground">
-          Select a subcategory to view products
+          {editMode ? "Edit subcategories — rename, delete, or add new" : "Select a subcategory to view products"}
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {subcategories.map((subcategory) => (
-            <Button
-              key={subcategory.id}
-              variant="outline"
-              className="min-h-[10rem] sm:min-h-[11rem] flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
-              onClick={() => onSubcategorySelect(subcategory)}
-            >
-              <div className="text-5xl sm:text-6xl group-hover:scale-110 transition-transform leading-none">
-                {subcategory.icon || '📂'}
-              </div>
-              <span className="text-sm sm:text-base font-medium text-center line-clamp-2 leading-tight px-2">
-                {subcategory.name}
-              </span>
-              {subcategory.product_count !== undefined && (
-                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-1">
-                  {subcategory.product_count} {subcategory.product_count === 1 ? 'product' : 'products'}
-                </span>
+            <div key={subcategory.id} className="relative">
+              {editMode && editingId === subcategory.id ? (
+                <div className="min-h-[10rem] sm:min-h-[11rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                  <Input
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    className="text-center text-sm h-8"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && editingName.trim()) {
+                        onRenameSubcategory?.(subcategory.id, editingName.trim());
+                        setEditingId(null);
+                      }
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                  />
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
+                      if (editingName.trim()) {
+                        onRenameSubcategory?.(subcategory.id, editingName.trim());
+                        setEditingId(null);
+                      }
+                    }}>Save</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingId(null)}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="min-h-[10rem] sm:min-h-[11rem] w-full flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
+                  onClick={() => editMode ? undefined : onSubcategorySelect(subcategory)}
+                >
+                  <div className="text-5xl sm:text-6xl group-hover:scale-110 transition-transform leading-none">
+                    {subcategory.icon || '📂'}
+                  </div>
+                  <span className="text-sm sm:text-base font-medium text-center line-clamp-2 leading-tight px-2">
+                    {subcategory.name}
+                  </span>
+                  {!editMode && subcategory.product_count !== undefined && (
+                    <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-1">
+                      {subcategory.product_count} {subcategory.product_count === 1 ? 'product' : 'products'}
+                    </span>
+                  )}
+                </Button>
               )}
-            </Button>
+              {/* Edit overlay buttons */}
+              {editMode && editingId !== subcategory.id && (
+                <div className="absolute top-1 right-1 flex gap-1 z-10">
+                  <Button size="icon" variant="secondary" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingId(subcategory.id);
+                    setEditingName(subcategory.name);
+                  }}>
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                  <Button size="icon" variant="destructive" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteSubcategory?.(subcategory.id);
+                  }}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
           ))}
+          {/* Add New Subcategory Button */}
+          {editMode && navigationStack.length > 0 && (
+            <div className="min-h-[10rem] sm:min-h-[11rem]">
+              {addingNew ? (
+                <div className="h-full border-2 border-dashed border-primary/50 rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-primary/5">
+                  <Input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Subcategory name"
+                    className="text-center text-sm h-8"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newName.trim()) {
+                        onAddSubcategory?.(navigationStack[0].id, newName.trim(), "📂");
+                        setNewName("");
+                        setAddingNew(false);
+                      }
+                      if (e.key === "Escape") { setAddingNew(false); setNewName(""); }
+                    }}
+                  />
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
+                      if (newName.trim()) {
+                        onAddSubcategory?.(navigationStack[0].id, newName.trim(), "📂");
+                        setNewName("");
+                        setAddingNew(false);
+                      }
+                    }}>Add</Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setAddingNew(false); setNewName(""); }}>Cancel</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="h-full w-full border-2 border-dashed flex flex-col items-center justify-center gap-2 text-muted-foreground hover:text-primary hover:border-primary"
+                  onClick={() => setAddingNew(true)}
+                >
+                  <Plus className="w-8 h-8" />
+                  <span className="text-sm font-medium">Add Subcategory</span>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

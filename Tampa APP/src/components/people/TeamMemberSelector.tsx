@@ -203,11 +203,11 @@ export const TeamMemberSelector = ({
                             <Badge
                               variant="secondary"
                               style={{
-                                backgroundColor: TEAM_MEMBER_ROLE_COLORS[member.role_type] + '20',
-                                color: TEAM_MEMBER_ROLE_COLORS[member.role_type],
+                                backgroundColor: TEAM_MEMBER_ROLE_COLORS[member.role as keyof typeof TEAM_MEMBER_ROLE_COLORS] + '20',
+                                color: TEAM_MEMBER_ROLE_COLORS[member.role as keyof typeof TEAM_MEMBER_ROLE_COLORS],
                               }}
                             >
-                              {TEAM_MEMBER_ROLE_LABELS[member.role_type]}
+                              {TEAM_MEMBER_ROLE_LABELS[member.role as keyof typeof TEAM_MEMBER_ROLE_LABELS]}
                             </Badge>
 
                             {!member.profile_complete && (

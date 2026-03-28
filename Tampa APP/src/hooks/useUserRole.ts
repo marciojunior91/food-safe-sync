@@ -4,18 +4,17 @@
 // This hook fetches and manages the current authenticated user's role from
 // the user_roles table (Layer 1: System Access)
 //
-// Roles Hierarchy:
-// - admin: Full system access
-// - manager: Manage team members and tasks
-// - leader_chef: Create team members and assign tasks
-// - staff: Limited access, requires PIN for profile edits
+// Roles Hierarchy (3 levels):
+// - admin: Full system access (billing, settings, user management)
+// - manager: Manage team, tasks, labels, recipes (no billing/settings)
+// - staff: Limited access, view & complete tasks, print labels
 // ============================================================================
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-export type AppRole = 'admin' | 'manager' | 'leader_chef' | 'staff';
+export type AppRole = 'admin' | 'manager' | 'staff';
 
 interface UseUserRoleReturn {
   role: AppRole | null;
@@ -23,7 +22,6 @@ interface UseUserRoleReturn {
   error: Error | null;
   isAdmin: boolean;
   isManager: boolean;
-  isLeaderChef: boolean;
   isStaff: boolean;
   canManageTeamMembers: boolean;
   canEditWithoutPIN: boolean;
@@ -73,7 +71,7 @@ export const useUserRole = (): UseUserRoleReturn => {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .order('role', { ascending: true }) // admin < manager < leader_chef < staff
+        .order('role', { ascending: true }) // admin < manager < staff
         .limit(1)
         .maybeSingle();
 
@@ -126,11 +124,10 @@ export const useUserRole = (): UseUserRoleReturn => {
   // Derived state - role checks
   const isAdmin = role === 'admin';
   const isManager = role === 'manager';
-  const isLeaderChef = role === 'leader_chef';
   const isStaff = role === 'staff';
 
   // Permission checks
-  const canManageTeamMembers = role === 'admin' || role === 'manager' || role === 'leader_chef';
+  const canManageTeamMembers = role === 'admin' || role === 'manager';
   const canEditWithoutPIN = role === 'admin' || role === 'manager';
 
   return {
@@ -139,7 +136,6 @@ export const useUserRole = (): UseUserRoleReturn => {
     error,
     isAdmin,
     isManager,
-    isLeaderChef,
     isStaff,
     canManageTeamMembers,
     canEditWithoutPIN,
@@ -153,7 +149,7 @@ export const useUserRole = (): UseUserRoleReturn => {
 export const hasRoleOrHigher = (userRole: AppRole | null, requiredRole: AppRole): boolean => {
   if (!userRole) return false;
 
-  const hierarchy: AppRole[] = ['admin', 'manager', 'leader_chef', 'staff'];
+  const hierarchy: AppRole[] = ['admin', 'manager', 'staff'];
   const userIndex = hierarchy.indexOf(userRole);
   const requiredIndex = hierarchy.indexOf(requiredRole);
 

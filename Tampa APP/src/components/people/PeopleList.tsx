@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 interface PeopleListProps {
   users: UserProfile[];
   loading: boolean;
-  onViewProfile?: (user: UserProfile) => void;
   onEdit?: (user: UserProfile) => void;
   onLoadMore?: () => void;
   hasMore?: boolean;
@@ -21,7 +20,6 @@ interface PeopleListProps {
 export default function PeopleList({
   users,
   loading,
-  onViewProfile,
   onEdit,
   onLoadMore,
   hasMore = false,
@@ -120,7 +118,6 @@ export default function PeopleList({
           <UserCard
             key={user.user_id}
             user={user}
-            onViewProfile={onViewProfile}
             onEdit={onEdit}
             showActions={showActions}
           />

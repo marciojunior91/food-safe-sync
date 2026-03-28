@@ -178,7 +178,6 @@ export default function CreateTeamMemberDialog({
         .insert({
           display_name: values.displayName,
           organization_id: context.organization_id,
-          role_type: values.role,
           position: values.position || null,
           phone: values.phone ? getRawPhoneNumber(values.phone) : null,
           email: values.email || null,
@@ -191,6 +190,13 @@ export default function CreateTeamMemberDialog({
         .single();
 
       if (teamError) throw teamError;
+
+      // Set role in user_roles if auth user is linked and role is provided
+      if (values.authUserId && values.role) {
+        await supabase
+          .from('user_roles')
+          .upsert({ user_id: values.authUserId, role: values.role } as any);
+      }
 
       // Success!
       toast({

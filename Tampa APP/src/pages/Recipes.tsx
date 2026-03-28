@@ -81,12 +81,12 @@ export default function Recipes() {
   const [sortBy, setSortBy] = useState<string>("name-asc");
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
-  const { role, isAdmin, isLeaderChef, loading: rolesLoading } = useUserRole();
+  const { role, isAdmin, isManager, loading: rolesLoading } = useUserRole();
   const { checkRecipeLimit, upgradeModalProps } = usePlanEnforcement();
   const { toast } = useToast();
   
-  // Check if user can manage recipes (admin or leader_chef)
-  const canManageRecipes = isAdmin || isLeaderChef;
+  // Check if user can manage recipes (admin or manager)
+  const canManageRecipes = isAdmin || isManager;
 
 
 

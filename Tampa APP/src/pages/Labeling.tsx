@@ -450,101 +450,18 @@ export default function Labeling() {
   };
 
   const handlePrintLabel = async (data: LabelData) => {
-    if (!organizationId) {
-      toast({
-        title: "Organization Required",
-        description: "Could not determine your organization. Please refresh the page.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // LabelForm already saved to database AND printed via usePrinter
+    // Just show success feedback, refresh dashboard, and navigate back
+    toast({
+      title: "Label Printed Successfully",
+      description: `Label for ${data.productName} has been sent to the printer and saved to history.`,
+    });
 
-    try {
-      // Fetch allergens for the product
-      let productAllergens: any[] = [];
-      if (data.productId) {
-        try {
-          const { data: allergenData } = await supabase
-            .from("product_allergens")
-            .select(`
-              allergen_id,
-              allergens (
-                id,
-                name,
-                icon,
-                severity
-              )
-            `)
-            .eq("product_id", data.productId);
-          
-          productAllergens = (allergenData || [])
-            .map((pa: any) => pa.allergens)
-            .filter(Boolean);
-        } catch (error) {
-          console.error("Error fetching allergens for print:", error);
-        }
-      }
-      
-      // Save to database first
-      await saveLabelToDatabase({
-        productId: data.productId,
-        productName: data.productName,
-        categoryId: data.categoryId === "all" ? null : data.categoryId,
-        categoryName: data.categoryName,
-        preparedBy: data.preparedBy,
-        preparedByName: data.preparedByName,
-        prepDate: data.prepDate,
-        expiryDate: data.expiryDate,
-        condition: data.condition,
-        quantity: data.quantity,
-        unit: data.unit,
-        batchNumber: data.batchNumber,
-        allergens: productAllergens,
-        organizationId: organizationId, // Required for RLS
-      });
+    // Reload dashboard stats
+    fetchDashboardStats();
+    fetchRecentLabels();
 
-      // Print using new printer system - pass complete label data
-      const success = await print({
-        productName: data.productName,
-        categoryName: data.categoryName,
-        subcategoryName: data.subcategoryName,
-        preparedDate: data.prepDate,
-        useByDate: data.expiryDate,
-        preparedByName: data.preparedByName, // ✅ Pass prepared by name from form
-        allergens: productAllergens.map(a => a.name),
-        storageInstructions: `Condition: ${data.condition}`,
-        barcode: data.batchNumber,
-        quantity: data.quantity,
-        unit: data.unit,
-        condition: data.condition,
-      });
-
-      if (success) {
-        toast({
-          title: "Label Printed Successfully",
-          description: `Label for ${data.productName} has been sent to the printer and saved to history.`,
-        });
-        
-        // Reload dashboard stats
-        fetchDashboardStats();
-        fetchRecentLabels();
-        
-        setCurrentView('overview');
-      } else {
-        toast({
-          title: "Print Failed",
-          description: "Could not connect to printer.",
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error("Error printing label:", error);
-      toast({
-        title: "Print Error",
-        description: "An unexpected error occurred while printing.",
-        variant: "destructive"
-      });
-    }
+    setCurrentView('overview');
   };
 
   const handleCancelForm = () => {
@@ -661,7 +578,7 @@ export default function Labeling() {
               <>
                 <span className="font-medium">{selectedUser.display_name}</span>
                 <Badge variant="secondary" className="ml-1 text-xs">
-                  {selectedUser.role_type}
+                  {selectedUser.role || 'staff'}
                 </Badge>
               </>
             ) : (

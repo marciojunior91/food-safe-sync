@@ -43,8 +43,8 @@ export function TestCurrentTeamMember() {
                 <p className="text-lg">{currentMember.position || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Role Type</p>
-                <Badge variant="outline">{currentMember.role_type}</Badge>
+                <p className="text-sm font-medium text-muted-foreground">Role</p>
+                <Badge variant="outline">{currentMember.role || 'staff'}</Badge>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Email</p>

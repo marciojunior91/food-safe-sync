@@ -21,7 +21,6 @@ import RoutineTasks from "./pages/RoutineTasks";
 import Training from "./pages/Training";
 import People from "./pages/People";
 import LabelCategories from "./pages/LabelCategories";
-import UserProfile from "./components/people/UserProfile";
 import PricingPage from "./pages/PricingPage";
 import Billing from "./pages/Billing";
 import FeedModule from "./pages/FeedModule";
@@ -65,7 +64,6 @@ const App = () => (
                 <Route path="recipes" element={<Recipes />} />
                 <Route path="routine-tasks" element={<RoutineTasks />} />
                 <Route path="people" element={<People />} />
-                <Route path="people/:userId" element={<UserProfile />} />
                 <Route path="feed" element={<FeedModule />} />
                 <Route path="knowledge-base" element={<KnowledgeBase />} />
                 <Route path="training" element={<Training />} />

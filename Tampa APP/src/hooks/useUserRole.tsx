@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 
-export type AppRole = 'admin' | 'manager' | 'leader_chef' | 'staff';
+export type AppRole = 'admin' | 'manager' | 'staff';
 
 interface UserRole {
   id: string;
@@ -41,7 +41,7 @@ export const useUserRole = () => {
       setRoles(userRoles);
 
       // Determine highest role based on hierarchy
-      const roleHierarchy: AppRole[] = ['admin', 'manager', 'leader_chef', 'staff'];
+      const roleHierarchy: AppRole[] = ['admin', 'manager', 'staff'];
       const highest = roleHierarchy.find(role => userRoles.includes(role)) || null;
       setHighestRole(highest);
       setLoading(false);
@@ -81,7 +81,6 @@ export const useUserRole = () => {
 
   const isAdmin = hasRole('admin');
   const isManager = hasAnyRole(['admin', 'manager']);
-  const isLeaderChef = hasAnyRole(['admin', 'leader_chef']);
 
   return {
     roles,
@@ -91,6 +90,5 @@ export const useUserRole = () => {
     hasAnyRole,
     isAdmin,
     isManager,
-    isLeaderChef,
   };
 };

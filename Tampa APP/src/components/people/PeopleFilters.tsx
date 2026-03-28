@@ -8,9 +8,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { UserRole, EmploymentStatus, UserFilters } from "@/types/people";
-import { X, Search, Filter, ArrowUpDown } from "lucide-react";
+import { X, Search } from "lucide-react";
 import { useState } from "react";
 
 interface PeopleFiltersProps {
@@ -25,14 +24,11 @@ export default function PeopleFilters({
   onClearFilters,
 }: PeopleFiltersProps) {
   const [searchQuery, setSearchQuery] = useState(filters.search || "");
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Count active filters
   const activeFiltersCount = [
     filters.role,
     filters.employment_status,
-    filters.department_id,
-    filters.active_only,
     filters.search,
   ].filter(Boolean).length;
 
@@ -51,13 +47,6 @@ export default function PeopleFilters({
     });
   };
 
-  const handleActiveOnlyToggle = () => {
-    onFilterChange({
-      ...filters,
-      active_only: !filters.active_only,
-    });
-  };
-
   const handleSearch = (value: string) => {
     setSearchQuery(value);
     onFilterChange({
@@ -68,7 +57,7 @@ export default function PeopleFilters({
 
   return (
     <div className="space-y-4">
-      {/* Quick Filters Row */}
+      {/* Filters Row */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Search */}
         <div className="flex-1 min-w-[200px]">
@@ -154,24 +143,6 @@ export default function PeopleFilters({
           </SelectContent>
         </Select>
 
-        {/* Advanced Filters Toggle */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="relative"
-        >
-          <Filter className="w-4 h-4" />
-          {activeFiltersCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
-            >
-              {activeFiltersCount}
-            </Badge>
-          )}
-        </Button>
-
         {/* Clear Filters */}
         {activeFiltersCount > 0 && (
           <Button
@@ -185,97 +156,6 @@ export default function PeopleFilters({
           </Button>
         )}
       </div>
-
-      {/* Advanced Filters Panel */}
-      {showAdvanced && (
-        <>
-          <Separator />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
-            {/* Sort By */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-2">
-                <ArrowUpDown className="w-4 h-4" />
-                Sort By
-              </label>
-              <Select defaultValue="name">
-                <SelectTrigger>
-                  <SelectValue placeholder="Sort by..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Name (A-Z)</SelectItem>
-                  <SelectItem value="name_desc">Name (Z-A)</SelectItem>
-                  <SelectItem value="role">Role</SelectItem>
-                  <SelectItem value="status">Status</SelectItem>
-                  <SelectItem value="compliance">Compliance</SelectItem>
-                  <SelectItem value="recent">Recently Added</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Department Filter (Placeholder) */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Department</label>
-              <Select defaultValue="all">
-                <SelectTrigger>
-                  <SelectValue placeholder="All Departments" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  <SelectItem value="kitchen">
-                    <div className="flex items-center gap-2">
-                      <span>👨‍🍳</span>
-                      <span>Kitchen</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="bar">
-                    <div className="flex items-center gap-2">
-                      <span>☕</span>
-                      <span>Bar</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="management">
-                    <div className="flex items-center gap-2">
-                      <span>💼</span>
-                      <span>Management</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Compliance Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Compliance</label>
-              <Select defaultValue="all">
-                <SelectTrigger>
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="compliant">
-                    <div className="flex items-center gap-2">
-                      <span>✅</span>
-                      <span>Compliant</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="expiring">
-                    <div className="flex items-center gap-2">
-                      <span>⚠️</span>
-                      <span>Expiring Soon</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="non_compliant">
-                    <div className="flex items-center gap-2">
-                      <span>❌</span>
-                      <span>Non-Compliant</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Active Filters Display */}
       {activeFiltersCount > 0 && (
@@ -305,15 +185,6 @@ export default function PeopleFilters({
               <X
                 className="w-3 h-3 cursor-pointer"
                 onClick={() => handleSearch("")}
-              />
-            </Badge>
-          )}
-          {filters.active_only && (
-            <Badge variant="secondary" className="gap-1">
-              Active Only
-              <X
-                className="w-3 h-3 cursor-pointer"
-                onClick={handleActiveOnlyToggle}
               />
             </Badge>
           )}

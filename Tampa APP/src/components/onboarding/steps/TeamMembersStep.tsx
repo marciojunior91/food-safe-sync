@@ -29,12 +29,9 @@ interface TeamMembersStepProps {
 }
 
 const TEAM_MEMBER_ROLES = [
-  { value: 'cook', label: 'Cook', icon: '👨‍🍳' },
-  { value: 'barista', label: 'Barista', icon: '☕' },
-  { value: 'chef', label: 'Chef', icon: '🔪' },
-  { value: 'cleaner', label: 'Cleaner', icon: '🧹' },
-  { value: 'server', label: 'Server', icon: '🍽️' },
-  { value: 'other', label: 'Other', icon: '👤' },
+  { value: 'staff', label: 'Staff', icon: '🔵' },
+  { value: 'manager', label: 'Manager', icon: '🟡' },
+  { value: 'admin', label: 'Admin', icon: '🔴' },
 ];
 
 export default function TeamMembersStep({ data, onChange, onNext, onBack }: TeamMembersStepProps) {

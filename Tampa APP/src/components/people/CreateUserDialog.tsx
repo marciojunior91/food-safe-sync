@@ -127,7 +127,7 @@ export default function CreateUserDialog({
           body: JSON.stringify({
             email: values.email,
             display_name: values.displayName,
-            role_type: values.role,
+            role: values.role,
             organization_id: context.organization_id,
           }),
         }

@@ -75,7 +75,7 @@ export interface CSVImportError {
 // Step 4: Team Members Registration
 export interface TeamMemberEntry {
   displayName: string;
-  role: 'cook' | 'barista' | 'chef' | 'cleaner' | 'server' | 'other';
+  role: 'admin' | 'manager' | 'staff';
   pin: string;
   email?: string;
   phone?: string;
@@ -90,7 +90,7 @@ export interface TeamMembersData {
 // Step 5: Invite Auth Users
 export interface UserInvitation {
   email: string;
-  role: 'admin' | 'manager' | 'leader_chef';
+  role: 'admin' | 'manager';
   personalMessage?: string;
 }
 

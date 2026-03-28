@@ -4,8 +4,7 @@ import type {
   TeamMember, 
   CreateTeamMemberInput, 
   UpdateTeamMemberInput,
-  TeamMemberFilters,
-  TeamMemberRole
+  TeamMemberFilters
 } from '@/types/teamMembers';
 import { hashPIN, generateRandomPIN } from '@/utils/pinUtils';
 import { useToast } from '@/hooks/use-toast';
@@ -27,10 +26,7 @@ export const useTeamMembers = () => {
         .select('*')
         .order('display_name', { ascending: true });
 
-      // Apply filters
-      if (filters?.role_type && filters.role_type !== 'all') {
-        query = query.eq('role_type', filters.role_type);
-      }
+      // Apply filters (role is computed from user_roles, filtered post-fetch)
 
       if (filters?.is_active !== undefined) {
         query = query.eq('is_active', filters.is_active);
@@ -60,8 +56,36 @@ export const useTeamMembers = () => {
 
       if (fetchError) throw fetchError;
 
-      setTeamMembers(data || []);
-      return data || [];
+      // Enrich with roles from user_roles (role lives there, not in team_members)
+      const members = (data || []) as any[];
+      const authRoleIds = members
+        .map((m: any) => m.auth_role_id)
+        .filter((id: any): id is string => Boolean(id));
+
+      let roleMap = new Map<string, string>();
+      if (authRoleIds.length > 0) {
+        const { data: roles } = await supabase
+          .from('user_roles')
+          .select('user_id, role')
+          .in('user_id', authRoleIds);
+        if (roles) {
+          roleMap = new Map(roles.map((r: any) => [r.user_id, r.role]));
+        }
+      }
+
+      const enrichedMembers: TeamMember[] = members.map((m: any) => ({
+        ...m,
+        role: m.auth_role_id ? roleMap.get(m.auth_role_id) || 'staff' : undefined,
+      }));
+
+      // Apply role filter (computed field, not DB column)
+      let filteredMembers = enrichedMembers;
+      if (filters?.role && filters.role !== 'all') {
+        filteredMembers = enrichedMembers.filter(m => m.role === filters.role);
+      }
+
+      setTeamMembers(filteredMembers);
+      return filteredMembers;
     } catch (err) {
       const error = err as Error;
       setError(error);
@@ -116,6 +140,7 @@ export const useTeamMembers = () => {
           email: input.email,
           phone: input.phone,
           position: input.position,
+          position_emoji: input.position_emoji,
           
           // New personal fields
           date_of_birth: input.date_of_birth,
@@ -130,7 +155,6 @@ export const useTeamMembers = () => {
           // Employment
           hire_date: input.hire_date,
           department_id: input.department_id,
-          role_type: input.role_type,
           auth_role_id: input.auth_role_id,
           organization_id: input.organization_id,
           location_id: input.location_id,
@@ -142,6 +166,13 @@ export const useTeamMembers = () => {
         .single();
 
       if (error) throw error;
+
+      // If role and auth_role_id are provided, set role in user_roles
+      if (input.role && input.auth_role_id) {
+        await supabase
+          .from('user_roles')
+          .upsert({ user_id: input.auth_role_id, role: input.role } as any);
+      }
 
       const teamMember = data;
 
@@ -175,9 +206,10 @@ export const useTeamMembers = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Prepare update data
+      // Prepare update data (exclude role — it goes to user_roles)
+      const { role: newRole, ...restUpdates } = updates;
       const updateData: any = {
-        ...updates,
+        ...restUpdates,
         updated_by: user.id,
       };
 
@@ -196,7 +228,14 @@ export const useTeamMembers = () => {
 
       if (error) throw error;
 
-      const teamMember = data;
+      const teamMember = data as any;
+
+      // If role was updated and member has auth_role_id, update user_roles
+      if (newRole && teamMember.auth_role_id) {
+        await supabase
+          .from('user_roles')
+          .upsert({ user_id: teamMember.auth_role_id, role: newRole } as any);
+      }
 
       toast({
         title: 'Team member updated',
@@ -306,9 +345,9 @@ export const useTeamMembers = () => {
     }
   };
 
-  // Get team members by role
-  const getTeamMembersByRole = async (role: TeamMemberRole): Promise<TeamMember[]> => {
-    return fetchTeamMembers({ role_type: role, is_active: true });
+  // Get team members by role (from user_roles)
+  const getTeamMembersByRole = async (role: string): Promise<TeamMember[]> => {
+    return fetchTeamMembers({ role: role, is_active: true });
   };
 
   // Get team members by auth account

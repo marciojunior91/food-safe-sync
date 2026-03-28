@@ -105,7 +105,7 @@ interface TaskFormProps {
   onSubmit: (data: CreateTaskInput) => Promise<void>;
   onCancel?: () => void;
   defaultValues?: Partial<TaskFormValues>;
-  users?: Array<{ user_id: string; display_name: string; role_type?: string }>;
+  users?: Array<{ user_id: string; display_name: string; role?: string }>;
   isLoading?: boolean;
   isEditing?: boolean; // New prop to determine if we're editing
   taskId?: string; // Task ID when editing (for attachments)
@@ -140,12 +140,11 @@ export function TaskForm({
   );
 
   // Check if user has permission to delete images
-  // Includes: admin, owner, manager, leader_chef roles
+  // Includes: admin, manager roles
   const canDeleteImages = 
     userRole === 'admin' || 
     userRole === 'owner' ||
-    userRole === 'manager' ||
-    userRole === 'leader_chef';
+    userRole === 'manager';
 
   // Load attachments when editing
   useEffect(() => {
@@ -229,7 +228,11 @@ export function TaskForm({
       task_type: defaultValues?.task_type || "others",
       custom_task_type: "",
       priority: defaultValues?.priority || "normal",
-      assigned_to: defaultValues?.assigned_to ? [defaultValues.assigned_to] : [],
+      assigned_to: Array.isArray(defaultValues?.assigned_to)
+        ? defaultValues.assigned_to
+        : defaultValues?.assigned_to
+          ? [defaultValues.assigned_to]
+          : [],
       scheduled_date: defaultValues?.scheduled_date || new Date(),
       scheduled_time: defaultValues?.scheduled_time || "",
       estimated_minutes: defaultValues?.estimated_minutes || 30,
@@ -541,7 +544,7 @@ export function TaskForm({
 
             const selectGroup = (roleTypes: string[]) => {
               const groupIds = users
-                .filter((u) => u.role_type && roleTypes.includes(u.role_type))
+                .filter((u) => u.role && roleTypes.includes(u.role))
                 .map((u) => u.user_id);
               const merged = Array.from(new Set([...selected, ...groupIds]));
               field.onChange(merged);
@@ -561,11 +564,11 @@ export function TaskForm({
                 {/* Group preset buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
-                    onClick={() => selectGroup(['cook', 'leader_chef'])}>
+                    onClick={() => selectGroup(['staff'])}>
                     🍳 Kitchen
                   </Button>
                   <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
-                    onClick={() => selectGroup(['barista'])}>
+                    onClick={() => selectGroup(['staff'])}>
                     🍹 Bar
                   </Button>
                   <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
@@ -630,8 +633,8 @@ export function TaskForm({
                             </span>
                           </div>
                           <span className="text-sm">{user.display_name}</span>
-                          {user.role_type && (
-                            <span className="ml-auto text-xs text-muted-foreground capitalize">{user.role_type.replace('_', ' ')}</span>
+                          {user.role && (
+                            <span className="ml-auto text-xs text-muted-foreground capitalize">{user.role.replace('_', ' ')}</span>
                           )}
                         </label>
                       ))

@@ -3,11 +3,9 @@
 // ============================================================================
 
 export type TeamMemberRole = 
-  | 'cook'
-  | 'barista'
+  | 'admin'
   | 'manager'
-  | 'leader_chef'
-  | 'admin';
+  | 'staff';
 
 export interface TeamMember {
   id: string;
@@ -15,6 +13,7 @@ export interface TeamMember {
   email?: string;
   phone?: string;
   position?: string;
+  position_emoji?: string;
   
   // New personal information fields
   date_of_birth?: string; // ISO date string
@@ -29,8 +28,10 @@ export interface TeamMember {
   // Employment information
   hire_date?: string;
   department_id?: string;
-  role_type: TeamMemberRole;
   is_active: boolean;
+
+  // Role (computed from user_roles via auth_role_id chain)
+  role?: string;
   
   // Authentication
   auth_role_id?: string; // Links to shared login account (profiles.user_id)
@@ -56,6 +57,7 @@ export interface CreateTeamMemberInput {
   email?: string;
   phone?: string;
   position?: string;
+  position_emoji?: string;
   
   // Personal information
   date_of_birth?: string;
@@ -70,7 +72,7 @@ export interface CreateTeamMemberInput {
   // Employment
   hire_date?: string;
   department_id?: string;
-  role_type: TeamMemberRole;
+  role?: string; // Saved to user_roles (not team_members)
   auth_role_id?: string;
   pin?: string; // Will be hashed before storage
   organization_id: string;
@@ -82,6 +84,7 @@ export interface UpdateTeamMemberInput {
   email?: string;
   phone?: string;
   position?: string;
+  position_emoji?: string;
   
   // Personal information
   date_of_birth?: string;
@@ -96,13 +99,13 @@ export interface UpdateTeamMemberInput {
   // Employment
   hire_date?: string;
   department_id?: string;
-  role_type?: TeamMemberRole;
+  role?: string; // Saved to user_roles (not team_members)
   pin?: string; // New PIN to hash and update
   is_active?: boolean;
 }
 
 export interface TeamMemberFilters {
-  role_type?: TeamMemberRole | 'all';
+  role?: string;
   department_id?: string;
   location_id?: string;
   organization_id?: string;
@@ -119,27 +122,21 @@ export interface TeamMemberWithAuth extends TeamMember {
 
 // Helper constants
 export const TEAM_MEMBER_ROLE_LABELS: Record<TeamMemberRole, string> = {
-  cook: 'Cook',
-  barista: 'Barista',
+  admin: 'Admin',
   manager: 'Manager',
-  leader_chef: 'Leader Chef',
-  admin: 'Admin'
+  staff: 'Staff'
 };
 
 export const TEAM_MEMBER_ROLE_COLORS: Record<TeamMemberRole, string> = {
-  cook: 'bg-blue-100 text-blue-800 border-blue-200',
-  barista: 'bg-green-100 text-green-800 border-green-200',
+  admin: 'bg-red-100 text-red-800 border-red-200',
   manager: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  leader_chef: 'bg-orange-100 text-orange-800 border-orange-200',
-  admin: 'bg-red-100 text-red-800 border-red-200'
+  staff: 'bg-blue-100 text-blue-800 border-blue-200'
 };
 
 export const TEAM_MEMBER_ROLE_ICONS: Record<TeamMemberRole, string> = {
-  cook: '🔵',
-  barista: '🟢',
+  admin: '🔴',
   manager: '🟡',
-  leader_chef: '🟠',
-  admin: '🔴'
+  staff: '🔵'
 };
 
 // Required fields for profile completion

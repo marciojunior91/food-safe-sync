@@ -23,8 +23,10 @@ import {
   AlertTriangle,
   Plus,
   Clock,
-  Settings
+  Settings,
+  Pencil
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { PrintMode, NavigationLevel } from "@/constants/quickPrintIcons";
 import { QuickPrintModeToggle } from "./QuickPrintModeToggle";
@@ -109,6 +111,10 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
   // Quick add to queue dialog state
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
   const [quickAddDialogOpen, setQuickAddDialogOpen] = useState(false);
+  
+  // Category edit mode
+  const [editMode, setEditMode] = useState(false);
+  const { toast } = useToast();
 
   // Fetch categories with counts
   useEffect(() => {
@@ -528,6 +534,89 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
     setQuickAddDialogOpen(true);
   };
 
+  // --- Category/Subcategory edit handlers ---
+  const getOrgId = async (): Promise<string | null> => {
+    if (!user?.id) return null;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .single();
+    return profile?.organization_id || null;
+  };
+
+  const handleAddCategory = async (name: string, icon: string) => {
+    const orgId = await getOrgId();
+    if (!orgId) return;
+    const { error } = await supabase.from('label_categories').insert({
+      name, icon, organization_id: orgId
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Category Added", description: `"${name}" created.` });
+    fetchCategories();
+  };
+
+  const handleRenameCategory = async (id: string, newName: string) => {
+    const { error } = await supabase.from('label_categories').update({ name: newName }).eq('id', id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, name: newName } : c));
+    toast({ title: "Renamed", description: `Category renamed to "${newName}".` });
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Delete this category and all its subcategories? Products will be unassigned.')) return;
+    const { error } = await supabase.from('label_categories').delete().eq('id', id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setCategories(prev => prev.filter(c => c.id !== id));
+    toast({ title: "Deleted", description: "Category removed." });
+  };
+
+  const handleAddSubcategory = async (categoryId: string, name: string, icon: string) => {
+    const orgId = await getOrgId();
+    if (!orgId) return;
+    // Get max display_order
+    const maxOrder = subcategories.reduce((max, s) => Math.max(max, (s as any).display_order || 0), 0);
+    const { error } = await supabase.from('label_subcategories').insert({
+      name, icon, category_id: categoryId, organization_id: orgId, display_order: maxOrder + 1
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Subcategory Added", description: `"${name}" created.` });
+    fetchSubcategories(categoryId);
+  };
+
+  const handleRenameSubcategory = async (id: string, newName: string) => {
+    const { error } = await supabase.from('label_subcategories').update({ name: newName }).eq('id', id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSubcategories(prev => prev.map(s => s.id === id ? { ...s, name: newName } : s));
+    toast({ title: "Renamed", description: `Subcategory renamed to "${newName}".` });
+  };
+
+  const handleDeleteSubcategory = async (id: string) => {
+    if (!confirm('Delete this subcategory? Products will be unassigned.')) return;
+    const { error } = await supabase.from('label_subcategories').delete().eq('id', id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setSubcategories(prev => prev.filter(s => s.id !== id));
+    toast({ title: "Deleted", description: "Subcategory removed." });
+  };
+
   return (
     <>
     <Card className={cn("w-full", className)}>
@@ -587,6 +676,20 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
             </Badge>
           </div>
           
+          <div className="flex items-center gap-2">
+            {/* Edit Mode toggle - only in category mode at category/subcategory level */}
+            {printMode === 'categories' && (navigationStack.length === 0 || (navigationStack.length === 1 && subcategories.length > 0)) && (
+              <Button
+                variant={editMode ? "default" : "outline"}
+                size="sm"
+                onClick={() => setEditMode(!editMode)}
+                className="h-9"
+              >
+                <Pencil className="w-4 h-4 mr-1" />
+                {editMode ? "Done" : "Edit"}
+              </Button>
+            )}
+          
           {/* Grid/List toggle - only shown in products mode */}
           {printMode === 'products' && (
             <div className="flex items-center gap-2">
@@ -608,6 +711,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
               </Button>
             </div>
           )}
+          </div>
         </div>
         
         {/* Breadcrumb - only shown in categories mode when navigating */}
@@ -655,6 +759,13 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
               onCategorySelect={handleCategorySelect}
               onSubcategorySelect={handleSubcategorySelect}
               onProductSelect={handleQuickPrint}
+              editMode={editMode}
+              onAddCategory={handleAddCategory}
+              onRenameCategory={handleRenameCategory}
+              onDeleteCategory={handleDeleteCategory}
+              onAddSubcategory={handleAddSubcategory}
+              onRenameSubcategory={handleRenameSubcategory}
+              onDeleteSubcategory={handleDeleteSubcategory}
             />
           )
         ) : (

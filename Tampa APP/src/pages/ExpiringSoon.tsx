@@ -199,7 +199,7 @@ export default function ExpiringSoon() {
             type: 'label',
             expiryDate,
             location: label.storage_location,
-            urgency: calculateUrgency(daysUntil),
+            urgency: calculateUrgency(expiryDate, now),
             daysUntilExpiry: daysUntil,
             status: labelStatus,
             qrCode: `label-${label.id}`, // Generate QR code identifier

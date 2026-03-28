@@ -4,14 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { UserProfile } from "@/types/people";
 import {
-  User,
   Mail,
   Phone,
   Building2,
   CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  Eye,
   Edit,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,14 +15,12 @@ import { formatPhoneNumber } from "@/utils/phoneFormat";
 
 interface UserCardProps {
   user: UserProfile;
-  onViewProfile?: (user: UserProfile) => void;
   onEdit?: (user: UserProfile) => void;
   showActions?: boolean;
 }
 
 export default function UserCard({
   user,
-  onViewProfile,
   onEdit,
   showActions = true,
 }: UserCardProps) {
@@ -42,26 +36,8 @@ export default function UserCard({
       case "manager":
         return {
           color: "bg-yellow-100 text-yellow-800 border-yellow-200",
-          icon: "👨‍💼",
+          icon: "�",
           label: "Manager",
-        };
-      case "leader_chef":
-        return {
-          color: "bg-orange-100 text-orange-800 border-orange-200",
-          icon: "👨‍🍳",
-          label: "Leader Chef",
-        };
-      case "cook":
-        return {
-          color: "bg-purple-100 text-purple-800 border-purple-200",
-          icon: "🍳",
-          label: "Cook",
-        };
-      case "barista":
-        return {
-          color: "bg-amber-100 text-amber-800 border-amber-200",
-          icon: "☕",
-          label: "Barista",
         };
       case "staff":
         return {
@@ -83,56 +59,8 @@ export default function UserCard({
     return {
       icon: CheckCircle2,
       color: "text-green-600",
-      bgColor: "bg-green-50",
+      bgColor: "bg-green-100",
       label: "Active",
-    };
-  };
-
-  // Calculate compliance status
-  const getComplianceStatus = () => {
-    if (!user.user_documents || user.user_documents.length === 0) {
-      return {
-        icon: AlertTriangle,
-        color: "text-amber-600",
-        label: "No Documents",
-      };
-    }
-
-    const now = new Date();
-    const expiringSoon = user.user_documents.filter((doc) => {
-      if (!doc.expiration_date) return false;
-      const expiryDate = new Date(doc.expiration_date);
-      const daysUntilExpiry = Math.ceil(
-        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      return daysUntilExpiry > 0 && daysUntilExpiry <= 30;
-    });
-
-    const expired = user.user_documents.filter((doc) => {
-      if (!doc.expiration_date) return false;
-      return new Date(doc.expiration_date) < now;
-    });
-
-    if (expired.length > 0) {
-      return {
-        icon: XCircle,
-        color: "text-red-600",
-        label: `${expired.length} Expired`,
-      };
-    }
-
-    if (expiringSoon.length > 0) {
-      return {
-        icon: AlertTriangle,
-        color: "text-amber-600",
-        label: `${expiringSoon.length} Expiring Soon`,
-      };
-    }
-
-    return {
-      icon: CheckCircle2,
-      color: "text-green-600",
-      label: "Compliant",
     };
   };
 
@@ -148,9 +76,7 @@ export default function UserCard({
 
   const roleConfig = getRoleConfig();
   const statusConfig = getStatusConfig();
-  const complianceStatus = getComplianceStatus();
   const StatusIcon = statusConfig.icon;
-  const ComplianceIcon = complianceStatus.icon;
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -223,56 +149,24 @@ export default function UserCard({
             {/* Employment Status */}
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Status</span>
-              <Badge variant="outline" className={statusConfig.bgColor}>
+              <Badge variant="outline" className={cn("text-green-700 border-green-300", statusConfig.bgColor)}>
                 {statusConfig.label}
               </Badge>
             </div>
-
-            {/* Compliance */}
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Compliance</span>
-              <div className="flex items-center gap-1">
-                <ComplianceIcon className={cn("w-4 h-4", complianceStatus.color)} />
-                <span className={cn("text-xs font-medium", complianceStatus.color)}>
-                  {complianceStatus.label}
-                </span>
-              </div>
-            </div>
-
-            {/* Documents Count */}
-            {user.user_documents && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Documents</span>
-                <span className="text-xs font-medium">
-                  {user.user_documents.length}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Actions */}
-          {showActions && (
+          {showActions && onEdit && (
             <div className="flex items-center gap-2 w-full pt-2">
               <Button
                 variant="outline"
                 size="sm"
                 className="flex-1"
-                onClick={() => onViewProfile?.(user)}
+                onClick={() => onEdit(user)}
               >
-                <Eye className="w-4 h-4 mr-1" />
-                View
+                <Edit className="w-4 h-4 mr-1" />
+                Edit
               </Button>
-              {onEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => onEdit(user)}
-                >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-              )}
             </div>
           )}
         </div>

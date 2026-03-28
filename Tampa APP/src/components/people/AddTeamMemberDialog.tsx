@@ -27,6 +27,7 @@ import { User, Briefcase, Phone, Shield, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatPhoneNumber, getRawPhoneNumber, isValidPhoneNumber, formatTFN, getRawTFN } from '@/utils/phoneFormat';
 import { DocumentUpload } from './DocumentUpload';
+import { PositionEmojiPicker } from './PositionEmojiPicker';
 
 // Local Document interface for upload component
 interface Document {
@@ -57,7 +58,7 @@ export function AddTeamMemberDialog({
   const [activeTab, setActiveTab] = useState<'personal' | 'employment' | 'emergency' | 'security' | 'documents'>('personal');
   const [formData, setFormData] = useState<CreateTeamMemberInput>({
     display_name: '',
-    role_type: 'cook',
+    role: 'staff',
     organization_id: context?.organization_id || '',
   });
   
@@ -71,7 +72,7 @@ export function AddTeamMemberDialog({
     if (open) {
       setFormData({
         display_name: '',
-        role_type: 'cook',
+        role: 'staff',
         organization_id: context?.organization_id || '',
       });
       setPin('');
@@ -371,18 +372,24 @@ export function AddTeamMemberDialog({
                   <CardDescription>Position, role, and hire information</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Position */}
+                  {/* Position with emoji picker */}
                   <div className="space-y-2">
                     <Label htmlFor="position">
                       Position / Title <span className="text-destructive">*</span>
                     </Label>
-                    <Input
-                      id="position"
-                      placeholder="e.g., Head Chef, Pastry Cook, Barista"
-                      value={formData.position || ''}
-                      onChange={(e) => handleFieldChange('position', e.target.value)}
-                      className={errors.position ? 'border-destructive' : ''}
-                    />
+                    <div className="flex gap-2">
+                      <PositionEmojiPicker
+                        value={formData.position_emoji || ''}
+                        onChange={(emoji) => handleFieldChange('position_emoji', emoji)}
+                      />
+                      <Input
+                        id="position"
+                        placeholder="e.g., Head Chef, Pastry Cook, Barista, Line Cook"
+                        value={formData.position || ''}
+                        onChange={(e) => handleFieldChange('position', e.target.value)}
+                        className={errors.position ? 'border-destructive' : ''}
+                      />
+                    </div>
                     {errors.position && (
                       <p className="text-xs text-destructive flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" />
@@ -391,16 +398,16 @@ export function AddTeamMemberDialog({
                     )}
                   </div>
 
-                  {/* Role Type */}
+                  {/* Role */}
                   <div className="space-y-2">
-                    <Label htmlFor="role_type">
-                      Role Type <span className="text-destructive">*</span>
+                    <Label htmlFor="role">
+                      Role <span className="text-destructive">*</span>
                     </Label>
                     <Select
-                      value={formData.role_type}
-                      onValueChange={(value: TeamMemberRole) => handleFieldChange('role_type', value)}
+                      value={formData.role || 'staff'}
+                      onValueChange={(value: TeamMemberRole) => handleFieldChange('role', value)}
                     >
-                      <SelectTrigger id="role_type">
+                      <SelectTrigger id="role">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>

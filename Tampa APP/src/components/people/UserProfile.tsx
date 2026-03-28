@@ -187,7 +187,7 @@ export default function UserProfile() {
                   </CardDescription>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="outline">
-                      {teamMember.role_type}
+                      {teamMember.role || 'staff'}
                     </Badge>
                     {!teamMember.profile_complete && (
                       <Badge variant="destructive">
@@ -241,7 +241,7 @@ export default function UserProfile() {
                 )}
                 <div className="flex items-center gap-2">
                   <Briefcase className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Role: {teamMember.role_type}</span>
+                  <span className="text-sm">Role: {teamMember.role || 'staff'}</span>
                 </div>
               </div>
             </div>

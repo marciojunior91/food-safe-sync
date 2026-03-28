@@ -3,7 +3,7 @@
 // DYNAMIC IMPORT - jsPDF loaded only when needed
 import { PrinterDriver, PrinterCapabilities, PrinterSettings, PrinterStatus } from '@/types/printer';
 import { renderPdfLabel } from '@/utils/labelRenderers/pdfRenderer';
-import { saveLabelToDatabase, type LabelPrintData } from '@/utils/zebraPrinter';
+import { type LabelPrintData } from '@/utils/zebraPrinter';
 import { supabase } from '@/integrations/supabase/client';
 import type { LabelData } from '@/components/labels/LabelForm';
 
@@ -26,6 +26,7 @@ interface IncomingLabelData {
   unit?: string;
   condition?: string;
   organizationId?: string;
+  labelId?: string;
 }
 
 export class PDFPrinter implements PrinterDriver {
@@ -129,13 +130,13 @@ export class PDFPrinter implements PrinterDriver {
 
   private async renderLabel(pdf: any, incomingData: IncomingLabelData): Promise<void> {
     try {
-      // Step 1: Convert incoming data to LabelPrintData and save to database
+      // Step 1: Convert incoming data to LabelPrintData (database save is handled by caller)
       const printData = await this.convertToLabelPrintData(incomingData);
-      const labelId = await saveLabelToDatabase(printData);
+      const labelId = incomingData.labelId || undefined;
       
       // Step 2: Convert to LabelData format with labelId
       const labelData: LabelData = {
-        labelId: labelId || undefined,
+        labelId: labelId,
         categoryId: printData.categoryId || '',
         categoryName: printData.categoryName,
         subcategoryId: undefined,
