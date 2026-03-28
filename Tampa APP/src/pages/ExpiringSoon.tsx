@@ -8,9 +8,9 @@ import {
   ChefHat,
   MapPin,
   Loader2,
-  QrCode,
   MoreHorizontal,
-  Eye
+  Eye,
+  ArrowUpDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,12 +58,12 @@ import {
   type UrgencyLevel 
 } from "@/utils/dateCalculations";
 import { useNavigate } from "react-router-dom";
-import { QRScanner } from "@/components/QRScanner";
 import { Grid3x3, List as ListIcon } from "lucide-react";
 
 type ItemType = 'product' | 'label' | 'recipe';
 type ActionType = 'consume' | 'extend' | 'discard';
 type LabelStatus = 'active' | 'near_expiry' | 'expired' | 'wasted' | 'used';
+type SortOption = 'urgency' | 'name' | 'expiry_asc' | 'expiry_desc';
 
 interface ExpiringItem {
   id: string;
@@ -116,8 +116,15 @@ export default function ExpiringSoon() {
   const [newExpiryDate, setNewExpiryDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // QR Scanner state
-  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+  // Sort state
+  const [sortBy, setSortBy] = useState<SortOption>('urgency');
+
+  // Bulk action dialog state
+  const [bulkActionDialog, setBulkActionDialog] = useState<{
+    open: boolean;
+    action: ActionType | null;
+  }>({ open: false, action: null });
+  const [bulkActionReason, setBulkActionReason] = useState("");
 
   // Fetch data on mount
   useEffect(() => {
@@ -139,12 +146,13 @@ export default function ExpiringSoon() {
       if (!profile?.organization_id) return;
 
       // Fetch labels with status (exclude used/wasted labels)
+      // Only show 'active' or null-status labels (null = legacy records before status column)
       const { data: labelsData } = await supabase
         .from('printed_labels')
         .select('*, status')
         .eq('organization_id', profile.organization_id)
         .not('expiry_date', 'is', null)
-        .not('status', 'in', '("wasted","used")'); // BUGFIX EXPIRING-6: Exclude discarded labels
+        .or('status.is.null,status.eq.active,status.eq.near_expiry,status.eq.expired');
 
       setLabels(labelsData || []);
     } catch (error) {
@@ -208,19 +216,34 @@ export default function ExpiringSoon() {
       }
     });
 
-    // Sort by urgency (critical first) and then by expiry date
-    return items.sort((a, b) => {
-      const urgencyOrder = { critical: 0, warning: 1, upcoming: 2 };
-      const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
-      if (urgencyDiff !== 0) return urgencyDiff;
-      return a.expiryDate.getTime() - b.expiryDate.getTime();
-    });
+    return items;
   }, [labels]);
+
+  // Sort items based on selected sort option
+  const sortedItems = useMemo(() => {
+    const sorted = [...expiringItems];
+    switch (sortBy) {
+      case 'name':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      case 'expiry_asc':
+        return sorted.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime());
+      case 'expiry_desc':
+        return sorted.sort((a, b) => b.expiryDate.getTime() - a.expiryDate.getTime());
+      case 'urgency':
+      default:
+        return sorted.sort((a, b) => {
+          const urgencyOrder = { critical: 0, warning: 1, upcoming: 2 };
+          const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+          if (urgencyDiff !== 0) return urgencyDiff;
+          return a.expiryDate.getTime() - b.expiryDate.getTime();
+        });
+    }
+  }, [expiringItems, sortBy]);
 
   // Apply filters — default empty: list only appears after selecting a counter card or typing a search
   const filteredItems = useMemo(() => {
     if (!urgencyFilter && !searchQuery) return [];
-    return expiringItems.filter(item => {
+    return sortedItems.filter(item => {
       if (searchQuery && !item.name.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
@@ -232,7 +255,7 @@ export default function ExpiringSoon() {
       }
       return true;
     });
-  }, [expiringItems, searchQuery, typeFilter, urgencyFilter]);
+  }, [sortedItems, searchQuery, typeFilter, urgencyFilter]);
 
   // Count by urgency
   const urgencyCounts = useMemo(() => {
@@ -273,10 +296,18 @@ export default function ExpiringSoon() {
     setSelectedItems(new Set());
   };
 
-  // Bulk actions
-  const handleBulkAction = async (action: ActionType) => {
+  // Bulk actions — open confirmation dialog
+  const handleBulkAction = (action: ActionType) => {
     if (selectedItems.size === 0) return;
+    setBulkActionReason("");
+    setBulkActionDialog({ open: true, action });
+  };
+
+  // Submit bulk action
+  const handleSubmitBulkAction = async () => {
+    if (selectedItems.size === 0 || !bulkActionDialog.action) return;
     
+    setIsSubmitting(true);
     try {
       // Group by type for different update strategies
       const labelIds = Array.from(selectedItems)
@@ -286,12 +317,12 @@ export default function ExpiringSoon() {
       if (labelIds.length > 0) {
         let updateData: any = {};
         
-        switch (action) {
+        switch (bulkActionDialog.action) {
           case 'consume':
-            updateData = { status: 'used' };
+            updateData = { status: 'used', action_notes: bulkActionReason || null };
             break;
           case 'discard':
-            updateData = { status: 'wasted' };
+            updateData = { status: 'wasted', action_notes: bulkActionReason || null };
             break;
           // extend would require individual handling
         }
@@ -308,17 +339,22 @@ export default function ExpiringSoon() {
 
       toast({
         title: "Bulk Action Completed",
-        description: `${action} applied to ${selectedItems.size} items`,
+        description: `${bulkActionDialog.action} applied to ${selectedItems.size} items`,
       });
 
+      // Optimistic removal: remove actioned items from local state immediately
+      const removedIds = new Set(labelIds);
+      setLabels(prev => prev.filter(l => !removedIds.has(l.id)));
       clearSelection();
-      fetchData(); // Refresh data
+      setBulkActionDialog({ open: false, action: null });
     } catch (error) {
       toast({
         title: "Error",
         description: "Failed to complete bulk action",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -336,14 +372,14 @@ export default function ExpiringSoon() {
         
         switch (actionDialog.action) {
           case 'consume':
-            updateData = { status: 'used' };
+            updateData = { status: 'used', action_notes: actionReason || null };
             break;
           case 'discard':
-            updateData = { status: 'wasted' };
+            updateData = { status: 'wasted', action_notes: actionReason || null };
             break;
           case 'extend':
             if (newExpiryDate) {
-              updateData = { expiry_date: newExpiryDate };
+              updateData = { expiry_date: newExpiryDate, action_notes: actionReason || null };
             }
             break;
         }
@@ -369,8 +405,14 @@ export default function ExpiringSoon() {
         description: actionMessages[actionDialog.action],
       });
 
+      // Optimistic removal: remove actioned item from local state immediately
+      if (actionDialog.action === 'consume' || actionDialog.action === 'discard') {
+        setLabels(prev => prev.filter(l => l.id !== item.id));
+      } else {
+        // For extend, re-fetch to get updated expiry date
+        fetchData();
+      }
       setActionDialog({ open: false, action: null, item: null });
-      fetchData(); // Refresh data to show updated status
     } catch (error) {
       toast({
         title: "Error",
@@ -380,42 +422,6 @@ export default function ExpiringSoon() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // QR Code handling
-  const handleQRScan = (qrData: string) => {
-    // Handle full URL format: https://app.com/labels/{id}/preview
-    const urlMatch = qrData.match(/\/labels\/([^/]+)\/preview/);
-    if (urlMatch) {
-      navigate(`/labels/${urlMatch[1]}/preview`);
-      return;
-    }
-    // Handle label-{id} prefix format
-    if (qrData.startsWith('label-')) {
-      const labelId = qrData.replace('label-', '');
-      navigate(`/labels/${labelId}/preview`);
-      return;
-    }
-    // Try JSON format (QR codes that contain productId etc.)
-    try {
-      const parsed = JSON.parse(qrData);
-      if (parsed.labelId) {
-        navigate(`/labels/${parsed.labelId}/preview`);
-        return;
-      }
-    } catch {}
-    // Fallback: treat as raw label ID
-    navigate(`/labels/${qrData}/preview`);
-  };
-
-  // Navigate to QR Label Action page
-  const handleOpenQRPage = (labelId: string) => {
-    navigate(`/qr-label-action/${labelId}`);
-  };
-
-  // Open QR Scanner (for future implementation with camera)
-  const handleOpenQRScanner = () => {
-    setQrScannerOpen(true);
   };
 
   // Get item icon
@@ -548,7 +554,7 @@ export default function ExpiringSoon() {
         </CardContent>
       </Card>
 
-          {/* Bulk Actions, View Toggle, and QR Scanner */}
+          {/* Bulk Actions, View Toggle, and Sort */}
           <div className="flex flex-wrap gap-2 items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               {/* Grid/List View Toggle */}
@@ -570,6 +576,20 @@ export default function ExpiringSoon() {
                   <ListIcon className="w-4 h-4" />
                 </Button>
               </div>
+
+              {/* Sort Dropdown */}
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+                <SelectTrigger className="w-[180px] h-8">
+                  <ArrowUpDown className="w-3.5 h-3.5 mr-2" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="urgency">Sort by Urgency</SelectItem>
+                  <SelectItem value="name">Sort by Name</SelectItem>
+                  <SelectItem value="expiry_asc">Expiry (Soonest)</SelectItem>
+                  <SelectItem value="expiry_desc">Expiry (Latest)</SelectItem>
+                </SelectContent>
+              </Select>
               
               {selectedItems.size > 0 && (
                 <>
@@ -603,10 +623,6 @@ export default function ExpiringSoon() {
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={selectAllVisible}>
                 Select All
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleOpenQRScanner}>
-                <QrCode className="w-4 h-4 mr-2" />
-                QR Scanner
               </Button>
             </div>
           </div>
@@ -939,12 +955,67 @@ export default function ExpiringSoon() {
         </DialogContent>
       </Dialog>
 
-      {/* QR Scanner Dialog */}
-      <QRScanner
-        open={qrScannerOpen}
-        onClose={() => setQrScannerOpen(false)}
-        onScan={handleQRScan}
-      />
+      {/* Bulk Action Confirmation Dialog */}
+      <Dialog open={bulkActionDialog.open} onOpenChange={(open) => !isSubmitting && setBulkActionDialog({ ...bulkActionDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {bulkActionDialog.action === 'consume' && 'Mark as Consumed (Bulk)'}
+              {bulkActionDialog.action === 'discard' && 'Discard Items (Bulk)'}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkActionDialog.action === 'consume' && `Mark ${selectedItems.size} selected items as consumed.`}
+              {bulkActionDialog.action === 'discard' && `Discard ${selectedItems.size} selected items. Please provide a reason.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="font-semibold">{selectedItems.size} items selected</p>
+              <p className="text-sm text-muted-foreground">
+                This action will be applied to all selected items.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bulk-reason">
+                {bulkActionDialog.action === 'discard' ? 'Reason *' : 'Notes (Optional)'}
+              </Label>
+              <Textarea
+                id="bulk-reason"
+                placeholder={
+                  bulkActionDialog.action === 'consume'
+                    ? 'Add any notes about consumption...'
+                    : 'Why are these items being discarded? (e.g., OFF, expired, damaged)'
+                }
+                value={bulkActionReason}
+                onChange={(e) => setBulkActionReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setBulkActionDialog({ open: false, action: null })}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitBulkAction}
+              disabled={
+                isSubmitting ||
+                (bulkActionDialog.action === 'discard' && !bulkActionReason.trim())
+              }
+              variant={bulkActionDialog.action === 'discard' ? 'destructive' : 'default'}
+            >
+              {isSubmitting ? 'Processing...' : `Confirm (${selectedItems.size} items)`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
         </>
       )}
     </div>

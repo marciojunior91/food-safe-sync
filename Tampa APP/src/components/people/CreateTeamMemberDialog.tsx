@@ -1,5 +1,5 @@
 // Create Team Member Dialog
-// Creates a team member record (PIN-only, no auth user required)
+// Creates a team member record linked to an auth user
 
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -36,17 +36,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Users } from "lucide-react";
 import { useUserContext } from "@/hooks/useUserContext";
 import { formatPhoneNumber, getRawPhoneNumber, isValidPhoneNumber } from "@/utils/phoneFormat";
+import { PositionEmojiPicker } from './PositionEmojiPicker';
 
 const formSchema = z.object({
   authUserId: z.string().min(1, "Please select an auth user"),
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
-  role: z.enum(["admin", "manager", "leader_chef", "cook", "barista"], {
-    required_error: "Please select a role",
-  }),
   position: z.string().optional(),
+  positionEmoji: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
-  departmentId: z.string().optional(),
+  departmentId: z.string().min(1, "Please select a department"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -55,6 +54,7 @@ interface AuthUser {
   id: string;
   email: string;
   display_name?: string;
+  role?: string;
 }
 
 interface Department {
@@ -81,13 +81,15 @@ export default function CreateTeamMemberDialog({
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
 
+  const [selectedUserRole, setSelectedUserRole] = useState<string | null>(null);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       authUserId: "",
       displayName: "",
-      role: undefined,
       position: "",
+      positionEmoji: "👨‍🍳",
       phone: "",
       email: "",
       departmentId: "",
@@ -101,21 +103,30 @@ export default function CreateTeamMemberDialog({
 
       setLoadingUsers(true);
       try {
-        // Get all profiles in this organization
-        // Email should be synced to profiles table after migration
+        // Get all profiles in this organization with their roles
         const { data: profiles, error: profilesError } = await supabase
           .from("profiles")
           .select("user_id, display_name, email")
           .eq("organization_id", context.organization_id)
-          .order("display_name") as any; // Type cast to bypass outdated types
+          .order("display_name") as any;
 
         if (profilesError) throw profilesError;
+
+        // Fetch roles for these users
+        const userIds = (profiles || []).map((p: any) => p.user_id);
+        const { data: userRoles } = await supabase
+          .from("user_roles")
+          .select("user_id, role")
+          .in("user_id", userIds) as any;
+
+        const roleMap = new Map((userRoles || []).map((r: any) => [r.user_id, r.role]));
 
         // Map to AuthUser format
         const usersWithEmails: AuthUser[] = (profiles || []).map((profile: any) => ({
           id: profile.user_id,
-          email: profile.email || "No email", // Fallback if email is missing
+          email: profile.email || "No email",
           display_name: profile.display_name || "No name",
+          role: roleMap.get(profile.user_id) || undefined,
         }));
 
         setAuthUsers(usersWithEmails);
@@ -179,9 +190,10 @@ export default function CreateTeamMemberDialog({
           display_name: values.displayName,
           organization_id: context.organization_id,
           position: values.position || null,
+          position_emoji: values.positionEmoji || "👨‍🍳",
           phone: values.phone ? getRawPhoneNumber(values.phone) : null,
           email: values.email || null,
-          department_id: values.departmentId || null,
+          department_id: values.departmentId,
           auth_role_id: values.authUserId,
           is_active: true,
           profile_complete: false,
@@ -191,13 +203,6 @@ export default function CreateTeamMemberDialog({
 
       if (teamError) throw teamError;
 
-      // Set role in user_roles if auth user is linked and role is provided
-      if (values.authUserId && values.role) {
-        await supabase
-          .from('user_roles')
-          .upsert({ user_id: values.authUserId, role: values.role } as any);
-      }
-
       // Success!
       toast({
         title: "Team Member Created",
@@ -206,6 +211,7 @@ export default function CreateTeamMemberDialog({
 
       // Reset form
       form.reset();
+      setSelectedUserRole(null);
 
       // Call success callback
       if (onSuccess) {
@@ -249,7 +255,21 @@ export default function CreateTeamMemberDialog({
                 <FormItem>
                   <FormLabel>Select Auth User *</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      // Auto-populate display name and email from selected user
+                      const selectedUser = authUsers.find(u => u.id === value);
+                      if (selectedUser) {
+                        if (selectedUser.display_name && selectedUser.display_name !== "No name") {
+                          form.setValue("displayName", selectedUser.display_name);
+                        }
+                        if (selectedUser.email && selectedUser.email !== "No email") {
+                          form.setValue("email", selectedUser.email);
+                        }
+                        // Set role from auth user
+                        setSelectedUserRole(selectedUser.role || null);
+                      }
+                    }}
                     defaultValue={field.value}
                     disabled={loading || loadingUsers}
                   >
@@ -276,82 +296,67 @@ export default function CreateTeamMemberDialog({
               )}
             />
 
-            {/* Two-column grid for Display Name and Role */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Display Name */}
-              <FormField
-                control={form.control}
-                name="displayName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Display Name *</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="John Doe"
-                        {...field}
-                        disabled={loading}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Name shown in the app
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Role */}
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
+            {/* Display Name */}
+            <FormField
+              control={form.control}
+              name="displayName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Display Name *</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder="John Doe"
+                      {...field}
                       disabled={loading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="leader_chef">Leader Chef</SelectItem>
-                        <SelectItem value="cook">Cook</SelectItem>
-                        <SelectItem value="barista">Barista</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Team member's role
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Name shown in the app
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Role info (auto-set from auth user) */}
+            {selectedUserRole && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+                <span>Role:</span>
+                <span className="font-medium capitalize text-foreground">{selectedUserRole.replace('_', ' ')}</span>
+                <span className="text-xs">(inherited from auth user)</span>
+              </div>
+            )}
 
             {/* Two-column grid for Position and Department */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Position (Optional) */}
+              {/* Position with Emoji Picker */}
               <FormField
                 control={form.control}
                 name="position"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Position (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        placeholder="Line Cook, Sous Chef, etc."
-                        {...field}
-                        disabled={loading}
+                    <div className="flex gap-2">
+                      <FormField
+                        control={form.control}
+                        name="positionEmoji"
+                        render={({ field: emojiField }) => (
+                          <PositionEmojiPicker
+                            value={emojiField.value || "👨‍🍳"}
+                            onChange={emojiField.onChange}
+                          />
+                        )}
                       />
-                    </FormControl>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          placeholder="Line Cook, Sous Chef, etc."
+                          {...field}
+                          disabled={loading}
+                        />
+                      </FormControl>
+                    </div>
                     <FormDescription>
                       Job title or position
                     </FormDescription>
@@ -360,13 +365,13 @@ export default function CreateTeamMemberDialog({
                 )}
               />
 
-              {/* Department ID (Optional) */}
+              {/* Department (Required) */}
               <FormField
                 control={form.control}
                 name="departmentId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Department (Optional)</FormLabel>
+                    <FormLabel>Department *</FormLabel>
                     <Select
                       onValueChange={field.onChange}
                       defaultValue={field.value}
@@ -386,7 +391,7 @@ export default function CreateTeamMemberDialog({
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      {loadingDepartments ? "Loading..." : "Team department"}
+                      {loadingDepartments ? "Loading..." : "Required for task grouping"}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

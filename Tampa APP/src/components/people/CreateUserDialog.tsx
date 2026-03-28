@@ -36,11 +36,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, UserPlus } from "lucide-react";
 import { useUserContext } from "@/hooks/useUserContext";
 
-// Form validation schema - simplified for auth user creation only
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
-  role: z.enum(["admin", "manager", "leader_chef", "cook", "barista"], {
+  role: z.enum(["admin", "manager", "staff"], {
     required_error: "Please select a role",
   }),
 });
@@ -278,9 +277,7 @@ export default function CreateUserDialog({
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="leader_chef">Leader Chef</SelectItem>
-                      <SelectItem value="cook">Cook</SelectItem>
-                      <SelectItem value="barista">Barista</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormDescription>

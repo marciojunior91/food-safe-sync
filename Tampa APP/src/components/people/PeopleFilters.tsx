@@ -91,22 +91,10 @@ export default function PeopleFilters({
                 <span>Manager</span>
               </div>
             </SelectItem>
-            <SelectItem value="leader_chef">
+            <SelectItem value="staff">
               <div className="flex items-center gap-2">
-                <span>👨‍🍳</span>
-                <span>Leader Chef</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="cook">
-              <div className="flex items-center gap-2">
-                <span>🍳</span>
-                <span>Cook</span>
-              </div>
-            </SelectItem>
-            <SelectItem value="barista">
-              <div className="flex items-center gap-2">
-                <span>☕</span>
-                <span>Barista</span>
+                <span>🔵</span>
+                <span>Staff</span>
               </div>
             </SelectItem>
           </SelectContent>

@@ -24,31 +24,42 @@ interface ExpiryStatus {
 const getExpiryStatus = (expiryDate: string): ExpiryStatus => {
   const now = new Date();
   const expiry = new Date(expiryDate);
-  const hoursUntilExpiry = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60));
+  
+  // Use start-of-day for both to avoid timezone/hour misclassification
+  const nowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const expiryStart = new Date(expiry.getFullYear(), expiry.getMonth(), expiry.getDate());
+  const daysUntilExpiry = Math.floor((expiryStart.getTime() - nowStart.getTime()) / (1000 * 60 * 60 * 24));
+  const hoursUntilExpiry = daysUntilExpiry * 24; // Approximate for display
 
-  if (hoursUntilExpiry < 0) {
+  if (daysUntilExpiry < 0) {
     return {
       status: 'expired',
       hoursUntilExpiry,
-      message: `Expired ${Math.abs(hoursUntilExpiry)} hours ago`
+      message: `Expired ${Math.abs(daysUntilExpiry)} day${Math.abs(daysUntilExpiry) !== 1 ? 's' : ''} ago`
     };
-  } else if (hoursUntilExpiry <= 24) {
+  } else if (daysUntilExpiry === 0) {
+    return {
+      status: 'expired',
+      hoursUntilExpiry: 0,
+      message: 'Expires today'
+    };
+  } else if (daysUntilExpiry === 1) {
     return {
       status: 'warning',
-      hoursUntilExpiry,
-      message: `Expires in ${hoursUntilExpiry} hours`
+      hoursUntilExpiry: 24,
+      message: 'Expires tomorrow'
     };
-  } else if (hoursUntilExpiry <= 72) {
+  } else if (daysUntilExpiry <= 3) {
     return {
       status: 'good',
       hoursUntilExpiry,
-      message: `Expires in ${Math.floor(hoursUntilExpiry / 24)} days`
+      message: `Expires in ${daysUntilExpiry} days`
     };
   } else {
     return {
       status: 'good',
       hoursUntilExpiry,
-      message: `Fresh for ${Math.floor(hoursUntilExpiry / 24)} days`
+      message: `Fresh for ${daysUntilExpiry} days`
     };
   }
 };

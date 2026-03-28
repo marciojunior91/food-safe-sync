@@ -160,9 +160,13 @@ export function calculateUrgency(
   currentDate: Date = new Date()
 ): UrgencyLevel {
   const expiry = typeof expiryDate === 'string' ? parseISO(expiryDate) : expiryDate;
-  const daysUntil = differenceInDays(expiry, currentDate);
+  // Use start of day for both dates to avoid timezone/hour misclassification
+  // (e.g. item expiring tomorrow at 00:00 vs now at 15:00 would give 0 days without this)
+  const expiryStart = startOfDay(expiry);
+  const currentStart = startOfDay(currentDate);
+  const daysUntil = differenceInDays(expiryStart, currentStart);
 
-  if (daysUntil <= 0) return 'critical'; // Expired
+  if (daysUntil <= 0) return 'critical'; // Expired (today or past)
   if (daysUntil === 1) return 'warning';  // Expires tomorrow
   return 'upcoming';                       // 2-7 days
 }
