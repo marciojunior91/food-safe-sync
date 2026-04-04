@@ -22,6 +22,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
   DndContext,
   closestCenter,
   KeyboardSensor,
@@ -46,7 +52,8 @@ import {
   Clock, 
   XCircle,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  CalendarDays,
 } from "lucide-react";
 import { format } from "date-fns";
 import { usePrinter } from "@/hooks/usePrinter";
@@ -84,9 +91,10 @@ interface SortableRowProps {
   onPrint: (id: string) => void;
   onDelete: (id: string) => void;
   onRetry: (id: string) => void;
+  onUpdateExpiry: (id: string, newDate: Date) => void;
 }
 
-function SortableRow({ item, onPrint, onDelete, onRetry }: SortableRowProps) {
+function SortableRow({ item, onPrint, onDelete, onRetry, onUpdateExpiry }: SortableRowProps) {
   const {
     attributes,
     listeners,
@@ -130,7 +138,31 @@ function SortableRow({ item, onPrint, onDelete, onRetry }: SortableRowProps) {
       <TableCell>{item.product?.category?.name || "N/A"}</TableCell>
       <TableCell>{item.quantity || "-"} {item.unit || ""}</TableCell>
       <TableCell className="capitalize">{item.condition}</TableCell>
-      <TableCell>{format(new Date(item.expiry_date), "MMM dd, yyyy")}</TableCell>
+      <TableCell>
+        {item.status === "pending" ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-auto px-2 py-1 font-normal gap-1">
+                {format(new Date(item.expiry_date), "MMM dd, yyyy")}
+                <CalendarDays className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={new Date(item.expiry_date)}
+                onSelect={(date) => {
+                  if (date) onUpdateExpiry(item.id, date);
+                }}
+                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+        ) : (
+          format(new Date(item.expiry_date), "MMM dd, yyyy")
+        )}
+      </TableCell>
       <TableCell>{getStatusBadge(item.status)}</TableCell>
       <TableCell className="text-right space-x-2">
         {item.status === "pending" && (
@@ -444,6 +476,30 @@ export function PrintQueue() {
     }
   };
 
+  const handleUpdateExpiry = async (id: string, newDate: Date) => {
+    try {
+      const isoDate = format(newDate, "yyyy-MM-dd");
+      const { error } = await supabase
+        .from("print_queue")
+        .update({ expiry_date: isoDate })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Expiry Updated",
+        description: `New expiry: ${format(newDate, "MMM dd, yyyy")}`,
+      });
+    } catch (error) {
+      console.error("Update expiry error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update expiry date",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleClearQueue = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -559,6 +615,7 @@ export function PrintQueue() {
                     onPrint={handlePrintSingle}
                     onDelete={handleDelete}
                     onRetry={handleRetry}
+                    onUpdateExpiry={handleUpdateExpiry}
                   />
                 ))}
               </SortableContext>

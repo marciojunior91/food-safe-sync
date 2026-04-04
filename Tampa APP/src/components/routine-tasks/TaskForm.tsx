@@ -3,7 +3,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, AlertCircle, Camera, Repeat, Plus, X, Users } from "lucide-react";
+import { CalendarIcon, Clock, AlertCircle, Camera, Repeat, Plus, X, Users, Building2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +40,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageUpload } from "./ImageUpload";
+import { useDepartments } from "@/hooks/useUserContext";
 
 import {
   TaskType,
@@ -105,7 +106,7 @@ interface TaskFormProps {
   onSubmit: (data: CreateTaskInput) => Promise<void>;
   onCancel?: () => void;
   defaultValues?: Partial<TaskFormValues>;
-  users?: Array<{ user_id: string; display_name: string; role?: string }>;
+  users?: Array<{ user_id: string; display_name: string; role?: string; department_id?: string }>;
   isLoading?: boolean;
   isEditing?: boolean; // New prop to determine if we're editing
   taskId?: string; // Task ID when editing (for attachments)
@@ -123,6 +124,7 @@ export function TaskForm({
   userRole,
 }: TaskFormProps) {
   const { toast } = useToast();
+  const { departments, loading: departmentsLoading } = useDepartments();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
@@ -528,6 +530,8 @@ export function TaskForm({
           />
         )}
 
+
+
         {/* Assign To Users - MULTI-SELECT */}
         <FormField
           control={form.control}
@@ -542,14 +546,6 @@ export function TaskForm({
               field.onChange(next);
             };
 
-            const selectGroup = (roleTypes: string[]) => {
-              const groupIds = users
-                .filter((u) => u.role && roleTypes.includes(u.role))
-                .map((u) => u.user_id);
-              const merged = Array.from(new Set([...selected, ...groupIds]));
-              field.onChange(merged);
-            };
-
             const selectAll = () => field.onChange(users.map((u) => u.user_id));
             const clearAll = () => field.onChange([]);
 
@@ -561,23 +557,43 @@ export function TaskForm({
                   <span className="text-destructive">*</span>
                 </FormLabel>
 
-                {/* Group preset buttons */}
+                {/* Department group buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
-                    onClick={() => selectGroup(['staff'])}>
-                    🍳 Kitchen
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
-                    onClick={() => selectGroup(['staff'])}>
-                    🍹 Bar
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
-                    onClick={() => selectGroup(['manager', 'admin'])}>
-                    👔 Management
-                  </Button>
+                  {departments.map((dept) => {
+                    const deptMemberIds = users
+                      .filter((u) => u.department_id === dept.id)
+                      .map((u) => u.user_id);
+                    const allSelected = deptMemberIds.length > 0 && deptMemberIds.every((id) => selected.includes(id));
+                    return (
+                      <Button
+                        key={dept.id}
+                        type="button"
+                        size="sm"
+                        variant={allSelected ? "default" : "outline"}
+                        className="h-7 text-xs px-2"
+                        onClick={() => {
+                          if (allSelected) {
+                            // Deselect all members of this department
+                            field.onChange(selected.filter((id) => !deptMemberIds.includes(id)));
+                          } else {
+                            // Select all members of this department
+                            const merged = Array.from(new Set([...selected, ...deptMemberIds]));
+                            field.onChange(merged);
+                          }
+                        }}
+                        disabled={deptMemberIds.length === 0}
+                      >
+                        <Building2 className="w-3 h-3 mr-1" />
+                        {dept.name}
+                        {deptMemberIds.length > 0 && (
+                          <span className="ml-1 opacity-70">({deptMemberIds.length})</span>
+                        )}
+                      </Button>
+                    );
+                  })}
                   <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
                     onClick={selectAll}>
-                    👥 All Staff
+                    👥 All
                   </Button>
                   {selected.length > 0 && (
                     <Button type="button" size="sm" variant="ghost" className="h-7 text-xs px-2 text-muted-foreground"

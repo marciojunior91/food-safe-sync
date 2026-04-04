@@ -32,6 +32,7 @@ export interface TeamMember {
 
   // Role (computed from user_roles via auth_role_id chain)
   role?: string;
+  role_type?: string; // DB column name (team_member_role enum)
   
   // Authentication
   auth_role_id?: string; // Links to shared login account (profiles.user_id)

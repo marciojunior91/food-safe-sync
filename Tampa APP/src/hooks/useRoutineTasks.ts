@@ -112,6 +112,7 @@ export function useRoutineTasks(organizationId?: string) {
         status: 'not_started',
         requires_approval: input.requires_approval || false,
         recurrence_pattern: input.recurrence_pattern || null,
+        department_id: input.department_id || null,
       };
 
       const { data, error: createError } = await supabase

@@ -1,12 +1,18 @@
 // PrintQueue - Shopping cart style print queue panel
 import { useState } from 'react';
-import { X, Trash2, Plus, Minus, Printer, AlertCircle, Settings } from 'lucide-react';
+import { X, Trash2, Plus, Minus, Printer, AlertCircle, Settings, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -42,6 +48,7 @@ export function PrintQueue() {
     printProgress,
     removeFromQueue,
     updateQuantity,
+    updateExpiryDate,
     clearQueue,
     closeQueue,
     printAll
@@ -243,13 +250,34 @@ export function PrintQueue() {
                           </span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Expiry:</span>
-                          <span className="ml-1 font-medium">
-                            {new Date(item.labelData.expiryDate).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric' 
-                            })}
-                          </span>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-auto px-1 py-0 font-normal text-xs gap-1 -ml-1">
+                                <span className="text-muted-foreground">Expiry:</span>
+                                <span className="font-medium">
+                                  {new Date(item.labelData.expiryDate).toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric' 
+                                  })}
+                                </span>
+                                <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={new Date(item.labelData.expiryDate)}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    const iso = date.toISOString().split('T')[0];
+                                    updateExpiryDate(item.id, iso);
+                                  }
+                                }}
+                                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </div>
 

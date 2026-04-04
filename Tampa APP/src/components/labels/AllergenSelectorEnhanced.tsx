@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { AlertCircle, AlertTriangle, Info, X, Plus } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AlertCircle, AlertTriangle, Info, X, Plus, SmilePlus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import { useAllergens, type Allergen } from "@/hooks/useAllergens";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -67,6 +69,7 @@ export function AllergenSelectorEnhanced({
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [showCustomDialog, setShowCustomDialog] = useState(false);
   const [customAllergenName, setCustomAllergenName] = useState("");
+  const [customAllergenIcon, setCustomAllergenIcon] = useState("⚠️");
   const [creatingAllergen, setCreatingAllergen] = useState(false);
   const { toast } = useToast();
 
@@ -124,7 +127,7 @@ export function AllergenSelectorEnhanced({
         name: customAllergenName.trim(),
         is_common: false, // Custom allergens are not common
         severity: 'info', // Default severity for custom
-        icon: '⚠️', // Default icon
+        icon: customAllergenIcon || '⚠️',
       });
 
       if (newAllergen) {
@@ -140,6 +143,7 @@ export function AllergenSelectorEnhanced({
         });
         
         setCustomAllergenName("");
+        setCustomAllergenIcon("⚠️");
         setShowCustomDialog(false);
       }
     } catch (error) {
@@ -305,6 +309,31 @@ export function AllergenSelectorEnhanced({
                 className="text-lg h-12"
               />
             </div>
+            <div className="space-y-2">
+              <Label>Icon (Emoji)</Label>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-12 w-12 text-2xl p-0">
+                      {customAllergenIcon || <SmilePlus className="w-5 h-5 text-muted-foreground" />}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" side="right">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData: EmojiClickData) => setCustomAllergenIcon(emojiData.emoji)}
+                      theme={Theme.AUTO}
+                      height={350}
+                      width={300}
+                      searchPlaceholder="Search emoji..."
+                      previewConfig={{ showPreview: false }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-sm text-muted-foreground">
+                  {customAllergenIcon ? `Selected: ${customAllergenIcon}` : 'Click to pick an icon'}
+                </span>
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -313,6 +342,7 @@ export function AllergenSelectorEnhanced({
               onClick={() => {
                 setShowCustomDialog(false);
                 setCustomAllergenName("");
+                setCustomAllergenIcon("⚠️");
               }}
               disabled={creatingAllergen}
             >

@@ -17,6 +17,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useUserContext } from "@/hooks/useUserContext";
 import { TampaIcon } from "@/components/TampaIcon";
+import { VenueSelector } from "@/components/VenueSelector";
 const navigation = [{
   name: "Dashboard",
   href: "/dashboard",
@@ -169,6 +170,8 @@ export function Layout() {
                         <span className="font-medium">{organization.name}</span>
                       </div>
                     )}
+                    {/* Venue selector - only for admin users in franchise groups */}
+                    {role === 'admin' && <VenueSelector />}
                     {department && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">Department:</span>

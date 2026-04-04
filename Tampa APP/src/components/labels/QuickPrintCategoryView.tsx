@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { getExpiryStatus, getStatusColor, getStatusLabel, shouldShowStatusBadge } from "@/utils/trafficLight";
 import type { Allergen } from "@/hooks/useAllergens";
+import { CategoryEmojiPicker } from "./CategoryEmojiPicker";
 
 interface Category {
   id: string;
@@ -65,11 +66,13 @@ interface QuickPrintCategoryViewProps {
   // Edit mode props
   editMode?: boolean;
   onAddCategory?: (name: string, icon: string) => void;
-  onRenameCategory?: (id: string, newName: string) => void;
+  onRenameCategory?: (id: string, newName: string, newIcon?: string) => void;
   onDeleteCategory?: (id: string) => void;
   onAddSubcategory?: (categoryId: string, name: string, icon: string) => void;
-  onRenameSubcategory?: (id: string, newName: string) => void;
+  onRenameSubcategory?: (id: string, newName: string, newIcon?: string) => void;
   onDeleteSubcategory?: (id: string) => void;
+  onRenameProduct?: (id: string, newName: string) => void;
+  onDeleteProduct?: (id: string) => void;
 }
 
 export function QuickPrintCategoryView({
@@ -92,6 +95,8 @@ export function QuickPrintCategoryView({
   onAddSubcategory,
   onRenameSubcategory,
   onDeleteSubcategory,
+  onRenameProduct,
+  onDeleteProduct,
 }: QuickPrintCategoryViewProps) {
   const { user } = useAuth();
   const [quickAddProduct, setQuickAddProduct] = useState<Product | null>(null);
@@ -103,6 +108,7 @@ export function QuickPrintCategoryView({
   const [addingNew, setAddingNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [newIcon, setNewIcon] = useState("📁");
+  const [editingIcon, setEditingIcon] = useState("");
 
   const handleQuickAdd = (e: React.MouseEvent, product: Product) => {
     e.stopPropagation(); // Prevent triggering onProductSelect
@@ -143,6 +149,7 @@ export function QuickPrintCategoryView({
             <div key={category.id} className="relative">
               {editMode && editingId === category.id ? (
                 <div className="h-36 sm:h-40 border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                  <CategoryEmojiPicker value={editingIcon} onChange={setEditingIcon} />
                   <Input
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
@@ -150,7 +157,7 @@ export function QuickPrintCategoryView({
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && editingName.trim()) {
-                        onRenameCategory?.(category.id, editingName.trim());
+                        onRenameCategory?.(category.id, editingName.trim(), editingIcon);
                         setEditingId(null);
                       }
                       if (e.key === "Escape") setEditingId(null);
@@ -159,7 +166,7 @@ export function QuickPrintCategoryView({
                   <div className="flex gap-1">
                     <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
                       if (editingName.trim()) {
-                        onRenameCategory?.(category.id, editingName.trim());
+                        onRenameCategory?.(category.id, editingName.trim(), editingIcon);
                         setEditingId(null);
                       }
                     }}>Save</Button>
@@ -192,6 +199,7 @@ export function QuickPrintCategoryView({
                     e.stopPropagation();
                     setEditingId(category.id);
                     setEditingName(category.name);
+                    setEditingIcon(category.icon || '📁');
                   }}>
                     <Pencil className="w-3 h-3" />
                   </Button>
@@ -210,6 +218,7 @@ export function QuickPrintCategoryView({
             <div className="h-36 sm:h-40">
               {addingNew ? (
                 <div className="h-full border-2 border-dashed border-primary/50 rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-primary/5">
+                  <CategoryEmojiPicker value={newIcon} onChange={setNewIcon} />
                   <Input
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
@@ -296,6 +305,7 @@ export function QuickPrintCategoryView({
             <div key={subcategory.id} className="relative">
               {editMode && editingId === subcategory.id ? (
                 <div className="min-h-[10rem] sm:min-h-[11rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                  <CategoryEmojiPicker value={editingIcon} onChange={setEditingIcon} />
                   <Input
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
@@ -303,7 +313,7 @@ export function QuickPrintCategoryView({
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && editingName.trim()) {
-                        onRenameSubcategory?.(subcategory.id, editingName.trim());
+                        onRenameSubcategory?.(subcategory.id, editingName.trim(), editingIcon);
                         setEditingId(null);
                       }
                       if (e.key === "Escape") setEditingId(null);
@@ -312,7 +322,7 @@ export function QuickPrintCategoryView({
                   <div className="flex gap-1">
                     <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
                       if (editingName.trim()) {
-                        onRenameSubcategory?.(subcategory.id, editingName.trim());
+                        onRenameSubcategory?.(subcategory.id, editingName.trim(), editingIcon);
                         setEditingId(null);
                       }
                     }}>Save</Button>
@@ -345,6 +355,7 @@ export function QuickPrintCategoryView({
                     e.stopPropagation();
                     setEditingId(subcategory.id);
                     setEditingName(subcategory.name);
+                    setEditingIcon(subcategory.icon || '📂');
                   }}>
                     <Pencil className="w-3 h-3" />
                   </Button>
@@ -363,6 +374,7 @@ export function QuickPrintCategoryView({
             <div className="min-h-[10rem] sm:min-h-[11rem]">
               {addingNew ? (
                 <div className="h-full border-2 border-dashed border-primary/50 rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-primary/5">
+                  <CategoryEmojiPicker value={newIcon} onChange={setNewIcon} />
                   <Input
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
@@ -429,7 +441,7 @@ export function QuickPrintCategoryView({
     return (
       <div className={cn("space-y-4", className)}>
         <p className="text-sm text-muted-foreground">
-          Tap to print instantly • Long-press + icon to add to queue
+          {editMode ? "Edit products — rename or delete" : "Tap to print instantly • Long-press + icon to add to queue"}
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {products.map((product) => {
@@ -447,16 +459,43 @@ export function QuickPrintCategoryView({
 
             return (
               <div key={product.id} className="relative">
+                {/* Edit mode: inline rename */}
+                {editMode && editingId === product.id ? (
+                  <div className="w-full min-h-[10rem] sm:min-h-[11rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                    <Input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      className="text-center text-sm h-8"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && editingName.trim()) {
+                          onRenameProduct?.(product.id, editingName.trim());
+                          setEditingId(null);
+                        }
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
+                        if (editingName.trim()) {
+                          onRenameProduct?.(product.id, editingName.trim());
+                          setEditingId(null);
+                        }
+                      }}>Save</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingId(null)}>Cancel</Button>
+                    </div>
+                  </div>
+                ) : (
                 <Button
                   variant="outline"
-                  disabled={isLoading}
+                  disabled={isLoading || editMode}
                   className={cn(
                     "w-full min-h-[10rem] sm:min-h-[11rem] flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                     isSuccess
                       ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
                       : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
                   )}
-                  onClick={() => onProductSelect(product)}
+                  onClick={() => !editMode && onProductSelect(product)}
                 >
                   {/* Top Row - Badges with proper spacing */}
                   <div className="absolute top-2 left-2 right-2 flex items-start justify-between z-20 pointer-events-none gap-2">
@@ -517,17 +556,29 @@ export function QuickPrintCategoryView({
                     </span>
                   </div>
                   
-                  {/* Bottom Info - Unit Display */}
-                  <div className="w-full flex flex-col items-center gap-1 min-h-[1.5rem]">
-                    {/* Unit display */}
-                    {!isLoading && !isSuccess && product.measuring_units && (
-                      <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80">
-                        {product.measuring_units.abbreviation}
-                      </span>
-                    )}
-                  </div>
+
                 </Button>
+                )}
                 
+                {/* Edit overlay buttons for products */}
+                {editMode && editingId !== product.id && (
+                  <div className="absolute top-1 right-1 flex gap-1 z-10">
+                    <Button size="icon" variant="secondary" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingId(product.id);
+                      setEditingName(product.name);
+                    }}>
+                      <Pencil className="w-3 h-3" />
+                    </Button>
+                    <Button size="icon" variant="destructive" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteProduct?.(product.id);
+                    }}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+
                 {/* Allergen Count Badge (Bottom-Right) - Outside button */}
                 {product.allergens && product.allergens.length > 0 && (
                   <Badge 

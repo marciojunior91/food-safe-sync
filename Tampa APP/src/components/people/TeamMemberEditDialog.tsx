@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { PINValidationDialog } from '@/components/auth/PINValidationDialog';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useTeamMembers } from '@/hooks/useTeamMembers';
+import { useDepartments } from '@/hooks/useUserContext';
 import type { TeamMember, TeamMemberRole, UpdateTeamMemberInput } from '@/types/teamMembers';
 import { TEAM_MEMBER_ROLE_LABELS } from '@/types/teamMembers';
 import { Shield, Lock, User, Briefcase, Phone as PhoneIcon, Heart, FileText } from 'lucide-react';
@@ -43,6 +44,7 @@ export function TeamMemberEditDialog({
 }: TeamMemberEditDialogProps) {
   const { role, canEditWithoutPIN, loading: roleLoading } = useUserRole();
   const { updateTeamMember, loading: updateLoading } = useTeamMembers();
+  const { departments, loading: departmentsLoading } = useDepartments();
 
   const [showPinValidation, setShowPinValidation] = useState(false);
   const [pinValidated, setPinValidated] = useState(false);
@@ -66,6 +68,7 @@ export function TeamMemberEditDialog({
         emergency_contact_phone: teamMember.emergency_contact_phone ? formatPhoneNumber(teamMember.emergency_contact_phone) : teamMember.emergency_contact_phone,
         emergency_contact_relationship: teamMember.emergency_contact_relationship,
         hire_date: teamMember.hire_date,
+        department_id: teamMember.department_id,
         role: teamMember.role,
         is_active: teamMember.is_active,
       });
@@ -285,6 +288,27 @@ export function TeamMemberEditDialog({
                   value={formData.hire_date || ''}
                   onChange={(e) => handleFieldChange('hire_date', e.target.value)}
                 />
+              </div>
+
+              {/* Department */}
+              <div className="space-y-2">
+                <Label htmlFor="department_id">Department</Label>
+                <Select
+                  value={formData.department_id || 'none'}
+                  onValueChange={(value) => handleFieldChange('department_id', value === 'none' ? undefined : value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Department</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Role (only for admin/manager) */}

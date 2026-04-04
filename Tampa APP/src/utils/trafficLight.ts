@@ -55,6 +55,6 @@ export const getStatusLabel = (status: ExpiryStatus): string => {
 
 // Helper to check if status should display a badge
 export const shouldShowStatusBadge = (status: ExpiryStatus): boolean => {
-  return status === 'expired'; // Only show "Expired" badge
+  return status === 'expired' || status === 'warning'; // Show both "Expired" and "Expiring Soon" badges
 };
 

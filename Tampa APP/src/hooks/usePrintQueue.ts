@@ -170,6 +170,16 @@ export function usePrintQueue() {
     setItems(newItems);
   }, [items, toast]);
 
+  // Update item expiry date
+  const updateExpiryDate = useCallback((itemId: string, newExpiryDate: string) => {
+    const newItems = items.map(item =>
+      item.id === itemId
+        ? { ...item, labelData: { ...item.labelData, expiryDate: newExpiryDate } }
+        : item
+    );
+    setItems(newItems);
+  }, [items]);
+
   // Clear entire queue
   const clearQueue = useCallback(() => {
     const count = items.length;
@@ -422,6 +432,7 @@ export function usePrintQueue() {
     addToQueue,
     removeFromQueue,
     updateQuantity,
+    updateExpiryDate,
     clearQueue,
     toggleQueue,
     openQueue,

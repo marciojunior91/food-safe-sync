@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useFeed } from '@/lib/feed/feedHooks';
-import { useUserContext } from '@/hooks/useUserContext';
+import { useUserContext, useDepartments } from '@/hooks/useUserContext';
 import { supabase } from '@/integrations/supabase/client';
 import PostComposer from '@/components/feed/PostComposer';
 import PostCard from '@/components/feed/PostCard';
@@ -20,6 +20,13 @@ import { IncompleteProfilesAlert } from '@/components/feed/IncompleteProfilesAle
 import { UserSelectionDialog } from '@/components/labels/UserSelectionDialog';
 import type { TeamMember } from '@/types/teamMembers';
 
+/** Check if the selected user belongs to the Managers department */
+const isInManagersDepartment = (user: TeamMember | null, departments: { id: string; name: string }[]): boolean => {
+  if (!user || !user.department_id) return false;
+  const dept = departments.find(d => d.id === user.department_id);
+  return dept?.name?.toLowerCase() === 'managers';
+};
+
 export default function FeedModule() {
   const navigate = useNavigate();
   const { context, loading: contextLoading } = useUserContext();
@@ -27,6 +34,7 @@ export default function FeedModule() {
   const [selectedUser, setSelectedUser] = useState<TeamMember | null>(null);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pinned' | 'mentions'>('all');
+  const { departments } = useDepartments();
 
   // Don't load feed until we have an organization_id
   const organizationId = context?.organization_id || '';
@@ -198,11 +206,8 @@ export default function FeedModule() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </Button>
 
-            {/* Create Post Button - Only for admin/manager */}
+            {/* Create Post Button - All users can create posts */}
             {selectedUser && (
-              selectedUser.role === 'admin' || 
-              selectedUser.role === 'manager'
-            ) && (
               <Button onClick={() => setShowComposer(true)} className="bg-orange-600 hover:bg-orange-700">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Post
@@ -286,10 +291,7 @@ export default function FeedModule() {
             filter={filter}
             // Only show create button if user has permission
             onCreatePost={
-              selectedUser && (
-                selectedUser.role === 'admin' || 
-                selectedUser.role === 'manager'
-              ) ? () => setShowComposer(true) : undefined
+              selectedUser ? () => setShowComposer(true) : undefined
             }
           />
         ) : (
@@ -303,6 +305,7 @@ export default function FeedModule() {
                   currentUserId={selectedUserId || context?.user_id || ''}
                   organizationId={context?.organization_id || ''}
                   onUpdate={refresh}
+                  isManager={isInManagersDepartment(selectedUser, departments)}
                 />
               ))}
             </div>

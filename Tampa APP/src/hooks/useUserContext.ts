@@ -36,7 +36,19 @@ export function useUserContext() {
       if (contextError) throw contextError;
 
       if (contextData && Array.isArray(contextData) && contextData.length > 0) {
-        const userContext = contextData[0] as UserContext;
+        const raw = contextData[0] as any;
+        // Map DB columns to UserContext fields
+        // The RPC returns: user_id, organization_id, role, department_id
+        // But UserContext expects: user_role, organization_name, department_name, display_name
+        const userContext: UserContext = {
+          user_id: raw.user_id,
+          organization_id: raw.organization_id,
+          organization_name: raw.organization_name || '',
+          department_id: raw.department_id,
+          department_name: raw.department_name || '',
+          user_role: raw.user_role || raw.role || 'staff',
+          display_name: raw.display_name || '',
+        };
         setContext(userContext);
 
         // Fetch full organization details

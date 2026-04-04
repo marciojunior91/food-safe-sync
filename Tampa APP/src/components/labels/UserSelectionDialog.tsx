@@ -114,7 +114,12 @@ export function UserSelectionDialog({
       }
 
       console.log("[UserSelectionDialog] Fetched team members:", data);
-      setUsers(data || []);
+      // Map role_type (DB column) to role (TypeScript interface field)
+      const mapped = (data || []).map((tm: any) => ({
+        ...tm,
+        role: tm.role_type ?? tm.role,
+      })) as TeamMember[];
+      setUsers(mapped);
       
       if (!data || data.length === 0) {
         toast({

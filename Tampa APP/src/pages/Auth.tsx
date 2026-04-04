@@ -60,7 +60,7 @@ const Auth = () => {
     const password = formData.get('password') as string;
     const displayName = formData.get('displayName') as string;
 
-    const { error } = await signUp(email, password, displayName);
+    const { error, session } = await signUp(email, password, displayName);
     
     if (error) {
       setError(error.message);
@@ -69,7 +69,14 @@ const Auth = () => {
         title: "Sign up failed",
         description: error.message,
       });
+    } else if (session) {
+      // Auto-confirm is enabled — user is signed in immediately
+      toast({
+        title: "Account created!",
+        description: "Welcome! You're now signed in.",
+      });
     } else {
+      // Email confirmation is required
       toast({
         title: "Account created!",
         description: "Please check your email to verify your account.",

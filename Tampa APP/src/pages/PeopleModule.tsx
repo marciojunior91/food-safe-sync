@@ -22,8 +22,9 @@ import EditUserDialog from "@/components/people/EditUserDialog";
 import { TeamMemberEditDialog } from "@/components/people/TeamMemberEditDialog";
 import CreateUserDialog from "@/components/people/CreateUserDialog";
 import CreateTeamMemberDialog from "@/components/people/CreateTeamMemberDialog";
+import { DepartmentManager } from "@/components/people/DepartmentManager";
 // UpgradeModal removed — no premium gate
-import { Plus, RefreshCw, Users, Briefcase, Search } from "lucide-react";
+import { Plus, RefreshCw, Users, Briefcase, Search, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 export default function People() {
@@ -38,6 +39,7 @@ export default function People() {
   const [activeTab, setActiveTab] = useState<"users" | "team">("team");
   const [createUserDialogOpen, setCreateUserDialogOpen] = useState(false);
   const [createTeamMemberDialogOpen, setCreateTeamMemberDialogOpen] = useState(false);
+  const [departmentManagerOpen, setDepartmentManagerOpen] = useState(false);
   const [teamSearchQuery, setTeamSearchQuery] = useState<string>("");  // BUG-008 FIX
   
   const {
@@ -221,6 +223,10 @@ export default function People() {
           {/* Add buttons - Only for admins/managers */}
           {canManageTeamMembers && (
             <>
+              <Button variant="outline" onClick={() => setDepartmentManagerOpen(true)}>
+                <Building2 className="w-4 h-4 mr-2" />
+                Manage Departments
+              </Button>
               {activeTab === "users" && (
                 <Button onClick={handleAddUserClick}>
                   <Plus className="w-4 h-4 mr-2" />
@@ -447,7 +453,11 @@ export default function People() {
         onSuccess={handleCreateTeamMemberSuccess}
       />
 
-
+      {/* Department Manager Dialog */}
+      <DepartmentManager
+        open={departmentManagerOpen}
+        onOpenChange={setDepartmentManagerOpen}
+      />
     </div>
   );
 }

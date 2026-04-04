@@ -46,9 +46,10 @@ interface PostCardProps {
   currentUserId: string;
   organizationId: string;
   onUpdate: () => void;
+  isManager?: boolean;
 }
 
-export default function PostCard({ post, currentUserId, organizationId, onUpdate }: PostCardProps) {
+export default function PostCard({ post, currentUserId, organizationId, onUpdate, isManager = false }: PostCardProps) {
   const [showComments, setShowComments] = useState(false);
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [commentCount, setCommentCount] = useState(post.comment_count);
@@ -139,8 +140,8 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
           </div>
         </div>
 
-        {/* Menu */}
-        {isAuthor && (
+        {/* Menu - visible for post author (own post actions) or managers (full control) */}
+        {(isAuthor || isManager) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -148,10 +149,14 @@ export default function PostCard({ post, currentUserId, organizationId, onUpdate
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handlePin}>
-                <Pin className="w-4 h-4 mr-2" />
-                {post.is_pinned ? 'Unpin Post' : 'Pin Post'}
-              </DropdownMenuItem>
+              {/* Pin/Unpin - Managers only */}
+              {isManager && (
+                <DropdownMenuItem onClick={handlePin}>
+                  <Pin className="w-4 h-4 mr-2" />
+                  {post.is_pinned ? 'Unpin Post' : 'Pin Post'}
+                </DropdownMenuItem>
+              )}
+              {/* Delete - Author can delete own, Managers can delete any */}
               <DropdownMenuItem onClick={handleDelete} className="text-red-600">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Post

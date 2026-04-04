@@ -15,6 +15,17 @@ export interface Organization {
   subscription_status: 'active' | 'suspended' | 'cancelled' | 'trial';
   created_at: string;
   updated_at: string;
+  // Venue/Franchise fields
+  parent_organization_id?: string | null;
+  is_franchise_group?: boolean;
+  venue_label?: string | null;
+}
+
+export interface Venue {
+  id: string;
+  name: string;
+  venue_label: string | null;
+  is_parent: boolean;
 }
 
 export interface Department {

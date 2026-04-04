@@ -3,15 +3,17 @@
  * Admin/Manager interface for CRUD operations on label categories & subcategories
  */
 
-import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, GripVertical, Save } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit, Trash2, GripVertical, Save, SmilePlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -327,15 +329,38 @@ export default function LabelCategoriesPage() {
             </div>
             <div className="space-y-2">
               <Label>Icon (Emoji)</Label>
-              <Input
-                value={icon}
-                onChange={(e) => setIcon(e.target.value)}
-                placeholder="e.g., 🧀"
-                maxLength={2}
-              />
-              <p className="text-xs text-muted-foreground">
-                Use a single emoji character (optional)
-              </p>
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="h-12 w-12 text-2xl p-0">
+                      {icon || <SmilePlus className="w-5 h-5 text-muted-foreground" />}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" side="right">
+                    <EmojiPicker
+                      onEmojiClick={(emojiData: EmojiClickData) => setIcon(emojiData.emoji)}
+                      theme={Theme.AUTO}
+                      height={350}
+                      width={300}
+                      searchPlaceholder="Search emoji..."
+                      previewConfig={{ showPreview: false }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                {icon && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIcon('')}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+                <span className="text-sm text-muted-foreground">
+                  {icon ? `Selected: ${icon}` : 'Click to pick an emoji'}
+                </span>
+              </div>
             </div>
           </div>
           <DialogFooter>

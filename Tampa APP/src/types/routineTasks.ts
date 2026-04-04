@@ -124,6 +124,7 @@ export interface CreateTaskInput {
   assigned_to?: string; // LEGACY: auth user_id - kept for backward compatibility
   team_member_id?: string; // NEW: team member ID - preferred
   assignees?: string[]; // All team member IDs assigned to this shared task
+  department_id?: string; // Department this task belongs to
   scheduled_date: string;
   scheduled_time?: string;
   estimated_minutes?: number;

@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -804,7 +805,7 @@ export default function TasksOverview() {
                 </DialogHeader>
                 <TaskForm
                   onSubmit={handleCreateTask}
-                  users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role }))}
+                  users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role, department_id: tm.department_id }))}
                   isLoading={teamMembersLoading}
                 />
               </DialogContent>
@@ -1651,7 +1652,7 @@ export default function TasksOverview() {
             </DialogHeader>
             <TaskForm
               onSubmit={handleEditTask}
-              users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role }))}
+              users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role, department_id: tm.department_id }))}
               isLoading={teamMembersLoading}
               isEditing={true}
               taskId={taskToEdit.id}
@@ -1726,41 +1727,43 @@ export default function TasksOverview() {
       {/* Assignee Picker Dialog for Mark as Complete */}
       {completingTask && (
         <Dialog open={!!completingTask} onOpenChange={(open) => { if (!open) setCompletingTask(null); }}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="max-w-xs">
             <DialogHeader>
-              <DialogTitle>Who completed this task?</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="text-base">Who completed this task?</DialogTitle>
+              <DialogDescription className="text-xs">
                 Select who completed "{completingTask.title}".
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-2 py-2">
-              {completingTask.assignees?.map((memberId) => {
-                const member = teamMembers.find(tm => tm.id === memberId);
-                if (!member) return null;
-                return (
-                  <div
-                    key={memberId}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-                      selectedCompleter === memberId
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-muted/50"
-                    )}
-                    onClick={() => setSelectedCompleter(memberId)}
-                  >
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="text-xs">
-                        {member.display_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="font-medium text-sm">{member.display_name}</span>
-                    {selectedCompleter === memberId && (
-                      <CheckCircle2 className="w-4 h-4 ml-auto text-primary" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <ScrollArea className="max-h-[300px] pr-3">
+              <div className="space-y-2 py-1">
+                {completingTask.assignees?.map((memberId) => {
+                  const member = teamMembers.find(tm => tm.id === memberId);
+                  if (!member) return null;
+                  return (
+                    <div
+                      key={memberId}
+                      className={cn(
+                        "flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors",
+                        selectedCompleter === memberId
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-muted/50"
+                      )}
+                      onClick={() => setSelectedCompleter(memberId)}
+                    >
+                      <Avatar className="w-7 h-7">
+                        <AvatarFallback className="text-xs">
+                          {member.display_name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-sm truncate">{member.display_name}</span>
+                      {selectedCompleter === memberId && (
+                        <CheckCircle2 className="w-4 h-4 ml-auto text-primary flex-shrink-0" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
             <DialogFooter className="gap-2">
               <Button variant="outline" onClick={() => setCompletingTask(null)}>Cancel</Button>
               <Button

@@ -24,7 +24,8 @@ import {
   Plus,
   Clock,
   Settings,
-  Pencil
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -114,6 +115,9 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
   
   // Category edit mode
   const [editMode, setEditMode] = useState(false);
+  // Inline product edit state (for "By Products" mode)
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingProductName, setEditingProductName] = useState("");
   const { toast } = useToast();
 
   // Fetch categories with counts
@@ -559,13 +563,15 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
     fetchCategories();
   };
 
-  const handleRenameCategory = async (id: string, newName: string) => {
-    const { error } = await supabase.from('label_categories').update({ name: newName }).eq('id', id);
+  const handleRenameCategory = async (id: string, newName: string, newIcon?: string) => {
+    const updateData: any = { name: newName };
+    if (newIcon !== undefined) updateData.icon = newIcon;
+    const { error } = await supabase.from('label_categories').update(updateData).eq('id', id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    setCategories(prev => prev.map(c => c.id === id ? { ...c, name: newName } : c));
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, name: newName, ...(newIcon !== undefined ? { icon: newIcon } : {}) } : c));
     toast({ title: "Renamed", description: `Category renamed to "${newName}".` });
   };
 
@@ -596,13 +602,15 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
     fetchSubcategories(categoryId);
   };
 
-  const handleRenameSubcategory = async (id: string, newName: string) => {
-    const { error } = await supabase.from('label_subcategories').update({ name: newName }).eq('id', id);
+  const handleRenameSubcategory = async (id: string, newName: string, newIcon?: string) => {
+    const updateData: any = { name: newName };
+    if (newIcon !== undefined) updateData.icon = newIcon;
+    const { error } = await supabase.from('label_subcategories').update(updateData).eq('id', id);
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       return;
     }
-    setSubcategories(prev => prev.map(s => s.id === id ? { ...s, name: newName } : s));
+    setSubcategories(prev => prev.map(s => s.id === id ? { ...s, name: newName, ...(newIcon !== undefined ? { icon: newIcon } : {}) } : s));
     toast({ title: "Renamed", description: `Subcategory renamed to "${newName}".` });
   };
 
@@ -615,6 +623,27 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
     }
     setSubcategories(prev => prev.filter(s => s.id !== id));
     toast({ title: "Deleted", description: "Subcategory removed." });
+  };
+
+  const handleRenameProduct = async (id: string, newName: string) => {
+    const { error } = await supabase.from('products').update({ name: newName }).eq('id', id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setFilteredProducts(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
+    toast({ title: "Renamed", description: `Product renamed to "${newName}".` });
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!confirm('Delete this product? This action cannot be undone.')) return;
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      return;
+    }
+    setFilteredProducts(prev => prev.filter(p => p.id !== id));
+    toast({ title: "Deleted", description: "Product removed." });
   };
 
   return (
@@ -677,8 +706,8 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Edit Mode toggle - only in category mode at category/subcategory level */}
-            {printMode === 'categories' && (navigationStack.length === 0 || (navigationStack.length === 1 && subcategories.length > 0)) && (
+            {/* Edit Mode toggle - available in categories view and products view */}
+            {(printMode === 'categories' || printMode === 'products') && (
               <Button
                 variant={editMode ? "default" : "outline"}
                 size="sm"
@@ -766,6 +795,8 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
               onAddSubcategory={handleAddSubcategory}
               onRenameSubcategory={handleRenameSubcategory}
               onDeleteSubcategory={handleDeleteSubcategory}
+              onRenameProduct={handleRenameProduct}
+              onDeleteProduct={handleDeleteProduct}
             />
           )
         ) : (
@@ -794,6 +825,34 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                       
                       return (
                         <div key={product.id} className="relative">
+                          {/* Inline rename form */}
+                          {editMode && editingProductId === product.id ? (
+                            <div className="min-h-[10rem] sm:min-h-[11rem] w-full border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                              <div className="text-4xl">📦</div>
+                              <Input
+                                value={editingProductName}
+                                onChange={(e) => setEditingProductName(e.target.value)}
+                                className="text-center text-sm h-8"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && editingProductName.trim()) {
+                                    handleRenameProduct(product.id, editingProductName.trim());
+                                    setEditingProductId(null);
+                                  }
+                                  if (e.key === "Escape") setEditingProductId(null);
+                                }}
+                              />
+                              <div className="flex gap-1">
+                                <Button size="sm" variant="default" className="h-7 text-xs" onClick={() => {
+                                  if (editingProductName.trim()) {
+                                    handleRenameProduct(product.id, editingProductName.trim());
+                                    setEditingProductId(null);
+                                  }
+                                }}>Save</Button>
+                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setEditingProductId(null)}>Cancel</Button>
+                              </div>
+                            </div>
+                          ) : (
                           <Button
                             variant="outline"
                             disabled={isLoading}
@@ -803,29 +862,12 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                                 ? "bg-green-500 text-white border-green-600 hover:bg-green-600" 
                                 : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
                             )}
-                            onClick={() => handleQuickPrint(product)}
+                            onClick={() => !editMode && handleQuickPrint(product)}
                           >
-                            {/* Top Row - Badges with proper spacing */}
-                            <div className="absolute top-2 left-2 right-2 flex items-start justify-between z-20 pointer-events-none gap-2">
-                              {/* Expiry Badge (Top-Left) - Only show for warnings and expired */}
-                              {product.latestLabel && expiryStatus && shouldShowStatusBadge(expiryStatus) ? (
-                                <Badge 
-                                  variant="secondary"
-                                  className="h-5 sm:h-6 px-2 text-[10px] sm:text-xs font-bold shadow-sm pointer-events-auto shrink-0"
-                                  style={{ 
-                                    backgroundColor: statusColor ? `${statusColor}20` : 'rgba(0,0,0,0.1)', 
-                                    color: statusColor || '#000',
-                                    borderColor: statusColor || 'transparent'
-                                  }}
-                                >
-                                  {getStatusLabel(expiryStatus)}
-                                </Badge>
-                              ) : (
-                                <span className="shrink-0"></span>
-                              )}
-                              
+                            {/* Top Row - Quick Add Button */}
+                            <div className="absolute top-2 left-2 right-2 flex items-start justify-end z-20 pointer-events-none gap-2">
                               {/* Quick Add Button (Top-Right) */}
-                              {!isLoading && !isSuccess && (
+                              {!isLoading && !isSuccess && !editMode && (
                                 <div
                                   role="button"
                                   tabIndex={0}
@@ -873,6 +915,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             <div className="w-full flex flex-col items-center gap-1 min-h-[1rem]">
                             </div>
                           </Button>
+                          )}
                           
                           {/* Allergen Count Badge (Bottom-Right) - Outside button */}
                           {product.allergens && product.allergens.length > 0 && (
@@ -887,6 +930,24 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             >
                               {product.allergens.length}
                             </Badge>
+                          )}
+                          {/* Edit overlay buttons for products in products mode */}
+                          {editMode && editingProductId !== product.id && (
+                            <div className="absolute top-1 right-1 flex gap-1 z-10">
+                              <Button size="icon" variant="secondary" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingProductId(product.id);
+                                setEditingProductName(product.name);
+                              }}>
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button size="icon" variant="destructive" className="h-7 w-7 rounded-full shadow-sm" onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProduct(product.id);
+                              }}>
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                       );
