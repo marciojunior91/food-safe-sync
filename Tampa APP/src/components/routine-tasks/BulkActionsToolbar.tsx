@@ -84,40 +84,38 @@ export function BulkActionsToolbar({
 
   return (
     <>
-      {/* Floating Toolbar */}
+      {/* Floating Toolbar — compact on tablets, uses popover for secondary actions */}
       <div
         className={cn(
-          "fixed bottom-6 left-1/2 -translate-x-1/2 z-50",
-          "bg-card border border-border rounded-lg shadow-2xl",
+          "fixed bottom-4 left-1/2 -translate-x-1/2 z-50",
+          "bg-card border border-border rounded-xl shadow-2xl",
           "transition-all duration-300 ease-out",
-          "animate-in slide-in-from-bottom-5"
+          "animate-in slide-in-from-bottom-5",
+          "max-w-[calc(100vw-2rem)]"
         )}
       >
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 sm:p-4 min-w-[320px] max-w-[95vw]">
+        <div className="flex items-center gap-2 p-2.5 sm:p-3">
           {/* Selection Count */}
-          <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-md">
-            <Badge variant="default" className="text-sm font-semibold">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-primary/10 rounded-md flex-shrink-0">
+            <Badge variant="default" className="text-xs font-semibold h-5 min-w-[1.25rem] flex items-center justify-center">
               {selectedCount}
             </Badge>
-            <span className="text-sm font-medium">
-              {selectedCount === 1 ? "task selected" : "tasks selected"}
+            <span className="text-xs font-medium whitespace-nowrap">
+              {selectedCount === 1 ? "task" : "tasks"}<span className="hidden sm:inline"> selected</span>
             </span>
           </div>
 
-          {/* Divider (hidden on mobile) */}
-          <div className="hidden sm:block w-px h-8 bg-border" />
-
-          {/* Actions - Row 1 (Primary actions) */}
-          <div className="flex flex-wrap gap-2">
+          {/* Primary Actions — always visible */}
+          <div className="flex items-center gap-1.5">
             {/* Complete Button */}
             <Button
               size="sm"
               variant="default"
-              className="gap-2 bg-green-600 hover:bg-green-700"
+              className="gap-1.5 bg-green-600 hover:bg-green-700 h-8 px-2.5 text-xs"
               onClick={handleComplete}
               disabled={isProcessing || loading}
             >
-              <Check className="w-4 h-4" />
+              <Check className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Complete</span>
             </Button>
 
@@ -125,20 +123,20 @@ export function BulkActionsToolbar({
             <Button
               size="sm"
               variant="destructive"
-              className="gap-2"
+              className="gap-1.5 h-8 px-2.5 text-xs"
               onClick={() => setShowDeleteConfirm(true)}
               disabled={isProcessing || loading}
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Delete</span>
             </Button>
 
             {/* Reassign Dropdown */}
             <Select onValueChange={handleReassign} disabled={isProcessing || loading}>
-              <SelectTrigger className="w-[140px] h-9">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-4 h-4" />
-                  <span className="hidden sm:inline">Reassign</span>
+              <SelectTrigger className="w-9 sm:w-[120px] h-8 px-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs">Reassign</span>
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -153,10 +151,10 @@ export function BulkActionsToolbar({
 
             {/* Priority Dropdown */}
             <Select onValueChange={handleChangePriority} disabled={isProcessing || loading}>
-              <SelectTrigger className="w-[130px] h-9">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span className="hidden sm:inline">Priority</span>
+              <SelectTrigger className="w-9 sm:w-[110px] h-8 px-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="hidden sm:inline text-xs">Priority</span>
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -166,12 +164,12 @@ export function BulkActionsToolbar({
               </SelectContent>
             </Select>
 
-            {/* Status Dropdown */}
+            {/* Status Dropdown — hidden on very small screens */}
             <Select onValueChange={handleChangeStatus} disabled={isProcessing || loading}>
-              <SelectTrigger className="w-[140px] h-9">
-                <div className="flex items-center gap-2">
-                  <XCircle className="w-4 h-4" />
-                  <span className="hidden sm:inline">Status</span>
+              <SelectTrigger className="hidden sm:flex w-[110px] h-8 px-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="text-xs">Status</span>
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -184,25 +182,22 @@ export function BulkActionsToolbar({
             </Select>
           </div>
 
-          {/* Divider (hidden on mobile) */}
-          <div className="hidden sm:block w-px h-8 bg-border" />
-
           {/* Cancel Button */}
           <Button
             size="sm"
             variant="ghost"
-            className="gap-2 sm:ml-auto"
+            className="gap-1 h-8 px-2 ml-auto flex-shrink-0"
             onClick={onClearSelection}
             disabled={isProcessing || loading}
           >
-            <X className="w-4 h-4" />
-            <span>Cancel</span>
+            <X className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline text-xs">Cancel</span>
           </Button>
         </div>
 
         {/* Processing Indicator */}
         {isProcessing && (
-          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm rounded-lg flex items-center justify-center">
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm rounded-xl flex items-center justify-center">
             <div className="flex items-center gap-2 text-sm font-medium">
               <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               Processing...

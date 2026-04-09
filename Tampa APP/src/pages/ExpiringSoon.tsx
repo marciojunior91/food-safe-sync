@@ -182,6 +182,9 @@ export default function ExpiringSoon() {
 
     // Add labels with lifecycle status
     labels?.forEach(label => {
+      // Client-side safeguard: skip consumed/discarded items even if DB query returned them
+      if (label.status === 'used' || label.status === 'wasted') return;
+
       if (label.expiry_date) {
         const expiryDate = parseISO(label.expiry_date);
         if (expiryDate <= sevenDaysFromNow) {
@@ -328,12 +331,26 @@ export default function ExpiringSoon() {
         }
 
         if (Object.keys(updateData).length > 0) {
-          const { error } = await supabase
+          // Use .select() to verify updates persisted (RLS can silently block them)
+          const { data: updated, error } = await supabase
             .from('printed_labels')
             .update(updateData)
-            .in('id', labelIds);
+            .in('id', labelIds)
+            .select();
 
           if (error) throw error;
+
+          if (!updated || updated.length === 0) {
+            throw new Error('Update not permitted. You may not have permission to modify these labels.');
+          }
+
+          if (updated.length < labelIds.length) {
+            toast({
+              title: "Partial Update",
+              description: `${updated.length} of ${labelIds.length} labels were updated. Some labels could not be modified.`,
+              variant: "destructive",
+            });
+          }
         }
       }
 
@@ -342,7 +359,7 @@ export default function ExpiringSoon() {
         description: `${bulkActionDialog.action} applied to ${selectedItems.size} items`,
       });
 
-      // Optimistic removal: remove actioned items from local state immediately
+      // Remove actioned items from local state only after DB update confirmed
       const removedIds = new Set(labelIds);
       setLabels(prev => prev.filter(l => !removedIds.has(l.id)));
       clearSelection();
@@ -379,18 +396,25 @@ export default function ExpiringSoon() {
             break;
           case 'extend':
             if (newExpiryDate) {
-              updateData = { expiry_date: newExpiryDate, action_notes: actionReason || null };
+              updateData = { expiry_date: newExpiryDate, status: 'active', action_notes: actionReason || null };
             }
             break;
         }
 
         if (Object.keys(updateData).length > 0) {
-          const { error } = await supabase
+          // Use .select() to verify the update actually persisted (RLS can silently block it)
+          const { data: updated, error } = await supabase
             .from('printed_labels')
             .update(updateData)
-            .eq('id', item.id);
+            .eq('id', item.id)
+            .select();
 
           if (error) throw error;
+
+          // If no rows were returned, the update was silently blocked by RLS
+          if (!updated || updated.length === 0) {
+            throw new Error('Update not permitted. You may not have permission to modify this label.');
+          }
         }
       }
       
@@ -405,12 +429,16 @@ export default function ExpiringSoon() {
         description: actionMessages[actionDialog.action],
       });
 
-      // Optimistic removal: remove actioned item from local state immediately
+      // Update local state only after DB update confirmed
       if (actionDialog.action === 'consume' || actionDialog.action === 'discard') {
         setLabels(prev => prev.filter(l => l.id !== item.id));
-      } else {
-        // For extend, re-fetch to get updated expiry date
-        fetchData();
+      } else if (actionDialog.action === 'extend' && newExpiryDate) {
+        // Update expiry date and status locally so urgency recalculates immediately
+        setLabels(prev => prev.map(l =>
+          l.id === item.id
+            ? { ...l, expiry_date: newExpiryDate, status: 'active' }
+            : l
+        ));
       }
       setActionDialog({ open: false, action: null, item: null });
     } catch (error) {

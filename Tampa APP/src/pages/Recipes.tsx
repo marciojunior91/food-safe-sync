@@ -302,7 +302,7 @@ export default function Recipes() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-page="recipes">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Recipes</h1>
@@ -319,8 +319,8 @@ export default function Recipes() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[180px] max-w-sm">
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
+        <div className="relative flex-1 min-w-0 sm:min-w-[180px] sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
           <Input
             placeholder="Search recipes..."
@@ -329,55 +329,57 @@ export default function Recipes() {
             className="pl-10"
           />
         </div>
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Sort by..." />
-          </SelectTrigger>
-          <SelectContent className="bg-background opacity-100">
-            <SelectItem value="name-asc">Name (A-Z)</SelectItem>
-            <SelectItem value="name-desc">Name (Z-A)</SelectItem>
-            <SelectItem value="created-desc">Newest First</SelectItem>
-            <SelectItem value="created-asc">Oldest First</SelectItem>
-            <SelectItem value="prep-asc">Prep Time ↑</SelectItem>
-            <SelectItem value="prep-desc">Prep Time ↓</SelectItem>
-          </SelectContent>
-        </Select>
-        {/* View toggle */}
-        <div className="flex border rounded-md overflow-hidden">
-          <Button
-            size="sm"
-            variant={pageView === 'categories' ? 'default' : 'ghost'}
-            className="rounded-none px-3"
-            onClick={() => { setPageView('categories'); setSelectedCategoryView(null); }}
-          >
-            <Grid3X3 className="w-4 h-4 mr-1" />
-            Categories
-          </Button>
-          <Button
-            size="sm"
-            variant={pageView === 'recipes' ? 'default' : 'ghost'}
-            className="rounded-none px-3"
-            onClick={() => setPageView('recipes')}
-          >
-            <List className="w-4 h-4 mr-1" />
-            All Recipes
-          </Button>
+        <div className="flex items-center gap-3">
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent className="bg-background opacity-100">
+              <SelectItem value="name-asc">Name (A-Z)</SelectItem>
+              <SelectItem value="name-desc">Name (Z-A)</SelectItem>
+              <SelectItem value="created-desc">Newest First</SelectItem>
+              <SelectItem value="created-asc">Oldest First</SelectItem>
+              <SelectItem value="prep-asc">Prep Time ↑</SelectItem>
+              <SelectItem value="prep-desc">Prep Time ↓</SelectItem>
+            </SelectContent>
+          </Select>
+          {/* View toggle */}
+          <div className="flex border rounded-md overflow-hidden">
+            <Button
+              size="sm"
+              variant={pageView === 'categories' ? 'default' : 'ghost'}
+              className="rounded-none px-3"
+              onClick={() => { setPageView('categories'); setSelectedCategoryView(null); }}
+            >
+              <Grid3X3 className="w-4 h-4 mr-1" />
+              Categories
+            </Button>
+            <Button
+              size="sm"
+              variant={pageView === 'recipes' ? 'default' : 'ghost'}
+              className="rounded-none px-3"
+              onClick={() => setPageView('recipes')}
+            >
+              <List className="w-4 h-4 mr-1" />
+              All Recipes
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* ── CATEGORIES VIEW ── */}
       {pageView === 'categories' && !selectedCategoryView && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div className="recipe-categories-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
           {Object.entries(CATEGORY_EMOJIS).map(([cat, emoji]) => {
             const count = recipes.filter(r => r.category?.trim().toLowerCase() === cat.toLowerCase()).length;
             return (
               <button
                 key={cat}
                 onClick={() => { setSelectedCategoryView(cat); setPageView('recipes'); }}
-                className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
+                className="flex flex-col items-center justify-center gap-1.5 p-4 md:p-5 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
               >
-                <span className="text-5xl">{emoji}</span>
-                <span className="font-semibold text-sm">{cat}</span>
+                <span className="recipe-category-emoji text-3xl md:text-4xl">{emoji}</span>
+                <span className="recipe-category-label font-semibold text-sm">{cat}</span>
                 <Badge variant="secondary" className="text-xs">{count} recipe{count !== 1 ? 's' : ''}</Badge>
               </button>
             );
@@ -385,10 +387,10 @@ export default function Recipes() {
           {/* All Recipes tile */}
           <button
             onClick={() => { setSelectedCategoryView(null); setPageView('recipes'); }}
-            className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
+            className="flex flex-col items-center justify-center gap-1.5 p-4 md:p-5 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
           >
-            <span className="text-5xl">📋</span>
-            <span className="font-semibold text-sm">All Recipes</span>
+            <span className="recipe-category-emoji text-3xl md:text-4xl">📋</span>
+            <span className="recipe-category-label font-semibold text-sm">All Recipes</span>
             <Badge variant="outline" className="text-xs">{recipes.length} total</Badge>
           </button>
         </div>
@@ -439,7 +441,7 @@ export default function Recipes() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="recipe-cards-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredRecipes.map((recipe) => (
                 <Card
                   key={recipe.id}
@@ -487,7 +489,7 @@ export default function Recipes() {
                         className="flex-1 whitespace-nowrap"
                         onClick={() => setSelectedRecipeDetail(recipe)}
                       >
-                        <ChefHat className="w-3 h-3 shrink-0 mr-1" />
+                        <ChefHat className="w-3 h-3 shrink-0 mr-0.5" />
                         View
                       </Button>
                       <RecipePrintButton

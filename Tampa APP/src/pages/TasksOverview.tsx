@@ -57,6 +57,7 @@ import { useRoutineTasks } from "@/hooks/useRoutineTasks";
 import { usePeople } from "@/hooks/usePeople";
 import { useTeamMembers } from "@/hooks/useTeamMembers";
 import { useUserContext } from "@/hooks/useUserContext";
+import { supabase } from "@/integrations/supabase/client";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   RoutineTask,
@@ -137,7 +138,18 @@ export default function TasksOverview() {
   // Complete a TaskOccurrence
   const handleCompleteOccurrence = async (occ: TaskOccurrence) => {
     if (!context?.user_id) return;
-    const ok = await recurringTasks.completeOccurrence(occ.id, context.user_id);
+    // task_occurrences.completed_by FK references profiles(id), not auth.users(id)
+    // Resolve the profile UUID for the current auth user
+    let profileId = context.user_id;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', context.user_id)
+        .single();
+      if (profile?.id) profileId = profile.id;
+    } catch { /* fallback to user_id */ }
+    const ok = await recurringTasks.completeOccurrence(occ.id, profileId);
     if (ok) {
       toast({ title: 'Task Completed!', description: `"${occ.title}" marked as complete` });
     }
@@ -354,15 +366,21 @@ export default function TasksOverview() {
     }
   };
 
+  // Resolve a valid team_member ID for completions (FK requires team_members.id, NOT auth user_id)
+  const resolveTeamMemberId = (memberId?: string): string | undefined => {
+    if (memberId) {
+      // Verify it's actually a team_member id
+      const found = teamMembers.find(tm => tm.id === memberId);
+      if (found) return found.id;
+    }
+    // Fall back to looking up by auth user_id
+    const completingMember = teamMembers.find(tm => tm.auth_role_id === context?.user_id);
+    return completingMember?.id; // undefined if not found — never pass auth user_id
+  };
+
   // Actually complete a task (called from picker dialog or directly)
   const executeCompleteTask = async (task: RoutineTask, completedByMemberId?: string) => {
-    let completedById: string | undefined;
-    if (completedByMemberId) {
-      completedById = completedByMemberId;
-    } else {
-      const completingMember = teamMembers.find(tm => tm.auth_role_id === context?.user_id);
-      completedById = completingMember?.id || context?.user_id;
-    }
+    const completedById = resolveTeamMemberId(completedByMemberId);
 
     // Detect virtual recurring instance (has _recurringInstanceDate from expandRecurringTask)
     const instanceDate = (task as any)._recurringInstanceDate as string | undefined;
@@ -446,16 +464,15 @@ export default function TasksOverview() {
 
   // Handle status change from detail view
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
-    const success = await updateTaskStatus(taskId, newStatus, context?.user_id);
+    const completedById = newStatus === 'completed' ? resolveTeamMemberId() : undefined;
+    const success = await updateTaskStatus(taskId, newStatus, completedById);
     if (success) {
       // Update the selected task with new status and timestamps
       if (selectedTask && selectedTask.id === taskId) {
         const updates: any = { status: newStatus };
         if (newStatus === 'completed') {
           updates.completed_at = new Date().toISOString();
-          // Store team_member_id for score tracking (falls back to auth user_id)
-          const completingMember = teamMembers.find(tm => tm.auth_role_id === context?.user_id);
-          updates.completed_by = completingMember?.id || context?.user_id;
+          updates.completed_by = completedById;
         } else if (newStatus === 'in_progress') {
           updates.started_at = new Date().toISOString();
         }
@@ -605,8 +622,7 @@ export default function TasksOverview() {
   };
 
   const handleBulkComplete = async () => {
-    const completingMember = teamMembers.find(tm => tm.auth_role_id === context?.user_id);
-    const completedById = completingMember?.id || context?.user_id;
+    const completedById = resolveTeamMemberId();
     let successCount = 0;
     for (const taskId of selectedTaskIds) {
       const success = await updateTaskStatus(taskId, "completed", completedById);
@@ -661,9 +677,10 @@ export default function TasksOverview() {
   };
 
   const handleBulkChangeStatus = async (status: TaskStatus) => {
+    const completedById = status === 'completed' ? resolveTeamMemberId() : undefined;
     let successCount = 0;
     for (const taskId of selectedTaskIds) {
-      const success = await updateTaskStatus(taskId, status, context?.user_id);
+      const success = await updateTaskStatus(taskId, status, completedById);
       if (success) successCount++;
     }
     setSelectedTaskIds([]);
@@ -756,7 +773,7 @@ export default function TasksOverview() {
   }
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 space-y-6">
+    <div className="container mx-auto p-4 sm:p-6 space-y-6" data-page="routine-tasks">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -1768,8 +1785,8 @@ export default function TasksOverview() {
               <Button variant="outline" onClick={() => setCompletingTask(null)}>Cancel</Button>
               <Button
                 disabled={!selectedCompleter}
-                onClick={() => {
-                  executeCompleteTask(completingTask, selectedCompleter);
+                onClick={async () => {
+                  await executeCompleteTask(completingTask, selectedCompleter);
                   setCompletingTask(null);
                 }}
               >

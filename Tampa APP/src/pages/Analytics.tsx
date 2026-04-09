@@ -11,9 +11,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StatsCard } from "@/components/StatsCard";
-import { usePlanEnforcement } from '@/hooks/usePlanEnforcement';
-import { UpgradeModal } from '@/components/billing/UpgradeModal';
-import { useEffect } from 'react';
 
 const complianceMetrics = [
   { category: "Label Compliance", current: 98.5, target: 95, trend: "+0.3%" },
@@ -30,13 +27,6 @@ const wasteData = [
 ];
 
 export default function Analytics() {
-  const { checkFeature, upgradeModalProps } = usePlanEnforcement();
-
-  useEffect(() => {
-    // Check if user has access to analytics when component mounts
-    checkFeature('hasCostControl', 'Cost Control & Analytics');
-  }, [checkFeature]);
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -255,7 +245,6 @@ export default function Analytics() {
         </div>
       </div>
 
-      <UpgradeModal {...upgradeModalProps} />
     </div>
   );
 }

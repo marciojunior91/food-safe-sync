@@ -78,17 +78,17 @@ export function TaskCard({
   return (
     <Card
       className={cn(
-        "transition-all hover:shadow-md",
+        "transition-all hover:shadow-md overflow-hidden",
         isCompleted && "opacity-75",
         selected && "ring-2 ring-primary shadow-lg",
         isOverdue && "border-red-500 border-2 bg-red-50/30 shadow-red-100"
       )}
     >
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-2">
           {/* Selection Checkbox (if selectable) */}
           {selectable && (
-            <div className="pt-1">
+            <div className="pt-1 flex-shrink-0">
               <Checkbox
                 checked={selected}
                 onCheckedChange={(checked) => onSelect?.(task.id, checked as boolean)}
@@ -98,11 +98,11 @@ export function TaskCard({
           )}
           
           {/* Left side - Icon and Info */}
-          <div className="flex items-start gap-3 flex-1 min-w-0">
+          <div className="flex items-start gap-2 flex-1 min-w-0 overflow-hidden">
             {/* Task Icon */}
             <div
               className={cn(
-                "w-12 h-12 rounded-lg flex items-center justify-center text-2xl flex-shrink-0",
+                "w-10 h-10 rounded-lg flex items-center justify-center text-xl flex-shrink-0",
                 isCompleted
                   ? "bg-green-100"
                   : isOverdue
@@ -114,8 +114,8 @@ export function TaskCard({
             </div>
 
             {/* Task Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2 mb-1">
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <div className="flex items-start gap-1.5 mb-1 min-w-0">
                 {/* Priority Indicator */}
                 <div
                   className={cn(
@@ -128,7 +128,7 @@ export function TaskCard({
                 {/* Task Title */}
                 <h3
                   className={cn(
-                    "font-semibold text-base break-words",
+                    "font-semibold text-sm leading-tight line-clamp-2",
                     isCompleted && "line-through text-muted-foreground"
                   )}
                   title={task.title}
@@ -138,7 +138,7 @@ export function TaskCard({
               </div>
 
               {/* Task Type Badge */}
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs max-w-full truncate">
                 {TASK_TYPE_LABELS[task.task_type]}
               </Badge>
             </div>
@@ -209,11 +209,11 @@ export function TaskCard({
         )}
 
         {/* Task Metadata */}
-        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {/* Scheduled Date/Time */}
-          <div className="flex items-center gap-1.5 whitespace-nowrap">
-            <Clock className="w-4 h-4 flex-shrink-0" />
-            <span>
+          <div className="flex items-center gap-1 min-w-0">
+            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">
               {format(new Date(task.scheduled_date), "MMM d, yyyy")}
               {task.scheduled_time && ` at ${task.scheduled_time}`}
             </span>
@@ -221,26 +221,26 @@ export function TaskCard({
 
           {/* Assigned User */}
           {task.assigned_user && (
-            <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <User className="w-4 h-4 flex-shrink-0" />
-              <span>{task.assigned_user.display_name}</span>
+            <div className="flex items-center gap-1 min-w-0">
+              <User className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">{task.assigned_user.display_name}</span>
             </div>
           )}
 
           {/* Estimated Time */}
           {task.estimated_minutes && (
-            <div className="flex items-center gap-1.5 whitespace-nowrap">
-              <span className="text-xs">⏱️ {task.estimated_minutes} min</span>
+            <div className="flex items-center gap-1 whitespace-nowrap">
+              <span>⏱️ {task.estimated_minutes} min</span>
             </div>
           )}
         </div>
 
         {/* Status Badge */}
-        <div className="mt-3 pt-3 border-t">
+        <div className="mt-3 pt-3 border-t flex flex-wrap items-center gap-1.5">
           <Badge
             variant="outline"
             className={cn(
-              "font-medium",
+              "font-medium text-xs",
               statusColor,
               isOverdue && "animate-pulse border-red-600 bg-red-100 text-red-800 font-bold"
             )}
@@ -251,14 +251,14 @@ export function TaskCard({
 
           {/* Completed Info */}
           {isCompleted && task.completed_at && (
-            <span className="ml-2 text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground truncate">
               Completed {format(new Date(task.completed_at), "MMM d 'at' h:mm a")}
             </span>
           )}
           
           {/* Overdue Warning */}
           {isOverdue && task.scheduled_date && (
-            <span className="ml-2 text-xs text-red-600 font-semibold">
+            <span className="text-xs text-red-600 font-semibold">
               Overdue since {format(new Date(task.scheduled_date), "MMM d")}
             </span>
           )}

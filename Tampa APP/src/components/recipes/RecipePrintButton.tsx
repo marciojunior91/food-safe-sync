@@ -47,7 +47,7 @@ export function RecipePrintButton({
         className={className}
         onClick={() => setUserDialogOpen(true)}
       >
-        <Printer className={size === 'sm' ? "mr-1 h-3 w-3" : "mr-2 h-4 w-4"} />
+        <Printer className={size === 'sm' ? "mr-0.5 h-3 w-3" : "mr-2 h-4 w-4"} />
         {size === 'sm' ? 'Print' : 'Print Label'}
       </Button>
 

@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { FileText, Upload, X, Image as ImageIcon, Download, Eye, Loader2 } from 'lucide-react';
+import { FileText, Upload, X, Image as ImageIcon, Download, Eye, Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useTeamMemberDocuments, TeamMemberDocument } from '@/hooks/useTeamMemberDocuments';
 
@@ -49,6 +49,7 @@ export function DocumentUpload({
   } = useTeamMemberDocuments(teamMemberId);
   
   const [localDocs, setLocalDocs] = useState<Document[]>(documents);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Fetch existing documents when component mounts or teamMemberId changes
   useEffect(() => {
@@ -126,12 +127,17 @@ export function DocumentUpload({
       }
 
       // Upload file to Supabase
-      await uploadDocument(teamMemberId, {
+      setUploadError(null);
+      const result = await uploadDocument(teamMemberId, {
         file: file,
         certificate_name: file.name,
         certificate_type: file.type.startsWith('image/') ? 'photo' : 'certificate',
         description: `Uploaded ${file.name}`,
       });
+
+      if (!result) {
+        setUploadError(`Failed to upload "${file.name}". Please try again or contact support.`);
+      }
     }
 
     // Reset input
@@ -209,6 +215,26 @@ export function DocumentUpload({
       <p className="text-xs text-muted-foreground">
         Supported formats: PDF, JPG, PNG, WEBP
       </p>
+
+      {/* Inline error message */}
+      {uploadError && (
+        <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Upload Failed</p>
+            <p className="text-xs mt-0.5 opacity-80">{uploadError}</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto h-6 w-6 p-0"
+            onClick={() => setUploadError(null)}
+          >
+            <X className="w-3 h-3" />
+          </Button>
+        </div>
+      )}
 
       {/* Uploaded Documents List */}
       {localDocs.length > 0 && (

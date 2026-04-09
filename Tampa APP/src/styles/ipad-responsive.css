@@ -51,12 +51,9 @@
   }
   
   /* Optimize grid for iPad - 2 columns gives better card size */
+  /* SCOPED: Only Quick Print grids — recipe and routine-tasks pages use their own rules */
   .quick-print-grid,
-  div[class*="grid"] > div[class*="grid"],
-  [class*="grid-cols-2"],
-  [class*="grid-cols-3"],
-  [class*="grid-cols-4"],
-  [class*="grid-cols-5"] {
+  :not([data-page="routine-tasks"]) > div[class*="grid"] > div[class*="grid"]:not([data-recipe-grid]) {
     display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 1.5rem !important;
@@ -65,15 +62,15 @@
   }
   
   /* Ensure grid parent doesn't interfere */
-  .quick-print-grid > *,
-  div[class*="grid"] > div {
+  /* SCOPED: exclude routine-tasks and recipe pages */
+  .quick-print-grid > * {
     grid-column: span 1 !important;
   }
   
   /* Product cards - much larger for iPad */
+  /* SCOPED: Only Quick Print — exclude recipe & routine-tasks pages */
   .quick-print-grid button,
-  div[class*="grid"] button[class*="min-h"],
-  button[class*="flex-col items-center"] {
+  .quick-print-grid > button[class*="flex-col items-center"] {
     min-height: 16rem !important;
     height: 16rem !important;
     width: 100% !important;
@@ -85,17 +82,17 @@
   }
   
   /* Product emoji/icon - larger */
+  /* SCOPED: Only Quick Print — exclude recipe & routine-tasks pages */
   .quick-print-grid button div[class*="text-5xl"],
-  .quick-print-grid button div[class*="text-6xl"],
-  button[class*="flex-col"] div[class*="text-"] {
+  .quick-print-grid button div[class*="text-6xl"] {
     font-size: 5rem !important;
     line-height: 1 !important;
   }
   
   /* Product names - much larger font for readability */
+  /* SCOPED: Only Quick Print — exclude recipe & routine-tasks pages */
   .quick-print-grid button span[class*="text-"],
-  .quick-print-grid button span[class*="font-medium"],
-  button[class*="flex-col"] span[class*="text-"] {
+  .quick-print-grid button span[class*="font-medium"] {
     font-size: 1.25rem !important;
     line-height: 1.5 !important;
     max-width: 100% !important;
@@ -432,7 +429,7 @@
   button div[class*="top-2"] [class*="Badge"],
   button div[class*="top-2"] > div {
     padding: 0.25rem 0.5rem !important;
-    font-size: 0.6875rem !important;
+        font-size: 0.75rem !important;
     line-height: 1.2 !important;
     font-weight: 600 !important;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
@@ -459,7 +456,144 @@
     min-height: 48px !important;
   }
   
-  /* Recipe page */
+  /* Recipe page — categories grid: 3 cols on iPad portrait */
+  [data-page="recipes"] .recipe-categories-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 1rem !important;
+  }
+
+  /* Recipe page — category tile buttons: fully reset Quick Print overrides */
+  [data-page="recipes"] .recipe-categories-grid > button {
+    min-height: auto !important;
+    height: auto !important;
+    padding: 1.25rem 0.75rem !important;
+    font-size: inherit !important;
+  }
+
+  /* Recipe page — emoji inside category tiles: reset the 5rem override */
+  [data-page="recipes"] .recipe-categories-grid > button span[class*="text-3xl"],
+  [data-page="recipes"] .recipe-categories-grid > button span[class*="text-4xl"],
+  [data-page="recipes"] .recipe-categories-grid > button > span,
+  [data-page="recipes"] .recipe-categories-grid > button div[class*="text-"] {
+    font-size: revert !important;
+    line-height: normal !important;
+  }
+
+  /* Recipe page — category tile emoji: proper size */
+  [data-page="recipes"] .recipe-categories-grid > button .recipe-category-emoji {
+    font-size: 2rem !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Recipe page — category tile label */
+  [data-page="recipes"] .recipe-categories-grid > button .recipe-category-label {
+    font-size: 0.875rem !important;
+    font-weight: 600 !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Recipe page — recipe cards grid: 2 cols on iPad portrait */
+  [data-page="recipes"] .recipe-cards-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 1rem !important;
+  }
+
+  /* Recipe page — cards: reset bloated padding from generic rule */
+  [data-page="recipes"] .recipe-cards-grid [class*="Card"] {
+    padding: 0 !important;
+  }
+  [data-page="recipes"] .recipe-cards-grid [class*="CardHeader"] {
+    padding: 1rem 1rem 0.5rem !important;
+  }
+  [data-page="recipes"] .recipe-cards-grid [class*="CardContent"] {
+    padding: 0 1rem 1rem !important;
+  }
+
+  /* Recipe page — ALL text inside recipe grids: reset broad font overrides */
+  [data-page="recipes"] .recipe-categories-grid span,
+  [data-page="recipes"] .recipe-categories-grid div,
+  [data-page="recipes"] .recipe-cards-grid span,
+  [data-page="recipes"] .recipe-cards-grid div {
+    font-size: revert !important;
+    line-height: revert !important;
+  }
+
+  /* Recipe page — then re-apply proper sizes */
+  [data-page="recipes"] .recipe-categories-grid .recipe-category-emoji {
+    font-size: 2rem !important;
+    line-height: 1.2 !important;
+  }
+  [data-page="recipes"] .recipe-categories-grid .recipe-category-label {
+    font-size: 0.875rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Recipe page — badges: keep small inside recipe cards & category tiles */
+  [data-page="recipes"] .recipe-cards-grid [class*="Badge"],
+  [data-page="recipes"] .recipe-categories-grid [class*="Badge"] {
+    padding: 0.125rem 0.5rem !important;
+    font-size: 0.75rem !important;
+    min-height: auto !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Recipe page — card title text */
+  [data-page="recipes"] .recipe-cards-grid [class*="CardTitle"] {
+    font-size: 0.875rem !important;
+    line-height: 1.25 !important;
+  }
+  
+  /* Recipe page — card meta text (prep time, yield) */
+  [data-page="recipes"] .recipe-cards-grid .text-xs {
+    font-size: 0.75rem !important;
+    line-height: 1.4 !important;
+  }
+  
+  /* Recipe page — card category emoji */
+  [data-page="recipes"] .recipe-cards-grid p.text-lg {
+    font-size: 1.125rem !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Recipe page — action buttons inside cards: reset bloated sizing */
+  [data-page="recipes"] .recipe-cards-grid button {
+    min-height: 32px !important;
+    height: auto !important;
+    padding: 0.375rem 0.75rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Recipe page — View & Print buttons: slightly smaller text for fit + wider padding */
+  [data-page="recipes"] .recipe-cards-grid button[class*="flex-1"] {
+    font-size: 0.6875rem !important;
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+  
+  /* Recipe page — "..." menu trigger button */
+  [data-page="recipes"] .recipe-cards-grid button[class*="px-2"] {
+    min-height: 32px !important;
+    min-width: 32px !important;
+    padding: 0.25rem 0.5rem !important;
+  }
+
+  /* Recipe page — toolbar buttons (Categories/All Recipes toggle, sort) */
+  [data-page="recipes"] > div:nth-child(2) button {
+    min-height: 36px !important;
+    padding: 0.5rem 0.75rem !important;
+        font-size: 0.75rem !important;
+  }
+  
+  /* Recipe page — Create Recipe button keeps reasonable size */
+  [data-page="recipes"] > div:first-child button {
+    min-height: 40px !important;
+    padding: 0.625rem 1rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Legacy class (unused but kept for compat) */
   .recipe-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 1.25rem !important;
@@ -550,32 +684,38 @@
     }
     
     /* 3 columns in landscape - better spacing than 4 */
+    /* SCOPED: Only Quick Print grids — recipe page uses its own rules */
     .quick-print-grid,
-    div[class*="grid"] > div[class*="grid"],
-    [class*="grid-cols-2"],
-    [class*="grid-cols-3"],
-    [class*="grid-cols-4"],
-    [class*="grid-cols-5"] {
+    div[class*="grid"] > div[class*="grid"]:not([data-recipe-grid]) {
       display: grid !important;
       grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
       gap: 1.25rem !important;
       width: 100% !important;
       max-width: 100% !important;
     }
+
+    /* Recipe page landscape — categories: 4 cols */
+    [data-page="recipes"] .recipe-categories-grid {
+      grid-template-columns: repeat(4, 1fr) !important;
+    }
+
+    /* Recipe page landscape — recipe cards: 3 cols */
+    [data-page="recipes"] .recipe-cards-grid {
+      grid-template-columns: repeat(3, 1fr) !important;
+    }
     
     /* Ensure all grid items have equal width */
     .quick-print-grid > *,
-    div[class*="grid"] > div[class*="grid"] > *,
-    [class*="grid-cols"] > * {
+    div[class*="grid"] > div[class*="grid"] > * {
       width: 100% !important;
       min-width: 0 !important;
       max-width: 100% !important;
     }
     
     /* Cards optimized for landscape - equal sizes */
+    /* SCOPED: exclude recipe page elements */
     .quick-print-grid button,
-    div[class*="grid"] button[class*="min-h"],
-    button[class*="flex-col items-center"] {
+    div[class*="grid"]:not(.recipe-categories-grid):not(.recipe-cards-grid) button[class*="min-h"] {
       min-height: 13rem !important;
       height: 13rem !important;
       width: 100% !important;
@@ -584,16 +724,74 @@
     }
     
     /* Slightly smaller emoji in landscape */
+    /* SCOPED: exclude recipe page elements */
     .quick-print-grid button div[class*="text-5xl"],
-    .quick-print-grid button div[class*="text-6xl"],
-    button[class*="flex-col"] div[class*="text-"] {
+    .quick-print-grid button div[class*="text-6xl"] {
       font-size: 3.5rem !important;
     }
     
     /* Product names */
+    /* SCOPED: exclude recipe page elements */
     .quick-print-grid button span[class*="text-"],
-    button[class*="flex-col"] span[class*="text-"] {
+    .quick-print-grid button span[class*="font-medium"] {
       font-size: 1rem !important;
+    }
+    
+    /* Recipe page landscape — reset all broad overrides on buttons & text */
+    [data-page="recipes"] .recipe-categories-grid > button {
+      min-height: auto !important;
+      height: auto !important;
+      padding: 1.25rem 0.75rem !important;
+      font-size: inherit !important;
+    }
+    [data-page="recipes"] .recipe-categories-grid span,
+    [data-page="recipes"] .recipe-categories-grid div,
+    [data-page="recipes"] .recipe-cards-grid span,
+    [data-page="recipes"] .recipe-cards-grid div {
+      font-size: revert !important;
+      line-height: revert !important;
+    }
+    [data-page="recipes"] .recipe-categories-grid .recipe-category-emoji {
+      font-size: 2rem !important;
+      line-height: 1.2 !important;
+    }
+    [data-page="recipes"] .recipe-categories-grid .recipe-category-label {
+      font-size: 0.875rem !important;
+      line-height: 1.4 !important;
+    }
+    [data-page="recipes"] .recipe-categories-grid [class*="Badge"],
+    [data-page="recipes"] .recipe-cards-grid [class*="Badge"] {
+      padding: 0.125rem 0.5rem !important;
+      font-size: 0.75rem !important;
+      min-height: auto !important;
+      line-height: 1.4 !important;
+    }
+    [data-page="recipes"] .recipe-cards-grid button {
+      min-height: 32px !important;
+      height: auto !important;
+      padding: 0.375rem 0.75rem !important;
+      font-size: 0.75rem !important;
+    }
+    [data-page="recipes"] .recipe-cards-grid [class*="CardTitle"] {
+      font-size: 0.875rem !important;
+      line-height: 1.25 !important;
+    }
+    [data-page="recipes"] .recipe-cards-grid p.text-lg {
+      font-size: 1.125rem !important;
+      line-height: 1.4 !important;
+    }
+    [data-page="recipes"] .recipe-cards-grid .text-xs {
+      font-size: 0.75rem !important;
+      line-height: 1.4 !important;
+    }
+    [data-page="recipes"] .recipe-cards-grid [class*="Card"] {
+      padding: 0 !important;
+    }
+    [data-page="recipes"] .recipe-cards-grid [class*="CardHeader"] {
+      padding: 1rem 1rem 0.5rem !important;
+    }
+    [data-page="recipes"] .recipe-cards-grid [class*="CardContent"] {
+      padding: 0 1rem 1rem !important;
     }
     
     /* Quick add button */
@@ -676,7 +874,7 @@
     button div[class*="top-2"] [class*="Badge"],
     button div[class*="top-2"] > div {
       padding: 0.25rem 0.5rem !important;
-      font-size: 0.6875rem !important;
+          font-size: 0.75rem !important;
       line-height: 1.2 !important;
       display: flex !important;
       align-items: center !important;
@@ -797,6 +995,65 @@
   .space-y-4 > div[class*="w-full"] > div[role="tablist"] button[role="tab"],
   .space-y-6 > div[class*="w-full"] > div[role="tablist"] button[role="tab"] {
     justify-content: center !important;
+  }
+}
+
+/* ============================================================================
+   ROUTINE TASKS PAGE - iPad optimization (768-1024px)
+   ============================================================================
+   Reset broad selectors that break the task cards grid layout
+============================================================================ */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  /* --- Task card grid: 2 columns on tablet --- */
+  [data-page="routine-tasks"] .grid.gap-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
+  }
+
+  /* --- Tab bar: compact for 5 tabs --- */
+  [data-page="routine-tasks"] [role="tablist"] {
+    gap: 0.25rem !important;
+  }
+
+  [data-page="routine-tasks"] [role="tab"] {
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.8125rem !important;
+    min-height: 36px !important;
+  }
+
+  /* --- Buttons inside task cards: reset to natural size --- */
+  [data-page="routine-tasks"] button:not(.icon-only) {
+    min-height: unset !important;
+    padding: revert !important;
+    font-size: revert !important;
+  }
+
+  /* Restore small buttons inside cards */
+  [data-page="routine-tasks"] button[class*="w-full mt-3"] {
+    min-height: 32px !important;
+    padding: 0.375rem 0.75rem !important;
+    font-size: 0.8125rem !important;
+  }
+
+  /* Header buttons retain touch target */
+  [data-page="routine-tasks"] > .flex > .flex button,
+  [data-page="routine-tasks"] > div:first-child button {
+    min-height: 40px !important;
+    padding: 0.5rem 1rem !important;
+    font-size: 0.875rem !important;
+  }
+
+  /* --- Cards: ensure no overflow --- */
+  [data-page="routine-tasks"] [class*="CardHeader"],
+  [data-page="routine-tasks"] [class*="CardContent"] {
+    overflow: hidden !important;
+  }
+
+  /* --- Badge inside task cards: reset font-size --- */
+  [data-page="routine-tasks"] .grid.gap-4 [class*="Badge"],
+  [data-page="routine-tasks"] .grid.gap-4 span[class*="text-xs"] {
+    font-size: 0.75rem !important;
   }
 }
 

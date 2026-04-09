@@ -195,8 +195,8 @@ export function IncompleteProfilesAlert({
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        // Navigate to People module with this member ID
-                        navigate(`/people/${member.id}`);
+                        // Navigate to People module with this member ID as edit param
+                        navigate(`/people?edit=${member.id}`);
                       }}
                     >
                       View Profile
@@ -216,8 +216,7 @@ export function IncompleteProfilesAlert({
               variant="default"
               size="sm"
               onClick={() => {
-                // Navigate to People module
-                console.log('Navigate to People module');
+                navigate('/people');
               }}
             >
               Go to People Module

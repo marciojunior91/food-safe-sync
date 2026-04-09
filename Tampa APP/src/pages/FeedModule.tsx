@@ -146,7 +146,7 @@ export default function FeedModule() {
                   variant="outline"
                   size="sm"
                   className="shrink-0 border-orange-600 text-orange-600 hover:bg-orange-50"
-                  onClick={() => navigate(`/people/${selectedUser.id}`)}
+                  onClick={() => navigate(`/people?edit=${selectedUser.id}`)}
                 >
                   Complete Profile
                 </Button>

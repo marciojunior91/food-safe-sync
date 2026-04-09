@@ -2,7 +2,7 @@
 // Team management, roles, certifications, and user profiles
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 
 export default function People() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { context, loading: contextLoading } = useUserContext();
   const { role, isAdmin, isManager, canManageTeamMembers } = useUserRole();
@@ -69,6 +70,20 @@ export default function People() {
       fetchTeamMembers({ organization_id: context.organization_id });
     }
   }, [context?.organization_id]);
+
+  // Handle ?edit=<memberId> query param from Feed module
+  useEffect(() => {
+    const editMemberId = searchParams.get('edit');
+    if (editMemberId && teamMembers.length > 0) {
+      const memberToEdit = teamMembers.find(m => m.id === editMemberId);
+      if (memberToEdit) {
+        setActiveTab('team');
+        setEditingTeamMember(memberToEdit);
+        // Clear the query param so it doesn't re-trigger
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, teamMembers]);
 
   // Handle refresh
   const handleRefresh = () => {
