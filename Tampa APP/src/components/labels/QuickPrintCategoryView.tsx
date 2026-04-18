@@ -144,11 +144,11 @@ export function QuickPrintCategoryView({
         <p className="text-sm text-muted-foreground">
           {editMode ? "Edit categories — rename, delete, or add new" : "Select a category to view products"}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {categories.map((category) => (
             <div key={category.id} className="relative">
               {editMode && editingId === category.id ? (
-                <div className="h-36 sm:h-40 border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                <div className="h-40 sm:h-44 md:h-48 border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
                   <CategoryEmojiPicker value={editingIcon} onChange={setEditingIcon} />
                   <Input
                     value={editingName}
@@ -176,10 +176,10 @@ export function QuickPrintCategoryView({
               ) : (
                 <Button
                   variant="outline"
-                  className="h-36 sm:h-40 w-full flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
+                  className="h-40 sm:h-44 md:h-48 w-full flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
                   onClick={() => editMode ? undefined : onCategorySelect(category)}
                 >
-                  <div className="text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition-transform leading-none">
+                  <div className="text-4xl sm:text-5xl mb-3 group-hover:scale-110 transition-transform leading-none">
                     {category.icon || '📁'}
                   </div>
                   <span className="text-sm font-medium text-center line-clamp-2 leading-tight">
@@ -300,11 +300,11 @@ export function QuickPrintCategoryView({
         <p className="text-sm text-muted-foreground">
           {editMode ? "Edit subcategories — rename, delete, or add new" : "Select a subcategory to view products"}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {subcategories.map((subcategory) => (
             <div key={subcategory.id} className="relative">
               {editMode && editingId === subcategory.id ? (
-                <div className="min-h-[10rem] sm:min-h-[11rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                <div className="min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
                   <CategoryEmojiPicker value={editingIcon} onChange={setEditingIcon} />
                   <Input
                     value={editingName}
@@ -332,10 +332,10 @@ export function QuickPrintCategoryView({
               ) : (
                 <Button
                   variant="outline"
-                  className="min-h-[10rem] sm:min-h-[11rem] w-full flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md overflow-hidden"
+                  className="min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] w-full flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md overflow-hidden"
                   onClick={() => editMode ? undefined : onSubcategorySelect(subcategory)}
                 >
-                  <div className="text-3xl sm:text-4xl group-hover:scale-110 transition-transform leading-none">
+                  <div className="text-4xl sm:text-5xl group-hover:scale-110 transition-transform leading-none">
                     {subcategory.icon || '📂'}
                   </div>
                   <span className="text-sm sm:text-base font-medium text-center line-clamp-2 leading-tight px-2">
@@ -371,7 +371,7 @@ export function QuickPrintCategoryView({
           ))}
           {/* Add New Subcategory Button */}
           {editMode && navigationStack.length > 0 && (
-            <div className="min-h-[10rem] sm:min-h-[11rem]">
+            <div className="min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem]">
               {addingNew ? (
                 <div className="h-full border-2 border-dashed border-primary/50 rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-primary/5">
                   <CategoryEmojiPicker value={newIcon} onChange={setNewIcon} />
@@ -443,7 +443,7 @@ export function QuickPrintCategoryView({
         <p className="text-sm text-muted-foreground">
           {editMode ? "Edit products — rename or delete" : "Tap to print instantly • Long-press + icon to add to queue"}
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {products.map((product) => {
             const isLoading = printingProductId === product.id;
             const isSuccess = successProductId === product.id;
@@ -461,7 +461,7 @@ export function QuickPrintCategoryView({
               <div key={product.id} className="relative">
                 {/* Edit mode: inline rename */}
                 {editMode && editingId === product.id ? (
-                  <div className="w-full min-h-[10rem] sm:min-h-[11rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                  <div className="w-full min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
                     <Input
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
@@ -490,7 +490,7 @@ export function QuickPrintCategoryView({
                   variant="outline"
                   disabled={isLoading || editMode}
                   className={cn(
-                    "w-full min-h-[10rem] sm:min-h-[11rem] flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
+                    "w-full min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                     isSuccess
                       ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
                       : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
@@ -546,7 +546,7 @@ export function QuickPrintCategoryView({
                         <Check className="w-8 h-8 sm:w-10 sm:h-10 animate-in zoom-in duration-300" />
                       </div>
                     ) : (
-                      <div className="text-3xl sm:text-4xl leading-none">
+                      <div className="text-4xl sm:text-5xl leading-none">
                         {getProductIcon()}
                       </div>
                     )}

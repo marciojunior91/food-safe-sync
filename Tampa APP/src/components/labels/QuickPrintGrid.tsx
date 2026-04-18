@@ -811,7 +811,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
               <>
                 {/* Grid View - TOUCH-FRIENDLY with larger buttons */}
                 {viewMode === "grid" && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 quick-print-grid">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 quick-print-grid">
                     {filteredProducts.map((product) => {
                       const isLoading = printingProductId === product.id;
                       const isSuccess = successProductId === product.id;
@@ -857,7 +857,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             variant="outline"
                             disabled={isLoading}
                             className={cn(
-                              "min-h-[10rem] sm:min-h-[11rem] w-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
+                              "min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] w-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                               isSuccess 
                                 ? "bg-green-500 text-white border-green-600 hover:bg-green-600" 
                                 : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
@@ -901,7 +901,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                                   <Check className="w-8 h-8 sm:w-10 sm:h-10" />
                                 </div>
                               ) : (
-                                <div className="text-3xl sm:text-4xl leading-none">
+                                <div className="text-4xl sm:text-5xl leading-none">
                                   📦
                                 </div>
                               )}
