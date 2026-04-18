@@ -588,18 +588,29 @@ ${rows.join('\n')}
    */
   async print(labelData: LabelPrintData): Promise<boolean> {
     try {
-      // CRITICAL: Determine protocol based on CURRENT device, not cached value
+      // STEP 1: Ensure BLE connection BEFORE detecting protocol.
+      // On the first call this.device is null, so connect() shows the
+      // Bluetooth picker, pairs the device, discovers GATT services/chars,
+      // and — crucially — runs detectProtocol() so this.protocol is set
+      // correctly BEFORE we generate ZPL or ESC/POS data.
+      if (!this.characteristic) {
+        console.log('📡 Not connected — connecting before generating label data...');
+        await this.connect();
+      }
+
+      // STEP 2: Determine protocol (connect() already updated this.protocol
+      // from the device name, but double-check in case it's still 'auto')
       let currentProtocol = this.protocol;
       
-      // If protocol is 'auto' and we have a device, detect it
       if (currentProtocol === 'auto' && this.device?.name) {
         currentProtocol = this.detectProtocol(this.device.name);
-        console.log(`� Re-detected protocol for "${this.device.name}": ${currentProtocol.toUpperCase()}`);
+        this.protocol = currentProtocol; // cache for subsequent prints
+        console.log(`🔄 Re-detected protocol for "${this.device.name}": ${currentProtocol.toUpperCase()}`);
       }
       
-      console.log(`�🖨️ Printing via Bluetooth (${currentProtocol.toUpperCase()}):`, labelData.productName);
+      console.log(`🖨️ Printing via Bluetooth (${currentProtocol.toUpperCase()}):`, labelData.productName);
 
-      // Generate appropriate command set based on protocol
+      // STEP 3: Generate appropriate command set based on detected protocol
       let data: string | Uint8Array;
       
       if (currentProtocol === 'zpl') {
@@ -610,7 +621,7 @@ ${rows.join('\n')}
         console.log('✅ ESC/POS generated:', data.length, 'bytes');
       }
 
-      // Send to printer
+      // STEP 4: Send to printer (already connected — no picker shown again)
       await this.sendData(data);
 
       return true;
