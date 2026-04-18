@@ -292,36 +292,120 @@ export const saveLabelToDatabase = async (data: LabelPrintData): Promise<string 
 };
 
 /**
- * Send ZPL to Zebra printer via WebSocket
- * Tries multiple ports in order:
- * - 6101: Zebra Browser Print (desktop/mobile)
- * - 9100: Web Services (Link-OS)
- * - 9200: Zebra Setup Utilities
+ * Send ZPL to Zebra printer
+ * 
+ * Strategy (in order):
+ * 1. Print Server HTTP API (for P1112640-017C Bluetooth-to-TCP adapter)
+ *    - Sends to local Node.js server which opens raw TCP socket to printer
+ * 2. WebSocket to Zebra Browser Print (legacy / iOS fallback)
+ *    - Tries ports 6101, 9100, 9200
+ * 
+ * Printer IP/port are read from localStorage (set by Settings → Printer tab)
+ * so each restaurant can configure their own printer without env files.
  */
+const PRINT_SERVER_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PRINT_SERVER_URL) || 'http://localhost:3001';
+
+/**
+ * Read printer IP and port from localStorage (saved by PrinterManagementTab / usePrinter hook).
+ * Falls back to env vars, then to safe defaults.
+ */
+function getPrinterAddress(): { ip: string; port: number } {
+  try {
+    const stored = localStorage.getItem('printer_settings');
+    if (stored) {
+      const settings = JSON.parse(stored);
+      const ip =
+        settings.connectionConfig?.ipAddress ||
+        settings.ipAddress ||
+        '';
+      const port =
+        settings.connectionConfig?.port ||
+        settings.port ||
+        9100;
+      if (ip) return { ip, port };
+    }
+  } catch { /* ignore parse errors */ }
+
+  // Fallback to env vars (for backwards compatibility / CI)
+  const envIp = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PRINTER_IP) || '';
+  const envPort = parseInt((typeof import.meta !== 'undefined' && import.meta.env?.VITE_PRINTER_PORT) || '9100');
+  return { ip: envIp || '192.168.1.100', port: envPort };
+}
+
 const sendToPrinter = async (zpl: string, quantity: number = 1): Promise<void> => {
-  // Ports to try in order of likelihood for Zebra Printer Setup on iOS
+  const { ip: PRINTER_IP, port: PRINTER_PORT } = getPrinterAddress();
+
+  printerDiagnostics.info('🖨️ Starting print job', {
+    zplLength: zpl.length,
+    quantity,
+    printServerUrl: PRINT_SERVER_URL,
+    printerIp: PRINTER_IP,
+    printerPort: PRINTER_PORT,
+    strategy: 'PrintServer(TCP) → WebSocket(BrowserPrint)',
+    source: 'localStorage → env → default',
+  });
+
+  // ── Method 1: Print Server (HTTP → raw TCP) ────────────────────────────────
+  // This is the primary path for the P1112640-017C wireless adapter
+  try {
+    printerDiagnostics.info('📡 Attempting Print Server (TCP bridge)...', {
+      url: `${PRINT_SERVER_URL}/print`,
+      printerIp: PRINTER_IP,
+      printerPort: PRINTER_PORT,
+    });
+
+    const response = await fetch(`${PRINT_SERVER_URL}/print`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        zpl,
+        copies: quantity,
+        ip: PRINTER_IP,
+        port: PRINTER_PORT,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      printerDiagnostics.success('✅ Print job sent via Print Server (TCP)!', {
+        jobNumber: result.jobNumber,
+        copies: quantity,
+        printerIp: result.ip,
+      });
+      return; // Success!
+    } else {
+      throw new Error(result.error || 'Print server returned failure');
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    printerDiagnostics.warning('⚠️ Print Server method failed, falling back to WebSocket...', {
+      error: msg,
+      hint: msg.includes('fetch') || msg.includes('Failed to fetch')
+        ? 'Print server not running. Start with: cd print-server && npm start'
+        : undefined,
+    });
+  }
+
+  // ── Method 2: WebSocket to Zebra Browser Print (legacy) ─────────────────────
   const ports = [
     { port: 6101, name: 'Zebra Browser Print' },
     { port: 9100, name: 'Web Services' },
     { port: 9200, name: 'Zebra Setup Utilities' }
   ];
 
-  printerDiagnostics.info('🖨️ Starting print job', {
-    device: 'iPhone via Zebra Printer Setup App',
-    connection: 'Bluetooth',
-    zplLength: zpl.length,
-    quantity,
-    portsToTry: ports.map(p => `${p.port} (${p.name})`)
+  printerDiagnostics.info('🔌 Trying WebSocket fallback (Zebra Browser Print)...', {
+    portsToTry: ports.map(p => `${p.port} (${p.name})`),
   });
 
   let lastError: Error | null = null;
 
-  // Try each port sequentially
   for (const { port, name } of ports) {
     const attemptNumber = ports.findIndex(p => p.port === port) + 1;
     
     try {
-      printerDiagnostics.info(`🔍 Attempting connection`, {
+      printerDiagnostics.info(`🔍 Attempting WebSocket connection`, {
         attempt: `${attemptNumber}/${ports.length}`,
         port,
         name
@@ -329,44 +413,48 @@ const sendToPrinter = async (zpl: string, quantity: number = 1): Promise<void> =
       
       await attemptConnection(zpl, quantity, port, name);
       
-      // If we get here, connection succeeded!
-      printerDiagnostics.success(`✅ Print job completed successfully!`, {
+      printerDiagnostics.success(`✅ Print job completed via WebSocket!`, {
         port,
         name,
         quantity
       }, port);
       
-      return; // Exit successfully
+      return;
       
     } catch (error) {
       lastError = error as Error;
-      printerDiagnostics.error(`Connection failed`, {
+      printerDiagnostics.error(`WebSocket connection failed`, {
         port,
         name,
         error: error instanceof Error ? error.message : String(error),
         willRetry: attemptNumber < ports.length
       }, port);
       
-      continue; // Try next port
+      continue;
     }
   }
 
-  // If we get here, all ports failed
-  const errorMessage = 'All connection attempts failed';
+  // All methods failed
+  const { ip: failedIp } = getPrinterAddress();
+  const errorMessage = 'All print methods failed (Print Server + WebSocket)';
   printerDiagnostics.error(errorMessage, {
+    printServerUrl: PRINT_SERVER_URL,
     triedPorts: ports.map(p => `${p.port} (${p.name})`),
     lastError: lastError?.message,
     troubleshooting: [
+      '--- P1112640-017C Adapter (preferred) ---',
+      'Start print server: cd print-server && npm start',
+      `Verify printer IP: ${failedIp} (hold FEED 5s to print config label)`,
+      'Ensure adapter LED is solid (not blinking)',
+      'Ensure printer & computer on same network',
+      '--- Zebra Browser Print (fallback) ---',
       'Zebra Printer Setup app is OPEN (not closed)',
       'Printer is CONNECTED via Bluetooth (🟢 green status)',
-      'Web Services is ENABLED (if option appears)',
-      'App is in FOREGROUND or background refresh enabled',
       'Try closing and reopening Zebra Printer Setup',
-      'Try disconnecting and reconnecting printer'
     ]
   });
   
-  throw new Error(`Failed to connect to printer on any port. Last error: ${lastError?.message}`);
+  throw new Error(`${errorMessage}. Last error: ${lastError?.message}`);
 };
 
 /**

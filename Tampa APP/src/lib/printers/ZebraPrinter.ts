@@ -1,8 +1,12 @@
 // ZebraPrinter - Generate ZPL commands for Zebra thermal printers
-// Updated to use unified BOPP design with labelId tracking
+// Updated to support P1112640-017C wireless adapter (Bluetooth-to-TCP bridge)
+// Connection flow: Web App → Print Server (HTTP) → Raw TCP → Printer
 import { PrinterDriver, PrinterCapabilities, PrinterSettings, PrinterStatus } from '@/types/printer';
 import { printLabel as printWithZebra, saveLabelToDatabase, type LabelPrintData } from '@/utils/zebraPrinter';
 import { supabase } from '@/integrations/supabase/client';
+
+// Default print server URL (local Node.js server that bridges HTTP→TCP)
+const DEFAULT_PRINT_SERVER_URL = 'http://localhost:3001';
 
 interface LabelData {
   productName: string;
@@ -31,6 +35,8 @@ export class ZebraPrinter implements PrinterDriver {
   capabilities: PrinterCapabilities;
   private settings: PrinterSettings;
   private connected: boolean = false;
+  private printServerUrl: string;
+  private lastConnectionTest: { success: boolean; latencyMs?: number; error?: string; timestamp: string } | null = null;
 
   constructor(name: string = 'Zebra Thermal', settings?: Partial<PrinterSettings>) {
     this.name = name;
@@ -47,6 +53,10 @@ export class ZebraPrinter implements PrinterDriver {
       ...settings
     };
     
+    // Print server URL can be configured via settings or env
+    this.printServerUrl = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PRINT_SERVER_URL) 
+      || DEFAULT_PRINT_SERVER_URL;
+    
     this.capabilities = {
       supportsZPL: true,
       supportsPDF: false,
@@ -56,14 +66,81 @@ export class ZebraPrinter implements PrinterDriver {
     };
   }
 
+  /**
+   * Connect to printer by testing the connection through the print server.
+   * The print server must be running locally (npm start in print-server/).
+   * 
+   * Connection path:
+   *   ZebraPrinter → HTTP → Print Server (localhost:3001) → Raw TCP → P1112640-017C adapter → Zebra ZD411
+   */
   async connect(): Promise<boolean> {
-    // In a real implementation, this would attempt to connect to the printer
-    // For now, we'll just mark as connected if IP is provided
-    if (this.settings.ipAddress) {
-      this.connected = true;
-      return true;
+    console.log('\n🔌 ============================================');
+    console.log('🔌 ZEBRA PRINTER - CONNECTION TEST');
+    console.log(`🔌 Print Server: ${this.printServerUrl}`);
+    console.log(`🔌 Printer IP: ${this.settings.ipAddress}:${this.settings.port}`);
+    console.log('🔌 ============================================\n');
+
+    try {
+      // Step 1: Check if print server is running
+      console.log('📡 [Step 1] Checking print server health...');
+      const healthResponse = await fetch(`${this.printServerUrl}/health`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      
+      if (!healthResponse.ok) {
+        throw new Error(`Print server returned status ${healthResponse.status}`);
+      }
+      
+      const healthData = await healthResponse.json();
+      console.log('✅ Print server is online:', healthData);
+
+      // Step 2: Test TCP connection to actual printer via print server
+      console.log(`\n📡 [Step 2] Testing TCP connection to printer at ${this.settings.ipAddress}:${this.settings.port}...`);
+      const testUrl = `${this.printServerUrl}/test-connection?ip=${encodeURIComponent(this.settings.ipAddress || '')}&port=${this.settings.port || 9100}`;
+      const testResponse = await fetch(testUrl, {
+        signal: AbortSignal.timeout(10000),
+      });
+      
+      const testData = await testResponse.json();
+      this.lastConnectionTest = testData;
+      
+      if (testData.success) {
+        this.connected = true;
+        console.log(`✅ Printer connected! Latency: ${testData.latencyMs}ms`);
+        console.log('🔌 ============================================\n');
+        return true;
+      } else {
+        this.connected = false;
+        console.error(`❌ Printer not reachable: ${testData.error}`);
+        console.error('🔌 ============================================\n');
+        return false;
+      }
+
+    } catch (error) {
+      this.connected = false;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Provide helpful error messages
+      if (errorMessage.includes('fetch') || errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Failed to fetch')) {
+        console.error('❌ Print server is NOT running!');
+        console.error('💡 Start it with: cd print-server && npm start');
+        console.error('💡 The print server bridges HTTP→TCP for the P1112640-017C adapter');
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('TimeoutError')) {
+        console.error('❌ Connection timed out');
+        console.error('💡 Check that the printer is powered on and the P1112640-017C adapter LED is solid');
+      } else {
+        console.error('❌ Connection error:', errorMessage);
+      }
+      
+      this.lastConnectionTest = {
+        success: false,
+        error: errorMessage,
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('🔌 ============================================\n');
+      return false;
     }
-    return false;
   }
 
   async disconnect(): Promise<void> {
@@ -74,12 +151,21 @@ export class ZebraPrinter implements PrinterDriver {
     return this.connected;
   }
 
+  /**
+   * Get the last connection test result (useful for UI diagnostics)
+   */
+  getLastConnectionTest() {
+    return this.lastConnectionTest;
+  }
+
   async print(labelData: any, testMode: boolean = false): Promise<boolean> {
     console.log('\n🖨️  ============================================');
     console.log('🖨️  ZEBRA PRINTER - PRINT REQUEST');
     console.log('🖨️  ============================================');
     console.log('📦 Input data:', JSON.stringify(labelData, null, 2));
     console.log('🧪 Test mode:', testMode);
+    console.log(`🌐 Print server: ${this.printServerUrl}`);
+    console.log(`🖨️  Printer IP: ${this.settings.ipAddress}:${this.settings.port}`);
     console.log('🖨️  ============================================\n');
 
     try {
@@ -94,42 +180,163 @@ export class ZebraPrinter implements PrinterDriver {
         preparedByName: printData.preparedByName,
       });
       
-      // Use updated zebraPrinter.ts which includes:
-      // 1. Save to database (get labelId)
-      // 2. Generate ZPL with BOPP design
-      // 3. Include labelId in QR code
-      // testMode=true: Skip printer connection, only save to DB
-      console.log('📡 Calling printWithZebra utility...\n');
-      const result = await printWithZebra(printData, testMode);
-      
-      if (!result.success) {
-        console.error('❌ Print failed:', result.error);
-        throw new Error(result.error || 'Print failed');
-      }
-      
       if (testMode) {
+        // TEST MODE: Save to DB + generate ZPL, skip actual printing
+        console.log('🧪 TEST MODE: Using zebraPrinter utility (DB save + ZPL gen only)...');
+        const result = await printWithZebra(printData, true);
+        
+        if (!result.success) {
+          console.error('❌ Test mode failed:', result.error);
+          throw new Error(result.error || 'Test mode failed');
+        }
+        
         console.log(`\n🧪 ============================================`);
         console.log(`🧪 TEST MODE: Label saved to DB`);
         console.log(`🧪 LabelId: ${result.labelId}`);
         console.log(`🧪 ZPL Length: ${result.zpl?.length || 0} chars`);
         console.log(`🧪 ============================================\n`);
-      } else {
-        console.log(`\n✅ ============================================`);
-        console.log(`✅ Label printed successfully`);
-        console.log(`✅ LabelId: ${result.labelId}`);
-        console.log(`✅ ============================================\n`);
+        return true;
       }
       
+      // PRODUCTION MODE: Try print server first (for P1112640-017C adapter)
+      console.log('📡 Attempting to print via Print Server (TCP bridge)...');
+      const printServerSuccess = await this.printViaPrintServer(printData);
+      
+      if (printServerSuccess) {
+        console.log(`\n✅ ============================================`);
+        console.log(`✅ Label printed via Print Server (TCP)!`);
+        console.log(`✅ ============================================\n`);
+        return true;
+      }
+      
+      // FALLBACK: Try WebSocket (Zebra Browser Print app)
+      console.log('⚠️  Print server failed, falling back to WebSocket (Zebra Browser Print)...');
+      const result = await printWithZebra(printData, false);
+      
+      if (!result.success) {
+        console.error('❌ Both print methods failed:', result.error);
+        throw new Error(result.error || 'Print failed on all methods');
+      }
+      
+      console.log(`\n✅ ============================================`);
+      console.log(`✅ Label printed via WebSocket fallback`);
+      console.log(`✅ LabelId: ${result.labelId}`);
+      console.log(`✅ ============================================\n`);
       return true;
+      
     } catch (error) {
       console.error('\n❌ ============================================');
-      console.error('❌ ZPL GENERATION ERROR');
+      console.error('❌ ZPL PRINT ERROR');
       console.error('❌ ============================================');
       console.error('❌ Error:', error);
       console.error('❌ Message:', error instanceof Error ? error.message : 'Unknown error');
       console.error('❌ Stack:', error instanceof Error ? error.stack : 'No stack trace');
       console.error('❌ ============================================\n');
       return false;
+    }
+  }
+
+  /**
+   * Print via the local print server (HTTP → TCP bridge)
+   * This is the primary method for the P1112640-017C adapter
+   */
+  private async printViaPrintServer(data: LabelPrintData): Promise<boolean> {
+    try {
+      // Step 1: Save to database to get labelId
+      console.log('💾 Saving label to database...');
+      const labelId = data.labelId ?? await saveLabelToDatabase(data);
+      if (!labelId) {
+        throw new Error('Failed to save label to database');
+      }
+      console.log(`✅ Label saved, ID: ${labelId}`);
+
+      // Step 2: Generate ZPL (import the generator from zebraPrinter utility)
+      const dataWithLabelId = { ...data, labelId };
+      
+      // We need to generate ZPL - use printWithZebra in test mode to get ZPL string
+      const genResult = await printWithZebra(dataWithLabelId, true);
+      if (!genResult.success || !genResult.zpl) {
+        throw new Error('Failed to generate ZPL code');
+      }
+      
+      const zpl = genResult.zpl;
+      console.log(`📝 ZPL generated (${zpl.length} chars)`);
+
+      // Step 3: Send to print server
+      const printQuantity = data.quantity ? parseInt(data.quantity) : 1;
+      console.log(`📤 Sending to print server: ${this.printServerUrl}/print`);
+      
+      const response = await fetch(`${this.printServerUrl}/print`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          zpl,
+          copies: isNaN(printQuantity) ? 1 : printQuantity,
+          ip: this.settings.ipAddress,
+          port: this.settings.port || 9100,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ Print server accepted job #${result.jobNumber}`);
+        return true;
+      } else {
+        console.error('❌ Print server rejected job:', result.error);
+        if (result.troubleshooting) {
+          console.error('💡 Troubleshooting:', result.troubleshooting);
+        }
+        return false;
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      
+      if (msg.includes('fetch') || msg.includes('ECONNREFUSED') || msg.includes('Failed to fetch')) {
+        console.warn('⚠️  Print server not running (cd print-server && npm start)');
+      } else {
+        console.error('❌ Print server error:', msg);
+      }
+      
+      return false;
+    }
+  }
+
+  /**
+   * Print a test label to verify the connection works end-to-end
+   */
+  async printTestLabel(): Promise<{ success: boolean; error?: string }> {
+    console.log('\n🧪 ============================================');
+    console.log('🧪 PRINTING TEST LABEL');
+    console.log(`🧪 Print Server: ${this.printServerUrl}`);
+    console.log(`🧪 Printer: ${this.settings.ipAddress}:${this.settings.port}`);
+    console.log('🧪 ============================================\n');
+
+    try {
+      const response = await fetch(`${this.printServerUrl}/print-test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ip: this.settings.ipAddress,
+          port: this.settings.port || 9100,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Test label printed successfully!');
+        return { success: true };
+      } else {
+        console.error('❌ Test label failed:', result.error);
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('❌ Test label error:', msg);
+      return { success: false, error: msg };
     }
   }
 

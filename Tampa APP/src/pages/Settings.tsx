@@ -1,9 +1,10 @@
 import { AdminPanel } from "@/components/admin/AdminPanel";
 import { ProfileTabContent } from "@/components/settings/ProfileTabContent";
 import { NotificationsTabContent } from "@/components/settings/NotificationsTabContent";
+import { PrinterManagementTab } from "@/components/settings/PrinterManagementTab";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings, User, Bell, Shield, CreditCard } from "lucide-react";
+import { Settings, User, Bell, Shield, CreditCard, Printer } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useState, useEffect } from "react";
@@ -15,7 +16,8 @@ export default function SettingsPage() {
     profile: false,
     notifications: false,
     admin: false,
-    billing: false
+    billing: false,
+    printer: false
   });
 
   // Preload all components on mount for faster tab switching
@@ -26,7 +28,8 @@ export default function SettingsPage() {
         profile: true,
         notifications: true,
         admin: isAdmin,
-        billing: true
+        billing: true,
+        printer: true
       });
     }, 100);
     
@@ -46,7 +49,7 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'} h-auto p-1`}>
+        <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'} h-auto p-1`}>
           <TabsTrigger value="profile" className="py-2 px-3">
             <User className="w-4 h-4 mr-2" />
             <span>Profile</span>
@@ -54,6 +57,10 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications" className="py-2 px-3">
             <Bell className="w-4 h-4 mr-2" />
             <span>Notifications</span>
+          </TabsTrigger>
+          <TabsTrigger value="printer" className="py-2 px-3">
+            <Printer className="w-4 h-4 mr-2" />
+            <span>Printer</span>
           </TabsTrigger>
           {isAdmin && (
             <TabsTrigger value="admin" className="py-2 px-3">
@@ -75,6 +82,11 @@ export default function SettingsPage() {
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-4 mt-6">
           {preloadedComponents.notifications && <NotificationsTabContent />}
+        </TabsContent>
+
+        {/* Printer Tab */}
+        <TabsContent value="printer" className="space-y-4 mt-6">
+          {preloadedComponents.printer && <PrinterManagementTab />}
         </TabsContent>
 
         {/* Admin Tab */}
