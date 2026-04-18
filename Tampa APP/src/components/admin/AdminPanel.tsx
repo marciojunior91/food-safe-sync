@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Settings, Shield, AlertCircle } from "lucide-react";
-import { PrinterManagementPanel } from "@/components/printers/PrinterManagementPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -96,7 +95,7 @@ export function AdminPanel() {
             
             {isAdmin && <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-green-800 text-sm font-medium">
-                  ✅ You have admin access - Printer management is available below
+                  ✅ You have admin access
                 </p>
               </div>}
 
@@ -109,9 +108,5 @@ export function AdminPanel() {
         </CardContent>
       </Card>
 
-      {/* Printer Management - Show for admins */}
-      {isAdmin && userProfile?.organization_id && (
-        <PrinterManagementPanel organizationId={userProfile.organization_id} />
-      )}
     </div>;
 }

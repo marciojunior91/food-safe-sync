@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -92,6 +92,7 @@ export function PrinterManagementTab() {
   const [isScanning, setIsScanning] = useState(false);
   const [discoveredDevices, setDiscoveredDevices] = useState<DiscoveredPrinter[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
+  const btDeviceRef = useRef<BluetoothDevice | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [darkness, setDarkness] = useState(() => loadSavedSettings().darkness ?? 20);
   const [speed, setSpeed] = useState(() => loadSavedSettings().speed ?? 4);
@@ -216,30 +217,38 @@ export function PrinterManagementTab() {
         }
       }
     } else {
-      // Bluetooth test
-      if (!navigator.bluetooth) {
+      // Bluetooth test — use the already-paired device from scan
+      const device = btDeviceRef.current;
+      if (!device) {
         setConnectionStatus('error');
-        setStatusMessage('Bluetooth is not supported in this browser. Use Chrome on Android.');
+        setStatusMessage('No Bluetooth printer paired yet. Tap "Search for Bluetooth Printers" first.');
         return;
       }
+
       try {
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{ namePrefix: 'Zebra' }, { namePrefix: 'ZD' }],
-          optionalServices: ['49535343-fe7d-4ae5-8fa9-9fafd205e455'],
-        });
-        if (device) {
-          setConnectionStatus('connected');
-          setStatusMessage(`Found: ${device.name || 'Zebra Printer'}`);
-          setPrinterName(device.name || 'Zebra Bluetooth');
-          toast({ title: 'Bluetooth Connected', description: `Device: ${device.name}` });
+        setStatusMessage(`Connecting to ${device.name || 'printer'} via GATT…`);
+        const server = await device.gatt?.connect();
+        if (!server) throw new Error('GATT connect returned empty');
+
+        // Try to discover the serial service (standard BLE printer UUID)
+        const BLE_SERIAL_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
+        try {
+          await server.getPrimaryService(BLE_SERIAL_SERVICE);
+        } catch {
+          // Some printers use different services — connection itself is proof enough
         }
+
+        setConnectionStatus('connected');
+        setStatusMessage(`Connected to ${device.name || 'Bluetooth Printer'}`);
+        toast({ title: 'Bluetooth Connected', description: `${device.name} is reachable.` });
+
+        // Disconnect after test so the connection is clean for printing later
+        server.disconnect();
       } catch (err) {
         setConnectionStatus('error');
-        setStatusMessage(
-          err instanceof Error && err.message.includes('cancelled')
-            ? 'Bluetooth pairing cancelled.'
-            : 'No Zebra printer found via Bluetooth.',
-        );
+        const msg = err instanceof Error ? err.message : String(err);
+        setStatusMessage(`Bluetooth connection failed: ${msg}`);
+        toast({ title: 'Connection Failed', description: msg, variant: 'destructive' });
       }
     }
   };
@@ -265,6 +274,9 @@ export function PrinterManagementTab() {
       });
 
       if (device) {
+        // Store the device reference for test connection & printing
+        btDeviceRef.current = device;
+
         const discovered: DiscoveredPrinter = {
           name: device.name || 'Unknown Printer',
           connectionType: 'bluetooth-le',
@@ -373,6 +385,45 @@ export function PrinterManagementTab() {
       (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PRINT_SERVER_URL) ||
       'http://localhost:3001';
 
+    // ── Bluetooth path ──────────────────────────────────────────────────────
+    if (connectionMethod === 'bluetooth' && btDeviceRef.current) {
+      try {
+        const device = btDeviceRef.current;
+        const server = await device.gatt?.connect();
+        if (!server) throw new Error('GATT connect failed');
+
+        const BLE_SERIAL_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
+        const BLE_SERIAL_CHAR = '49535343-8841-43f4-a8d4-ecbe34729bb3';
+
+        const service = await server.getPrimaryService(BLE_SERIAL_SERVICE);
+        const characteristic = await service.getCharacteristic(BLE_SERIAL_CHAR);
+
+        // Send ZPL in 512-byte chunks (BLE MTU limit)
+        const encoder = new TextEncoder();
+        const data = encoder.encode(testZpl);
+        const CHUNK = 512;
+        for (let i = 0; i < data.length; i += CHUNK) {
+          const chunk = data.slice(i, i + CHUNK);
+          await characteristic.writeValue(chunk);
+        }
+
+        server.disconnect();
+        toast({ title: 'Test Label Sent!', description: `Sent via Bluetooth to ${device.name}.` });
+        setConnectionStatus('connected');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast({
+          title: 'Bluetooth Print Failed',
+          description: msg,
+          variant: 'destructive',
+        });
+      } finally {
+        setIsPrinting(false);
+      }
+      return;
+    }
+
+    // ── WiFi / Network path ─────────────────────────────────────────────────
     try {
       // Try print server
       const res = await fetch(`${printServerUrl}/print`, {
