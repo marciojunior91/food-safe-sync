@@ -120,16 +120,22 @@ export function PrinterManagementTab() {
     const connType: ConnectionType =
       connectionMethod === 'bluetooth' ? 'bluetooth-le' : 'tcp-ip';
 
+    // Auto-set printer type based on connection method
+    // Bluetooth → 'bluetooth' driver (BluetoothUniversalPrinter)
+    // WiFi     → keep user-selected type (zebra, universal, etc.)
+    const effectiveType = connectionMethod === 'bluetooth' ? 'bluetooth' : printerType;
+
     return {
-      type: printerType,
+      type: effectiveType,
       name: printerName,
       model: 'Zebra ZD411',
       manufacturer: 'Zebra',
-      protocol: printerType === 'zebra' || printerType === 'universal' ? 'zpl' : 'auto',
+      protocol: effectiveType === 'zebra' || effectiveType === 'universal' ? 'zpl' : 'auto',
       connectionType: connType,
       connectionConfig: {
         ipAddress: connectionMethod === 'wifi' ? ipAddress : undefined,
         port: connectionMethod === 'wifi' ? parseInt(port) || 9100 : undefined,
+        bluetoothDeviceName: connectionMethod === 'bluetooth' ? printerName : undefined,
         preferredConnection: connType,
         autoReconnect: true,
         timeout: 5000,

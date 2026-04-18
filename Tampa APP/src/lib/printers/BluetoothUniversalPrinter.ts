@@ -7,9 +7,25 @@ import type { LabelPrintData } from '@/utils/zebraPrinter';
 // Common Bluetooth Serial Port Profile (SPP) UUID
 const SPP_SERVICE_UUID = '00001101-0000-1000-8000-00805f9b34fb';
 
-// Zebra-specific UUIDs (fallback for Zebra printers)
+// Zebra-specific UUIDs
 const ZEBRA_SERVICE_UUID = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
 const ZEBRA_CHARACTERISTIC_UUID = '49535343-8841-43f4-a8d4-ecbe34729bb3';
+
+// Zebra BLE Parser (ZD411, ZD421, ZD621 + P1112640-017C adapter)
+const ZEBRA_BLE_PARSER_SERVICE = '38eb4a80-c570-11e3-9507-0002a5d5c51b';
+const ZEBRA_BLE_PARSER_CHAR = '38eb4a82-c570-11e3-9507-0002a5d5c51b';
+
+// All optional services to request during pairing
+const ALL_OPTIONAL_SERVICES = [
+  ZEBRA_SERVICE_UUID,
+  ZEBRA_BLE_PARSER_SERVICE,
+  SPP_SERVICE_UUID,
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Nordic UART
+  '000018f0-0000-1000-8000-00805f9b34fb', // Zebra BTLE
+  '0000ff00-0000-1000-8000-00805f9b34fb', // Generic vendor
+  '0000fff0-0000-1000-8000-00805f9b34fb', // Common printer service
+  '0000ae30-0000-1000-8000-00805f9b34fb', // Zebra write service
+];
 
 export type PrinterProtocol = 'zpl' | 'escpos' | 'auto';
 
@@ -249,7 +265,8 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
   }
 
   /**
-   * Connect to ANY Bluetooth printer
+   * Connect to ANY Bluetooth printer.
+   * Tries getDevices() first (reconnect without picker), then requestDevice().
    */
   async connect(): Promise<boolean> {
     try {
@@ -257,14 +274,43 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
         throw new Error('Web Bluetooth is not supported. Please use Chrome on Android.');
       }
 
-      console.log('🔵 Requesting Bluetooth device (ANY thermal printer)...');
+      // ── 1. Try to reconnect to an already-paired device (no UI picker) ────
+      const savedName = this.settings.connectionConfig?.bluetoothDeviceName || this.name;
+      console.log(`🔵 Trying to reconnect to previously paired device: "${savedName}"`);
 
-      // SOLUTION: Accept ALL devices (no filters)
-      // This will show EVERY Bluetooth device including MPT-II_309F
-      this.device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
-        optionalServices: [SPP_SERVICE_UUID, ZEBRA_SERVICE_UUID]
-      });
+      try {
+        if ('getDevices' in navigator.bluetooth) {
+          const pairedDevices = await (navigator.bluetooth as any).getDevices();
+          console.log(`📋 Found ${pairedDevices.length} previously paired device(s):`,
+            pairedDevices.map((d: BluetoothDevice) => d.name || d.id));
+
+          // Find our device by name
+          for (const dev of pairedDevices) {
+            if (dev.name === savedName || dev.name === this.settings.name) {
+              console.log(`✅ Found paired device: ${dev.name}`);
+              this.device = dev;
+              break;
+            }
+          }
+
+          // If no name match, try first available paired device
+          if (!this.device && pairedDevices.length > 0) {
+            this.device = pairedDevices[0];
+            console.log(`✅ Using first paired device: ${this.device!.name || this.device!.id}`);
+          }
+        }
+      } catch (e) {
+        console.warn('⚠️ getDevices() not available or failed:', e);
+      }
+
+      // ── 2. Fall back to requestDevice() picker if no paired device ────────
+      if (!this.device) {
+        console.log('🔵 No paired device found, showing Bluetooth picker...');
+        this.device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ALL_OPTIONAL_SERVICES,
+        });
+      }
 
       if (!this.device) {
         throw new Error('No device selected');
@@ -277,7 +323,7 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
         this.protocol = this.detectProtocol(this.device.name);
       }
 
-      // Connect to GATT server
+      // ── 3. Connect GATT and find writable characteristic ──────────────────
       const server = await this.device.gatt?.connect();
       if (!server) {
         throw new Error('Failed to connect to GATT server');
@@ -285,50 +331,91 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
 
       console.log('✅ GATT server connected');
 
-      // Try to get service (try Zebra first, then SPP)
-      let service: BluetoothRemoteGATTService;
-      try {
-        service = await server.getPrimaryService(ZEBRA_SERVICE_UUID);
-        console.log('✅ Using Zebra service');
-        // CRITICAL: MPT-II uses Zebra service BUT processes ESC/POS
-        // Keep protocol as detected by device name, don't force ZPL here
-        console.log(`📌 Zebra service found, but keeping detected protocol: ${this.protocol}`);
-      } catch {
+      // Try services in order: Zebra Parser, ISS/Zebra, SPP, then enumerate all
+      const SERVICE_UUIDS = [
+        ZEBRA_BLE_PARSER_SERVICE,
+        ZEBRA_SERVICE_UUID,
+        SPP_SERVICE_UUID,
+        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+        '000018f0-0000-1000-8000-00805f9b34fb',
+        '0000fff0-0000-1000-8000-00805f9b34fb',
+        '0000ff00-0000-1000-8000-00805f9b34fb',
+      ];
+      const CHAR_UUIDS = [
+        ZEBRA_BLE_PARSER_CHAR,
+        ZEBRA_CHARACTERISTIC_UUID,
+        'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+        '0000fff2-0000-1000-8000-00805f9b34fb',
+      ];
+
+      let foundChar: BluetoothRemoteGATTCharacteristic | null = null;
+
+      // Try known service+char pairs
+      for (const svcUUID of SERVICE_UUIDS) {
         try {
-          service = await server.getPrimaryService(SPP_SERVICE_UUID);
-          console.log('✅ Using SPP service (Serial Port Profile)');
-          if (this.protocol === 'auto') {
-            this.protocol = 'escpos'; // Default to ESC/POS for SPP
+          const svc = await server.getPrimaryService(svcUUID);
+          console.log(`✅ Service found: ${svcUUID.slice(0, 8)}...`);
+
+          // Keep detected protocol (don't override based on service)
+          console.log(`📌 Keeping protocol: ${this.protocol}`);
+
+          // Try known characteristic UUIDs
+          for (const charUUID of CHAR_UUIDS) {
+            try {
+              const ch = await svc.getCharacteristic(charUUID);
+              if (ch.properties.write || ch.properties.writeWithoutResponse) {
+                foundChar = ch;
+                console.log(`✅ Writable char found: ${charUUID.slice(0, 8)}...`);
+                break;
+              }
+            } catch { /* next */ }
           }
-        } catch {
-          throw new Error('Could not find compatible Bluetooth service');
-        }
+          if (foundChar) break;
+
+          // Enumerate all characteristics of this service
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+            for (const ch of chars) {
+              if (ch.properties.write || ch.properties.writeWithoutResponse) {
+                foundChar = ch;
+                console.log(`✅ Enum writable char: ${ch.uuid.slice(0, 8)}...`);
+                break;
+              }
+            }
+          } catch { /* can't enumerate */ }
+          if (foundChar) break;
+        } catch { /* service not found, next */ }
       }
 
-      // Get characteristic for writing
-      // Try to find writable characteristic
-      let foundCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
-      
-      try {
-        // Try Zebra-specific characteristic first
-        foundCharacteristic = await service.getCharacteristic(ZEBRA_CHARACTERISTIC_UUID);
-      } catch {
-        // Fallback: Try to get any characteristic (some printers don't expose getCharacteristics)
-        // We'll just try common UUIDs or use a default approach
-        console.log('⚠️ Could not find specific characteristic, trying default approach');
-      }
-
-      this.characteristic = foundCharacteristic;
-
-      if (!this.characteristic) {
-        // Fallback: try Zebra characteristic UUID
+      // Last resort: enumerate all services
+      if (!foundChar) {
         try {
-          this.characteristic = await service.getCharacteristic(ZEBRA_CHARACTERISTIC_UUID);
-        } catch {
-          throw new Error('No writable characteristic found');
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const allServices: BluetoothRemoteGATTService[] = await (server as any)['getPrimaryServices']();
+          console.log('📋 All services:', allServices.map(s => s.uuid));
+          for (const svc of allServices) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+            for (const ch of chars) {
+              if (ch.properties.write || ch.properties.writeWithoutResponse) {
+                foundChar = ch;
+                console.log(`✅ Full-enum char: svc=${svc.uuid.slice(0,8)} char=${ch.uuid.slice(0,8)}`);
+                break;
+              }
+            }
+            if (foundChar) break;
+          }
+        } catch (e) {
+          console.warn('Cannot enumerate all services:', e);
         }
       }
 
+      if (!foundChar) {
+        throw new Error('No writable characteristic found on this Bluetooth device');
+      }
+
+      this.characteristic = foundChar;
       console.log('✅ Characteristic ready for writing');
       console.log(`📝 Using protocol: ${this.protocol.toUpperCase()}`);
 
