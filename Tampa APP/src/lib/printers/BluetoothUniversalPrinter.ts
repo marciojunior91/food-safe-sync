@@ -113,34 +113,117 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
       preparedByName, 
       quantity, 
       unit, 
-      allergens
+      allergens,
+      labelId,
     } = data;
     
-    const qrData = JSON.stringify({
-      product: productName,
-      prep: prepDate,
-      exp: expiryDate,
-      by: preparedByName,
-    });
+    // QR code URL to label preview (same as zebraPrinter.ts)
+    const qrValue = labelId
+      ? `https://app.tampaapp.com.br/labels/${labelId}/preview`
+      : JSON.stringify({ product: productName, prep: prepDate, exp: expiryDate });
     
     const allergenText = allergens && allergens.length > 0
       ? allergens.map(a => a.name).join(', ')
       : '';
     
-    return `
-^XA
-^CF0,30
-^FO50,30^A0N,40,40^FD${productName}^FS
-^FO50,80^A0N,25,25^FD${categoryName}^FS
-^FO50,120^A0N,20,20^FDPrep: ${prepDate}^FS
-^FO50,150^A0N,20,20^FDExp: ${expiryDate}^FS
-^FO50,180^A0N,20,20^FDBy: ${preparedByName}^FS
-${quantity ? `^FO50,210^A0N,20,20^FD${quantity} ${unit}^FS` : ''}
-^FO50,240^A0N,20,20^FD${condition}^FS
-${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
-^FO300,50^BQN,2,6^FDQA,${qrData}^FS
-^XZ
-    `.trim();
+    // Use saved label dimensions (mm → dots at 203dpi: 1mm = 8 dots)
+    const DPI = 203;
+    const MM_TO_DOT = DPI / 25.4; // ~8 dots per mm
+    const labelWidthMm = this.settings.paperWidth || 102;
+    const labelHeightMm = this.settings.paperHeight || 180;
+    const PW = Math.round(labelWidthMm * MM_TO_DOT);
+
+    // Responsive sizing based on label width
+    const isSmall = labelWidthMm <= 60; // 50mm labels
+    const ML = isSmall ? 10 : 30; // left margin
+    const CW = PW - ML * 2;       // content width
+
+    // Font sizes adapt to label size
+    const titleFont = isSmall ? 28 : 40;
+    const normalFont = isSmall ? 18 : 25;
+    const smallFont = isSmall ? 16 : 20;
+    const tinyFont = isSmall ? 14 : 18;
+
+    // QR code: magnification 3 for small labels, 5 for large
+    const qrMag = isSmall ? 3 : 5;
+    const qrW = qrMag * 25 + 20; // approximate QR pixel width
+    const leftColW = CW - qrW - 10;
+
+    const rows: string[] = [];
+    let y = isSmall ? 10 : 20;
+
+    // Product name (truncate for small labels)
+    const maxNameLen = isSmall ? 18 : 30;
+    const displayName = productName.length > maxNameLen ? productName.substring(0, maxNameLen - 1) + '...' : productName;
+    rows.push(`^FO${ML},${y}^A0N,${titleFont},${titleFont}^FD${displayName}^FS`);
+    y += titleFont + 6;
+
+    // Category
+    if (categoryName) {
+      rows.push(`^FO${ML},${y}^A0N,${normalFont},${normalFont}^FD${categoryName}^FS`);
+      y += normalFont + 4;
+    }
+
+    // Separator
+    rows.push(`^FO${ML},${y}^GB${CW},1,1^FS`);
+    y += 6;
+
+    const contentStartY = y;
+
+    // Prep date
+    rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FDPrep: ${prepDate || 'N/A'}^FS`);
+    y += smallFont + 4;
+
+    // Expiry date
+    rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FDExp: ${expiryDate || 'N/A'}^FS`);
+    y += smallFont + 4;
+
+    // Prepared by
+    rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FDBy: ${preparedByName || 'Unknown'}^FS`);
+    y += smallFont + 4;
+
+    // Quantity + unit
+    if (quantity) {
+      rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FD${quantity} ${unit || 'Unit'}^FS`);
+      y += smallFont + 4;
+    }
+
+    // Condition
+    if (condition) {
+      rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FD${condition}^FS`);
+      y += smallFont + 4;
+    }
+
+    // Allergens
+    if (allergenText) {
+      if (isSmall) {
+        // Single line, truncated
+        const truncAllergens = allergenText.length > 30 ? allergenText.substring(0, 29) + '…' : allergenText;
+        rows.push(`^FO${ML},${y}^A0N,${tinyFont},${tinyFont}^FD${truncAllergens}^FS`);
+        y += tinyFont + 4;
+      } else {
+        rows.push(`^FO${ML},${y}^A0N,${tinyFont},${tinyFont}^FDAllergens: ${allergenText}^FS`);
+        y += tinyFont + 4;
+      }
+    }
+
+    // QR code on right side, aligned to content start
+    const qrX = ML + leftColW + 5;
+    rows.push(`^FO${qrX},${contentStartY}^BQN,2,${qrMag}^FDQA,${qrValue}^FS`);
+
+    // Label height: max of content Y and QR bottom, plus margin
+    const qrHeight = qrMag * 25 + 10;
+    const finalY = Math.max(y, contentStartY + qrHeight) + (isSmall ? 10 : 20);
+    const LL = Math.min(Math.round(labelHeightMm * MM_TO_DOT), finalY);
+
+    return `^XA
+^MMT
+^PW${PW}
+^LL${LL}
+^LS0
+^CI28
+${rows.join('\n')}
+^XZ`;
   }
 
   /**
@@ -455,11 +538,30 @@ ${allergenText ? `^FO50,270^A0N,18,18^FDAllergens: ${allergenText}^FS` : ''}
 
       // Send data in chunks (Bluetooth MTU limits)
       const chunkSize = 512;
+      const useWOR = this.characteristic.properties.writeWithoutResponse;
+      console.log(`📤 Sending ${bytes.length} bytes in ${Math.ceil(bytes.length / chunkSize)} chunks (writeWithoutResponse=${useWOR})`);
+
       for (let i = 0; i < bytes.length; i += chunkSize) {
         const chunk = bytes.slice(i, Math.min(i + chunkSize, bytes.length));
         
-        // Use writeValue (standard Web Bluetooth API method)
-        await this.characteristic.writeValue(chunk);
+        try {
+          if (useWOR) {
+            await this.characteristic.writeValueWithoutResponse(chunk);
+          } else {
+            await this.characteristic.writeValue(chunk);
+          }
+        } catch (writeErr) {
+          // Retry once after reconnecting (GATT can drop mid-transfer)
+          console.warn('⚠️ Write failed, reconnecting and retrying...', writeErr);
+          this.characteristic = null;
+          await this.connect();
+          if (!this.characteristic) throw new Error('Reconnect failed');
+          if (useWOR) {
+            await this.characteristic.writeValueWithoutResponse(chunk);
+          } else {
+            await this.characteristic.writeValue(chunk);
+          }
+        }
         
         // Small delay between chunks
         if (i + chunkSize < bytes.length) {

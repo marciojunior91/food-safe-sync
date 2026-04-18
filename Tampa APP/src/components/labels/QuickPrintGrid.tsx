@@ -901,7 +901,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                                   <Check className="w-8 h-8 sm:w-10 sm:h-10" />
                                 </div>
                               ) : (
-                                <div className="text-5xl sm:text-6xl leading-none">
+                                <div className="text-3xl sm:text-4xl leading-none">
                                   📦
                                 </div>
                               )}

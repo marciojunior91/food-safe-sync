@@ -179,7 +179,7 @@ export function QuickPrintCategoryView({
                   className="h-36 sm:h-40 w-full flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
                   onClick={() => editMode ? undefined : onCategorySelect(category)}
                 >
-                  <div className="text-5xl mb-3 group-hover:scale-110 transition-transform">
+                  <div className="text-3xl sm:text-4xl mb-3 group-hover:scale-110 transition-transform leading-none">
                     {category.icon || '📁'}
                   </div>
                   <span className="text-sm font-medium text-center line-clamp-2 leading-tight">
@@ -332,10 +332,10 @@ export function QuickPrintCategoryView({
               ) : (
                 <Button
                   variant="outline"
-                  className="min-h-[10rem] sm:min-h-[11rem] w-full flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
+                  className="min-h-[10rem] sm:min-h-[11rem] w-full flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md overflow-hidden"
                   onClick={() => editMode ? undefined : onSubcategorySelect(subcategory)}
                 >
-                  <div className="text-5xl sm:text-6xl group-hover:scale-110 transition-transform leading-none">
+                  <div className="text-3xl sm:text-4xl group-hover:scale-110 transition-transform leading-none">
                     {subcategory.icon || '📂'}
                   </div>
                   <span className="text-sm sm:text-base font-medium text-center line-clamp-2 leading-tight px-2">
@@ -546,7 +546,7 @@ export function QuickPrintCategoryView({
                         <Check className="w-8 h-8 sm:w-10 sm:h-10 animate-in zoom-in duration-300" />
                       </div>
                     ) : (
-                      <div className="text-5xl sm:text-6xl leading-none">
+                      <div className="text-3xl sm:text-4xl leading-none">
                         {getProductIcon()}
                       </div>
                     )}
