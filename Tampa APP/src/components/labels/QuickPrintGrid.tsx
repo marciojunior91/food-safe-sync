@@ -827,7 +827,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                         <div key={product.id} className="relative">
                           {/* Inline rename form */}
                           {editMode && editingProductId === product.id ? (
-                            <div className="min-h-[10rem] sm:min-h-[11rem] w-full border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                            <div className="h-44 sm:h-48 md:h-52 w-full border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
                               <div className="text-4xl">📦</div>
                               <Input
                                 value={editingProductName}
@@ -853,11 +853,12 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                               </div>
                             </div>
                           ) : (
+                          <div className="h-44 sm:h-48 md:h-52">
                           <Button
                             variant="outline"
                             disabled={isLoading}
                             className={cn(
-                              "min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] w-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
+                              "h-full w-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                               isSuccess 
                                 ? "bg-green-500 text-white border-green-600 hover:bg-green-600" 
                                 : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
@@ -915,6 +916,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             <div className="w-full flex flex-col items-center gap-1 min-h-[1rem]">
                             </div>
                           </Button>
+                          </div>
                           )}
                           
                           {/* Allergen Count Badge (Bottom-Right) - Outside button */}

@@ -304,7 +304,7 @@ export function QuickPrintCategoryView({
           {subcategories.map((subcategory) => (
             <div key={subcategory.id} className="relative">
               {editMode && editingId === subcategory.id ? (
-                <div className="min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                <div className="h-44 sm:h-48 md:h-52 border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
                   <CategoryEmojiPicker value={editingIcon} onChange={setEditingIcon} />
                   <Input
                     value={editingName}
@@ -330,9 +330,10 @@ export function QuickPrintCategoryView({
                   </div>
                 </div>
               ) : (
+                <div className="h-44 sm:h-48 md:h-52">
                 <Button
                   variant="outline"
-                  className="min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] w-full flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md overflow-hidden"
+                  className="h-full w-full flex flex-col items-center justify-center p-3 sm:p-4 gap-3 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md overflow-hidden"
                   onClick={() => editMode ? undefined : onSubcategorySelect(subcategory)}
                 >
                   <div className="text-4xl sm:text-5xl group-hover:scale-110 transition-transform leading-none">
@@ -347,6 +348,7 @@ export function QuickPrintCategoryView({
                     </span>
                   )}
                 </Button>
+                </div>
               )}
               {/* Edit overlay buttons */}
               {editMode && editingId !== subcategory.id && (
@@ -371,7 +373,7 @@ export function QuickPrintCategoryView({
           ))}
           {/* Add New Subcategory Button */}
           {editMode && navigationStack.length > 0 && (
-            <div className="min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem]">
+            <div className="h-44 sm:h-48 md:h-52">
               {addingNew ? (
                 <div className="h-full border-2 border-dashed border-primary/50 rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-primary/5">
                   <CategoryEmojiPicker value={newIcon} onChange={setNewIcon} />
@@ -461,7 +463,7 @@ export function QuickPrintCategoryView({
               <div key={product.id} className="relative">
                 {/* Edit mode: inline rename */}
                 {editMode && editingId === product.id ? (
-                  <div className="w-full min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
+                  <div className="w-full h-44 sm:h-48 md:h-52 border rounded-lg p-3 flex flex-col items-center justify-center gap-2 bg-muted/30">
                     <Input
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
@@ -486,11 +488,12 @@ export function QuickPrintCategoryView({
                     </div>
                   </div>
                 ) : (
+                <div className="h-44 sm:h-48 md:h-52">
                 <Button
                   variant="outline"
                   disabled={isLoading || editMode}
                   className={cn(
-                    "w-full min-h-[11rem] sm:min-h-[12rem] md:min-h-[13rem] flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
+                    "w-full h-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                     isSuccess
                       ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
                       : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
@@ -558,6 +561,7 @@ export function QuickPrintCategoryView({
                   
 
                 </Button>
+                </div>
                 )}
                 
                 {/* Edit overlay buttons for products */}
