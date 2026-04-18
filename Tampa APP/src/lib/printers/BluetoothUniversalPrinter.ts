@@ -546,7 +546,7 @@ ${rows.join('\n')}
         
         try {
           if (useWOR) {
-            await this.characteristic.writeValueWithoutResponse(chunk);
+            await (this.characteristic as any).writeValueWithoutResponse(chunk);
           } else {
             await this.characteristic.writeValue(chunk);
           }
@@ -557,7 +557,7 @@ ${rows.join('\n')}
           await this.connect();
           if (!this.characteristic) throw new Error('Reconnect failed');
           if (useWOR) {
-            await this.characteristic.writeValueWithoutResponse(chunk);
+            await (this.characteristic as any).writeValueWithoutResponse(chunk);
           } else {
             await this.characteristic.writeValue(chunk);
           }
