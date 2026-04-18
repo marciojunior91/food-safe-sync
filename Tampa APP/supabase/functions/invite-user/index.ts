@@ -15,7 +15,7 @@ const corsHeaders = {
 interface CreateAuthUserRequest {
   email: string;
   display_name: string;
-  role_type: "cook" | "barista" | "manager" | "leader_chef" | "admin";
+  role: "admin" | "manager" | "staff";
   organization_id: string;
 }
 
@@ -89,13 +89,13 @@ serve(async (req) => {
     const {
       email,
       display_name,
-      role_type,
+      role,
       organization_id,
     } = body;
 
     // Validate required fields
-    if (!email || !display_name || !role_type || !organization_id) {
-      throw new Error("Missing required fields: email, display_name, role_type, organization_id");
+    if (!email || !display_name || !role || !organization_id) {
+      throw new Error("Missing required fields: email, display_name, role, organization_id");
     }
 
     // Validate organization access
@@ -103,7 +103,7 @@ serve(async (req) => {
       throw new Error("Cannot create users in other organizations");
     }
 
-    console.log(`Creating auth user: ${email} with role ${role_type} for organization ${organization_id}`);
+    console.log(`Creating auth user: ${email} with role ${role} for organization ${organization_id}`);
 
     // Step 1: Create user WITHOUT auto-confirming email so invite email is sent
     console.log(`Attempting to create user: ${email}`);
@@ -113,10 +113,10 @@ serve(async (req) => {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: defaultPassword,
-      email_confirm: false, // Changed to false to trigger invite email
+      email_confirm: true, // Auto-confirm so user can log in immediately
       user_metadata: {
         display_name: display_name,
-        role_type: role_type,
+        role: role,
         organization_id: organization_id,
       },
     });
@@ -134,36 +134,80 @@ serve(async (req) => {
     console.log(`✓ User created: ${email}, user ID: ${authData.user.id}`);
     console.log('✓ Profile automatically created by handle_new_user trigger');
 
-    // Step 2: Send invitation email (confirmation email)
-    console.log('📧 Sending invitation email...');
-    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${req.headers.get('origin') || Deno.env.get('SUPABASE_URL')}/auth/callback`,
-    });
+    // Step 2: Send welcome email via Resend
+    console.log('📧 Sending welcome email via Resend...');
+    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+    let emailSent = false;
+    
+    if (RESEND_API_KEY) {
+      try {
+        const appUrl = Deno.env.get("APP_URL") || "https://www.tampahospo.com.au";
+        const emailResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: "Tampa APP <noreply@tampahospo.com.au>",
+            to: [email],
+            subject: "Welcome to Tampa Hospitality - Your Account is Ready",
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <style>
+                  body { font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px; }
+                  .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; padding: 40px; }
+                  .button { display: inline-block; background-color: #2563eb; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+                  .credentials { background-color: #f0f4ff; border: 1px solid #d0d8f0; border-radius: 6px; padding: 16px; margin: 16px 0; }
+                  .footer { color: #888; font-size: 12px; margin-top: 30px; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <h2>Welcome, ${display_name}! 🎉</h2>
+                  <p>Your account on <strong>Tampa Hospitality</strong> has been created successfully.</p>
+                  <div class="credentials">
+                    <p><strong>Your login credentials:</strong></p>
+                    <p>📧 Email: <strong>${email}</strong></p>
+                    <p>🔑 Temporary Password: <strong>${defaultPassword}</strong></p>
+                    <p style="color: #e53e3e; font-size: 13px;">⚠️ Please change your password after your first login.</p>
+                  </div>
+                  <p>Click the button below to log in:</p>
+                  <a href="${appUrl}/login" class="button">Log In Now</a>
+                  <div class="footer">
+                    <p>If you didn't request this account, please contact support.</p>
+                    <p>© ${new Date().getFullYear()} Tampa Hospitality</p>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `,
+          }),
+        });
 
-    if (inviteError) {
-      console.warn('⚠️ Warning: Could not send invitation email:', inviteError);
+        if (emailResponse.ok) {
+          emailSent = true;
+          console.log('✅ Welcome email sent to', email);
+        } else {
+          const errorData = await emailResponse.json();
+          console.warn('⚠️ Warning: Resend email failed:', JSON.stringify(errorData));
+        }
+      } catch (emailErr) {
+        console.warn('⚠️ Warning: Could not send welcome email:', emailErr);
+      }
     } else {
-      console.log('✅ Invitation email sent to', email);
+      console.warn('⚠️ RESEND_API_KEY not configured, skipping welcome email');
     }
 
-    // Step 3: Send password reset email
-    console.log('📧 Sending password reset email...');
-    const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${req.headers.get('origin') || Deno.env.get('SUPABASE_URL')}/auth/callback`,
-    });
-
-    if (resetError) {
-      console.warn('⚠️ Warning: Could not send password reset email:', resetError);
-    } else {
-      console.log('✅ Password reset email sent to', email);
-    }
-
-    // Step 4: Create user_roles entry
+    // Step 3: Create user_roles entry
     const { error: userRoleError } = await supabaseAdmin
       .from("user_roles")
       .insert({
         user_id: authData.user.id,
-        role: role_type,
+        role: role,
+        organization_id: organization_id,
         created_at: new Date().toISOString(),
       });
 
@@ -174,20 +218,23 @@ serve(async (req) => {
       throw new Error(`Failed to create user role: ${userRoleError.message}`);
     }
     
-    console.log(`✓ User role created: ${role_type} for user ${authData.user.id}`);
+    console.log(`✓ User role created: ${role} for user ${authData.user.id}`);
 
     // Success response
     return new Response(
       JSON.stringify({
         success: true,
-        message: "User created successfully. Invitation and password reset emails sent.",
+        message: "User created successfully.",
         data: {
           user_id: authData.user.id,
           email: email,
           display_name: display_name,
-          role: role_type,
+          role: role,
           organization_id: organization_id,
-          note: "User will receive invitation and password reset emails. Default password (TampaAPP@2026) can be used as backup.",
+          emailSent: emailSent,
+          note: emailSent 
+            ? "Welcome email sent with login credentials." 
+            : "User created. Default password: TampaAPP@2026",
         },
       }),
       {
