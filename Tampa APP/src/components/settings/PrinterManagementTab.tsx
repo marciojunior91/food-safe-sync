@@ -274,6 +274,7 @@ export function PrinterManagementTab() {
         optionalServices: [
           '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISS (MPT-II, many BLE printers)
           'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Nordic UART
+          '38eb4a80-c570-11e3-9507-0002a5d5c51b', // Zebra BLE Parser (ZD411, ZD421, etc.)
           '000018f0-0000-1000-8000-00805f9b34fb', // Zebra BTLE
           '00001101-0000-1000-8000-00805f9b34fb', // SPP
           '0000ff00-0000-1000-8000-00805f9b34fb', // Generic vendor
@@ -434,16 +435,22 @@ export function PrinterManagementTab() {
     // Known UUIDs to try in order
     const KNOWN_SERVICES = [
       btGattInfoRef.current?.serviceUUID,                   // previously discovered
+      '38eb4a80-c570-11e3-9507-0002a5d5c51b',              // Zebra BLE Parser (ZD411, ZD421, ZD621)
       '49535343-fe7d-4ae5-8fa9-9fafd205e455',              // ISS (MPT-II, many BLE printers)
       'e7810a71-73ae-499d-8c15-faa9aef0c3f2',              // Nordic UART TX
       '000018f0-0000-1000-8000-00805f9b34fb',              // Zebra BTLE
+      '0000fff0-0000-1000-8000-00805f9b34fb',              // Common printer service
+      '0000ff00-0000-1000-8000-00805f9b34fb',              // Generic vendor
+      '0000ae30-0000-1000-8000-00805f9b34fb',              // Zebra write service
       '00001101-0000-1000-8000-00805f9b34fb',              // SPP
     ].filter(Boolean) as string[];
 
     const KNOWN_CHARS = [
       btGattInfoRef.current?.characteristicUUID,
+      '38eb4a82-c570-11e3-9507-0002a5d5c51b',              // Zebra BLE Parser write
       '49535343-8841-43f4-a8d4-ecbe34729bb3',              // ISS write
       'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',              // Nordic UART RX
+      '0000fff2-0000-1000-8000-00805f9b34fb',              // Common printer write
     ].filter(Boolean) as string[];
 
     // 1️⃣ Try known service+characteristic pairs
@@ -492,6 +499,24 @@ export function PrinterManagementTab() {
       console.warn('Cannot enumerate all services:', e);
     }
 
+    // Log diagnostic info
+    console.error('❌ BLE: No writable characteristic found after trying all known services');
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allSvcs: BluetoothRemoteGATTService[] = await (server as any)['getPrimaryServices']();
+      console.log('📋 Available BLE services:', allSvcs.map(s => s.uuid));
+    } catch { console.log('📋 Could not enumerate services (access denied by browser)'); }
+
+    const isZebra = (server.device.name || '').toLowerCase().match(/zebra|zd|zt|zq|zp|dfj/);
+    if (isZebra) {
+      throw new Error(
+        'Zebra BLE: no writable GATT service found. ' +
+        'The P1112640-017C adapter may need BLE data mode enabled.\n\n' +
+        'In the Zebra Printer Setup app → Connectivity → Bluetooth:\n' +
+        '• Set "Controller Mode" to "Both" or "LE"\n' +
+        '• Or use WiFi (recommended for Zebra printers)'
+      );
+    }
     throw new Error('No writable BLE characteristic found. Make sure the printer is on and in range.');
   };
 
@@ -534,11 +559,26 @@ export function PrinterManagementTab() {
         setConnectionStatus('connected');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        toast({ title: 'Bluetooth Print Failed', description: msg, variant: 'destructive' });
-      } finally {
-        setIsPrinting(false);
+        const isZebraDevice = (btDeviceRef.current?.name || printerName).toLowerCase().match(/zebra|zd|zt|zq|zp|dfj/);
+
+        // If Zebra and WiFi IP is available, auto-fallback to WiFi
+        if (isZebraDevice && ipAddress && msg.includes('No writable BLE') || msg.includes('Zebra BLE')) {
+          console.log(`🔄 BLE failed for Zebra, falling back to WiFi ${ipAddress}:${port}`);
+          toast({ title: 'BLE unavailable', description: `Trying WiFi (${ipAddress})...` });
+          // Don't return — fall through to WiFi path below
+        } else {
+          toast({ title: 'Bluetooth Print Failed', description: msg, variant: 'destructive' });
+          setIsPrinting(false);
+          return;
+        }
       }
-      return;
+      // If we reach here from catch fallback, continue to WiFi path
+      if (connectionStatus !== 'connected') {
+        // fall through to WiFi
+      } else {
+        setIsPrinting(false);
+        return;
+      }
     }
 
     // ── WiFi / Network path ─────────────────────────────────────────────────
