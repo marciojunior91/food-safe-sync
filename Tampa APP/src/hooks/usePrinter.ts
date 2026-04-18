@@ -34,7 +34,18 @@ export function usePrinter(context?: string) {
       console.log(`🖨️ Loading printer settings for context: ${context || 'default'}`);
       
       // Load user preference from localStorage
-      const stored = localStorage.getItem(STORAGE_KEY);
+      // 1. Try context-specific key first
+      // 2. Fall back to global 'printer_settings' (set by Settings > Printer tab)
+      // 3. Fall back to Zebra defaults
+      let stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored && context) {
+        // No context-specific settings → inherit from global printer config
+        stored = localStorage.getItem(DEFAULT_STORAGE_KEY);
+        if (stored) {
+          console.log(`📋 No settings for "${context}", inheriting from global printer config`);
+        }
+      }
+      
       if (stored) {
         const parsedSettings = JSON.parse(stored) as PrinterSettings;
         setSettings(parsedSettings);
@@ -78,8 +89,8 @@ export function usePrinter(context?: string) {
       const customEvent = event as CustomEvent<PrinterSettingsChangedDetail>;
       const { storageKey, settings: newSettings } = customEvent.detail;
       
-      // Only reload if this is our storage key
-      if (storageKey === STORAGE_KEY) {
+      // Reload if this is our storage key OR the global key (for inherited settings)
+      if (storageKey === STORAGE_KEY || (context && storageKey === DEFAULT_STORAGE_KEY)) {
         console.log(`🔄 Printer settings changed externally for context: ${context || 'default'}`);
         setSettings(newSettings);
         

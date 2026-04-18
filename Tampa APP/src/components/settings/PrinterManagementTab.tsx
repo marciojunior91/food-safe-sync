@@ -93,6 +93,7 @@ export function PrinterManagementTab() {
   const [discoveredDevices, setDiscoveredDevices] = useState<DiscoveredPrinter[]>([]);
   const [isPrinting, setIsPrinting] = useState(false);
   const btDeviceRef = useRef<BluetoothDevice | null>(null);
+  const btGattInfoRef = useRef<{ serviceUUID: string; characteristicUUID: string } | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [darkness, setDarkness] = useState(() => loadSavedSettings().darkness ?? 20);
   const [speed, setSpeed] = useState(() => loadSavedSettings().speed ?? 4);
@@ -270,7 +271,15 @@ export function PrinterManagementTab() {
     try {
       const device = await navigator.bluetooth.requestDevice({
         acceptAllDevices: true,
-        optionalServices: ['49535343-fe7d-4ae5-8fa9-9fafd205e455'],
+        optionalServices: [
+          '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISS (MPT-II, many BLE printers)
+          'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Nordic UART
+          '000018f0-0000-1000-8000-00805f9b34fb', // Zebra BTLE
+          '00001101-0000-1000-8000-00805f9b34fb', // SPP
+          '0000ff00-0000-1000-8000-00805f9b34fb', // Generic vendor
+          '0000fff0-0000-1000-8000-00805f9b34fb', // Common printer service
+          '0000ae30-0000-1000-8000-00805f9b34fb', // Zebra write service
+        ],
       });
 
       if (device) {
@@ -358,12 +367,46 @@ export function PrinterManagementTab() {
     toast({ title: 'Printer Selected', description: dp.name });
   };
 
-  // ── Print test label ──────────────────────────────────────────────────────
-  const handlePrintTest = async () => {
-    setIsPrinting(true);
+  // ── Detect if printer is ESC/POS based on name ───────────────────────────
+  const isEscPos = (name: string): boolean => {
+    const n = name.toLowerCase();
+    return (
+      n.includes('mpt') || n.includes('xprinter') || n.includes('epson') ||
+      n.includes('tm-') || n.includes('pos') || n.includes('thermal') ||
+      n.includes('rongta') || n.includes('hprt') || n.includes('mini')
+    );
+  };
 
-    // Build simple ZPL test label
-    const testZpl = `^XA
+  // ── Generate ESC/POS test receipt ──────────────────────────────────────────
+  const buildEscPosTest = (): Uint8Array => {
+    const cmds: number[] = [];
+    const txt = (s: string) => cmds.push(...Array.from(new TextEncoder().encode(s)));
+    cmds.push(0x1B, 0x40);           // ESC @ — init
+    cmds.push(0x1B, 0x61, 0x01);     // center
+    cmds.push(0x1D, 0x21, 0x11);     // double size
+    cmds.push(0x1B, 0x45, 0x01);     // bold on
+    txt('Tampa APP\n');
+    cmds.push(0x1B, 0x45, 0x00);     // bold off
+    cmds.push(0x1D, 0x21, 0x00);     // normal size
+    txt('Test Label\n');
+    txt('------------------------\n');
+    cmds.push(0x1B, 0x61, 0x00);     // align left
+    txt(`Printer: ${printerName}\n`);
+    txt(`Connection: Bluetooth\n`);
+    txt(`Date: ${new Date().toLocaleString()}\n`);
+    txt(`Darkness: ${darkness} | Speed: ${speed}\n`);
+    txt(`Label: ${paperWidth}x${paperHeight}mm\n`);
+    txt('------------------------\n');
+    cmds.push(0x1B, 0x61, 0x01);     // center
+    txt('If you see this,\n');
+    txt('your printer is working!\n');
+    cmds.push(0x0A, 0x0A, 0x0A);     // line feeds
+    cmds.push(0x1D, 0x56, 0x00);     // cut
+    return new Uint8Array(cmds);
+  };
+
+  // ── Build ZPL test label ──────────────────────────────────────────────────
+  const buildZplTest = (): string => `^XA
 ^MMT
 ^PW812
 ^LL400
@@ -381,6 +424,81 @@ export function PrinterManagementTab() {
 ^FO40,350^A0N,20,20^FDDarkness: ${darkness} | Speed: ${speed} | ${paperWidth}x${paperHeight}mm^FS
 ^XZ`;
 
+  /**
+   * Discover writable BLE characteristic dynamically.
+   * Tries cached service first, then known UUIDs, then enumerates all services.
+   */
+  const findBleCharacteristic = async (
+    server: BluetoothRemoteGATTServer,
+  ): Promise<BluetoothRemoteGATTCharacteristic> => {
+    // Known UUIDs to try in order
+    const KNOWN_SERVICES = [
+      btGattInfoRef.current?.serviceUUID,                   // previously discovered
+      '49535343-fe7d-4ae5-8fa9-9fafd205e455',              // ISS (MPT-II, many BLE printers)
+      'e7810a71-73ae-499d-8c15-faa9aef0c3f2',              // Nordic UART TX
+      '000018f0-0000-1000-8000-00805f9b34fb',              // Zebra BTLE
+      '00001101-0000-1000-8000-00805f9b34fb',              // SPP
+    ].filter(Boolean) as string[];
+
+    const KNOWN_CHARS = [
+      btGattInfoRef.current?.characteristicUUID,
+      '49535343-8841-43f4-a8d4-ecbe34729bb3',              // ISS write
+      'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',              // Nordic UART RX
+    ].filter(Boolean) as string[];
+
+    // 1️⃣ Try known service+characteristic pairs
+    for (const svcUUID of KNOWN_SERVICES) {
+      try {
+        const svc = await server.getPrimaryService(svcUUID);
+        for (const charUUID of KNOWN_CHARS) {
+          try {
+            const ch = await svc.getCharacteristic(charUUID);
+            if (ch.properties.write || ch.properties.writeWithoutResponse) {
+              btGattInfoRef.current = { serviceUUID: svcUUID, characteristicUUID: charUUID };
+              console.log(`✅ BLE found writable char: svc=${svcUUID.slice(0,8)} char=${charUUID.slice(0,8)}`);
+              return ch;
+            }
+          } catch { /* next char */ }
+        }
+        // If service found but no known char, enumerate all characteristics
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+        for (const ch of chars) {
+          if (ch.properties.write || ch.properties.writeWithoutResponse) {
+            btGattInfoRef.current = { serviceUUID: svcUUID, characteristicUUID: ch.uuid };
+            console.log(`✅ BLE enum char: svc=${svcUUID.slice(0,8)} char=${ch.uuid.slice(0,8)}`);
+            return ch;
+          }
+        }
+      } catch { /* service not found, next */ }
+    }
+
+    // 2️⃣ Last resort: enumerate ALL primary services
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const services: BluetoothRemoteGATTService[] = await (server as any)['getPrimaryServices']();
+      for (const svc of services) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+        for (const ch of chars) {
+          if (ch.properties.write || ch.properties.writeWithoutResponse) {
+            btGattInfoRef.current = { serviceUUID: svc.uuid, characteristicUUID: ch.uuid };
+            console.log(`✅ BLE full-enum char: svc=${svc.uuid.slice(0,8)} char=${ch.uuid.slice(0,8)}`);
+            return ch;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Cannot enumerate all services:', e);
+    }
+
+    throw new Error('No writable BLE characteristic found. Make sure the printer is on and in range.');
+  };
+
+  // ── Print test label ──────────────────────────────────────────────────────
+  const handlePrintTest = async () => {
+    setIsPrinting(true);
+
     const printServerUrl =
       (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PRINT_SERVER_URL) ||
       'http://localhost:3001';
@@ -392,19 +510,23 @@ export function PrinterManagementTab() {
         const server = await device.gatt?.connect();
         if (!server) throw new Error('GATT connect failed');
 
-        const BLE_SERIAL_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
-        const BLE_SERIAL_CHAR = '49535343-8841-43f4-a8d4-ecbe34729bb3';
+        // Auto-discover writable characteristic
+        const characteristic = await findBleCharacteristic(server);
 
-        const service = await server.getPrimaryService(BLE_SERIAL_SERVICE);
-        const characteristic = await service.getCharacteristic(BLE_SERIAL_CHAR);
+        // Choose protocol based on printer name
+        const useEscPos = isEscPos(device.name || printerName);
+        const payload: Uint8Array = useEscPos
+          ? buildEscPosTest()
+          : new TextEncoder().encode(buildZplTest());
 
-        // Send ZPL in 512-byte chunks (BLE MTU limit)
-        const encoder = new TextEncoder();
-        const data = encoder.encode(testZpl);
+        console.log(`🖨️ Sending ${useEscPos ? 'ESC/POS' : 'ZPL'} test (${payload.length} bytes) to ${device.name}`);
+
+        // Send in 512-byte chunks
         const CHUNK = 512;
-        for (let i = 0; i < data.length; i += CHUNK) {
-          const chunk = data.slice(i, i + CHUNK);
+        for (let i = 0; i < payload.length; i += CHUNK) {
+          const chunk = payload.slice(i, i + CHUNK);
           await characteristic.writeValue(chunk);
+          if (i + CHUNK < payload.length) await new Promise(r => setTimeout(r, 50));
         }
 
         server.disconnect();
@@ -412,11 +534,7 @@ export function PrinterManagementTab() {
         setConnectionStatus('connected');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        toast({
-          title: 'Bluetooth Print Failed',
-          description: msg,
-          variant: 'destructive',
-        });
+        toast({ title: 'Bluetooth Print Failed', description: msg, variant: 'destructive' });
       } finally {
         setIsPrinting(false);
       }
@@ -424,21 +542,15 @@ export function PrinterManagementTab() {
     }
 
     // ── WiFi / Network path ─────────────────────────────────────────────────
+    const testZpl = buildZplTest();
     try {
-      // Try print server
       const res = await fetch(`${printServerUrl}/print`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          zpl: testZpl,
-          copies: 1,
-          ip: ipAddress,
-          port: parseInt(port) || 9100,
-        }),
+        body: JSON.stringify({ zpl: testZpl, copies: 1, ip: ipAddress, port: parseInt(port) || 9100 }),
         signal: AbortSignal.timeout(15000),
       });
       const data = await res.json();
-
       if (data.success) {
         toast({ title: 'Test Label Sent!', description: 'Check your printer.' });
         setConnectionStatus('connected');
@@ -451,21 +563,13 @@ export function PrinterManagementTab() {
         const ws = new WebSocket('ws://127.0.0.1:9100/');
         await new Promise<void>((resolve, reject) => {
           const t = setTimeout(() => { ws.close(); reject(new Error('timeout')); }, 10000);
-          ws.onopen = () => {
-            ws.send(testZpl);
-            clearTimeout(t);
-            setTimeout(() => { ws.close(); resolve(); }, 1000);
-          };
+          ws.onopen = () => { ws.send(testZpl); clearTimeout(t); setTimeout(() => { ws.close(); resolve(); }, 1000); };
           ws.onerror = () => { clearTimeout(t); reject(new Error('ws error')); };
         });
         toast({ title: 'Test Label Sent!', description: 'Sent via Zebra Browser Print.' });
         setConnectionStatus('connected');
       } catch {
-        toast({
-          title: 'Print Failed',
-          description: 'Could not send test label. Check your printer connection.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Print Failed', description: 'Could not send test label. Check your printer connection.', variant: 'destructive' });
       }
     } finally {
       setIsPrinting(false);
