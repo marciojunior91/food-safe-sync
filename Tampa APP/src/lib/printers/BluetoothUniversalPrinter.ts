@@ -119,11 +119,12 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   /**
    * Generate ZPL code for Zebra printers.
    * Tuned for 50mm × 50mm thermal labels (no QR code):
-   *   PRODUCT NAME
-   *   CATEGORY – SUBCATEGORY
+   *   PRODUCT NAME (large)
+   *   CATEGORY - SUBCATEGORY
    *   ──────────────────────
-   *   PREPARED DATE: DD/MM/YYYY
-   *   EXPIRE DATE:   DD/MM/YYYY
+   *   PREPARED DATE: DD/MM/YYYY   (BOLD)
+   *   EXPIRE DATE:   DD/MM/YYYY   (BOLD)
+   *   ──────────────────────
    *   PRINTED BY:    Name
    *   QUANTITY:      1 UNIT
    *   CONDITION:     REFRIGERATED
@@ -152,49 +153,62 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
     // Use saved label dimensions (mm → dots at 203dpi: 1mm = 8 dots)
     const DPI = 203;
     const MM_TO_DOT = DPI / 25.4;
-    const labelWidthMm = this.settings.paperWidth || 102;
-    const labelHeightMm = this.settings.paperHeight || 180;
+    const labelWidthMm = this.settings.paperWidth || 50;
+    const labelHeightMm = this.settings.paperHeight || 50;
     const PW = Math.round(labelWidthMm * MM_TO_DOT);
+    const LL = Math.round(labelHeightMm * MM_TO_DOT);
 
     const isSmall = labelWidthMm <= 60;
-    const ML = isSmall ? 10 : 30;
+    const ML = isSmall ? 12 : 30;
     const CW = PW - ML * 2;
 
-    // Font sizes (dots). User-requested product font: 24.
-    const titleFont = 24;
-    const subFont = isSmall ? 16 : 20;
-    const bodyFont = isSmall ? 18 : 22;
-    const allergenLabelFont = isSmall ? 16 : 20;
+    // Font sizes (dots) — larger to fill 50mm label without blank space.
+    const titleFont = isSmall ? 44 : 50;
+    const subFont = isSmall ? 24 : 28;
+    const dateFont = isSmall ? 26 : 30;
+    const bodyFont = isSmall ? 24 : 28;
+    const allergenLabelFont = isSmall ? 22 : 26;
 
     const rows: string[] = [];
-    let y = isSmall ? 10 : 20;
 
-    // ── PRODUCT NAME ────────────────────────────────────────
-    rows.push(`^FO${ML},${y}^A0N,${titleFont},${titleFont}^FD${productName}^FS`);
-    y += titleFont + 6;
+    // Double-print at +1 dot offset to simulate BOLD in ZPL's bitmap font.
+    const boldRow = (x: number, y: number, h: number, w: number, text: string): string[] => [
+      `^FO${x},${y}^A0N,${h},${w}^FD${text}^FS`,
+      `^FO${x + 1},${y}^A0N,${h},${w}^FD${text}^FS`,
+    ];
 
-    // ── CATEGORY – SUBCATEGORY ─────────────────────────────
+    let y = isSmall ? 12 : 20;
+
+    // ── PRODUCT NAME (bold large title) ───────────────────
+    rows.push(...boldRow(ML, y, titleFont, titleFont, productName));
+    y += titleFont + 8;
+
+    // ── CATEGORY - SUBCATEGORY ─────────────────────────────
     const catParts: string[] = [];
     if (categoryName) catParts.push(categoryName);
     if (subcategoryName) catParts.push(subcategoryName);
     if (catParts.length > 0) {
-      const catLine = catParts.join(' - ');
-      rows.push(`^FO${ML},${y}^A0N,${subFont},${subFont}^FD${catLine}^FS`);
-      y += subFont + 6;
+      rows.push(`^FO${ML},${y}^A0N,${subFont},${subFont}^FD${catParts.join(' - ')}^FS`);
+      y += subFont + 10;
     }
 
     // ── Separator ──────────────────────────────────────────
-    rows.push(`^FO${ML},${y}^GB${CW},1,1^FS`);
-    y += 8;
+    rows.push(`^FO${ML},${y}^GB${CW},3,3^FS`);
+    y += 12;
 
-    // ── PREPARED DATE / EXPIRE DATE / PRINTED BY / CONDITION ──
-    const lineGap = bodyFont + 6;
+    // ── DATES (BOLD) ───────────────────────────────────────
+    rows.push(...boldRow(ML, y, dateFont, dateFont, `PREPARED DATE: ${this.formatDateDMY(prepDate)}`));
+    y += dateFont + 8;
 
-    rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDPREPARED DATE: ${this.formatDateDMY(prepDate)}^FS`);
-    y += lineGap;
+    rows.push(...boldRow(ML, y, dateFont, dateFont, `EXPIRE DATE: ${this.formatDateDMY(expiryDate)}`));
+    y += dateFont + 10;
 
-    rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDEXPIRE DATE: ${this.formatDateDMY(expiryDate)}^FS`);
-    y += lineGap;
+    // ── Separator between dates and other info ─────────────
+    rows.push(`^FO${ML},${y}^GB${CW},3,3^FS`);
+    y += 12;
+
+    // ── BODY (printed by / quantity / condition) ───────────
+    const lineGap = bodyFont + 8;
 
     rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDPRINTED BY: ${preparedByName || 'Unknown'}^FS`);
     y += lineGap;
@@ -212,18 +226,15 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
 
     // ── Separator + ALLERGENS ──────────────────────────────
     if (allergenText) {
-      rows.push(`^FO${ML},${y}^GB${CW},1,1^FS`);
-      y += 8;
+      rows.push(`^FO${ML},${y}^GB${CW},3,3^FS`);
+      y += 12;
 
-      rows.push(`^FO${ML},${y}^A0N,${allergenLabelFont},${allergenLabelFont}^FDALLERGENS^FS`);
-      y += allergenLabelFont + 4;
+      rows.push(...boldRow(ML, y, allergenLabelFont, allergenLabelFont, 'ALLERGENS'));
+      y += allergenLabelFont + 6;
 
       rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FD${allergenText}^FS`);
-      y += bodyFont + 4;
+      y += bodyFont + 6;
     }
-
-    const finalY = y + (isSmall ? 10 : 20);
-    const LL = Math.min(Math.round(labelHeightMm * MM_TO_DOT), finalY);
 
     return `^XA
 ^MMT
@@ -270,14 +281,14 @@ ${rows.join('\n')}
     commands.push(0x1B, 0x40); // ESC @ - Initialize
     commands.push(0x1B, 0x61, 0x00); // ESC a 0 - Left align
 
-    // ── PRODUCT NAME (double size + bold) ──────────────────
-    commands.push(0x1D, 0x21, 0x11); // GS ! - Double width + double height
+    // ── PRODUCT NAME (triple size + bold) ──────────────────
+    commands.push(0x1D, 0x21, 0x22); // GS ! - Triple width + triple height
     commands.push(0x1B, 0x45, 0x01); // ESC E - Bold on
     commands.push(...this.stringToBytes(productName + '\n'));
     commands.push(0x1B, 0x45, 0x00); // ESC E - Bold off
     commands.push(0x1D, 0x21, 0x00); // GS ! - Normal size
 
-    // ── CATEGORY – SUBCATEGORY ─────────────────────────────
+    // ── CATEGORY - SUBCATEGORY ─────────────────────────────
     const catParts: string[] = [];
     if (categoryName) catParts.push(categoryName);
     if (subcategoryName) catParts.push(subcategoryName);
@@ -288,9 +299,18 @@ ${rows.join('\n')}
     // ── Separator ──────────────────────────────────────────
     commands.push(...this.stringToBytes(sep));
 
-    // ── Fields ─────────────────────────────────────────────
+    // ── DATES (BOLD + slightly larger) ─────────────────────
+    commands.push(0x1D, 0x21, 0x01); // GS ! - Double height
+    commands.push(0x1B, 0x45, 0x01); // Bold on
     commands.push(...this.stringToBytes(`PREPARED DATE: ${this.formatDateDMY(prepDate)}\n`));
     commands.push(...this.stringToBytes(`EXPIRE DATE: ${this.formatDateDMY(expiryDate)}\n`));
+    commands.push(0x1B, 0x45, 0x00); // Bold off
+    commands.push(0x1D, 0x21, 0x00); // Normal size
+
+    // ── Separator between dates and other info ─────────────
+    commands.push(...this.stringToBytes(sep));
+
+    // ── BODY ───────────────────────────────────────────────
     commands.push(...this.stringToBytes(`PRINTED BY: ${preparedByName || 'Unknown'}\n`));
     if (quantity) {
       commands.push(...this.stringToBytes(`QUANTITY: ${quantity}${unit ? ' ' + unit.toUpperCase() : ''}\n`));
