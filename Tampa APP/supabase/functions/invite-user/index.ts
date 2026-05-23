@@ -149,7 +149,7 @@ serve(async (req) => {
             Authorization: `Bearer ${RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            from: "Tampa APP <noreply@tampahospo.com.au>",
+            from: "Tampa APP <hello@tampahospo.com.au>",
             to: [email],
             subject: "Welcome to Tampa Hospitality - Your Account is Ready",
             html: `
