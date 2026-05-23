@@ -58,6 +58,23 @@ const KNOWN_VENDOR_IDS = [
 
 export type UsbPrinterProtocol = 'zpl' | 'escpos' | 'auto';
 
+// Module-level singleton so multiple WebUsbPrinter instances share one open
+// USB session — prevents the picker from re-appearing on every component
+// mount. See the BluetoothUniversalPrinter shared-conn rationale.
+interface SharedUsbConnection {
+  device: USBDevice;
+  endpointOut: number;
+  interfaceNumber: number;
+  protocol: UsbPrinterProtocol;
+}
+let sharedUsb: SharedUsbConnection | null = null;
+let inflightUsbConnect: Promise<SharedUsbConnection | null> | null = null;
+
+function clearSharedUsb(reason: string): void {
+  if (sharedUsb) console.log(`🔌 Clearing shared USB connection: ${reason}`);
+  sharedUsb = null;
+}
+
 export class WebUsbPrinter implements PrinterDriver {
   type: 'webusb' = 'webusb';
   name: string;
@@ -182,54 +199,100 @@ export class WebUsbPrinter implements PrinterDriver {
     return new Uint8Array(cmd);
   }
 
-  async connect(silent: boolean = false): Promise<boolean> {
+  /**
+   * Connect to the USB printer. Uses the shared singleton so every
+   * BluetoothUniversalPrinter-like instance reuses one open session.
+   *
+   * @param silent  When true (default), never shows the device picker.
+   *                Returns false if no cached device is available. Picker
+   *                only appears when the user explicitly initiates pairing
+   *                from the Settings UI.
+   */
+  async connect(silent: boolean = true): Promise<boolean> {
+    if (sharedUsb && sharedUsb.device.opened) {
+      this.device = sharedUsb.device;
+      this.endpointOut = sharedUsb.endpointOut;
+      this.interfaceNumber = sharedUsb.interfaceNumber;
+      this.protocol = sharedUsb.protocol;
+      return true;
+    }
+
+    if (inflightUsbConnect) {
+      const result = await inflightUsbConnect;
+      if (result) {
+        this.device = result.device;
+        this.endpointOut = result.endpointOut;
+        this.interfaceNumber = result.interfaceNumber;
+        this.protocol = result.protocol;
+        return true;
+      }
+      return false;
+    }
+
+    inflightUsbConnect = this.doConnect(silent);
+    try {
+      const result = await inflightUsbConnect;
+      if (!result) {
+        if (silent) return false;
+        throw new Error('Failed to connect to USB printer');
+      }
+      sharedUsb = result;
+      this.device = result.device;
+      this.endpointOut = result.endpointOut;
+      this.interfaceNumber = result.interfaceNumber;
+      this.protocol = result.protocol;
+      return true;
+    } finally {
+      inflightUsbConnect = null;
+    }
+  }
+
+  private async doConnect(silent: boolean): Promise<SharedUsbConnection | null> {
     try {
       if (typeof navigator === 'undefined' || !('usb' in navigator)) {
         throw new Error('WebUSB is not supported in this browser. Use Chrome or Edge.');
       }
 
-      // ── Tier 1: cached device (granted permission, no picker) ─────────
-      this.device = await findCachedUsbDevice();
-      if (this.device) {
-        console.log(`🟡 USB cached device: ${this.device.productName || 'Unknown'}`);
-      }
+      // ── Tier 1: cached device (already-granted permission) ────────────
+      let device = await findCachedUsbDevice();
+      if (device) console.log(`🟡 USB cached device: ${device.productName || 'Unknown'}`);
 
-      // ── Tier 2: any already-granted device ────────────────────────────
-      if (!this.device) {
+      // ── Tier 2: any other already-granted device ──────────────────────
+      if (!device) {
         const granted = await navigator.usb.getDevices();
         if (granted.length > 0) {
-          this.device = granted[0];
-          console.log(`🟡 USB previously granted: ${this.device.productName || 'Unknown'}`);
+          device = granted[0];
+          console.log(`🟡 USB previously granted: ${device.productName || 'Unknown'}`);
         }
       }
 
-      // ── Tier 3: show picker ───────────────────────────────────────────
-      if (!this.device) {
-        if (silent) return false;
+      // ── Tier 3: show picker (only on explicit pair action) ────────────
+      if (!device) {
+        if (silent) {
+          emitStatus({ connected: false, reason: 'no paired USB printer' });
+          return null;
+        }
         console.log('🟡 USB: showing device picker…');
-        this.device = await navigator.usb.requestDevice({
+        device = await navigator.usb.requestDevice({
           filters: KNOWN_VENDOR_IDS.map(vendorId => ({ vendorId })),
         });
       }
-
-      if (!this.device) throw new Error('No USB device selected');
+      if (!device) throw new Error('No USB device selected');
 
       // ── Open + claim interface ────────────────────────────────────────
-      if (!this.device.opened) await this.device.open();
-      if (this.device.configuration === null) await this.device.selectConfiguration(1);
+      if (!device.opened) await device.open();
+      if (device.configuration === null) await device.selectConfiguration(1);
 
-      const { iface, endpointNumber } = findPrinterInterface(this.device);
-      this.interfaceNumber = iface;
-      this.endpointOut = endpointNumber;
+      const { iface, endpointNumber } = findPrinterInterface(device);
 
       try {
-        await this.device.claimInterface(iface);
+        await device.claimInterface(iface);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.toLowerCase().includes('access denied') || msg.toLowerCase().includes('claim')) {
           throw new Error(
             'USB interface is claimed by another driver (typically the OS printer driver on Windows). ' +
-            'Unplug the printer, install WinUSB via Zadig, or use a different OS (Android works out of the box).'
+            'Unplug the printer, install WinUSB via Zadig, or use Android with a USB OTG cable.'
           );
         }
         throw e;
@@ -237,49 +300,62 @@ export class WebUsbPrinter implements PrinterDriver {
 
       // ── Detect protocol ───────────────────────────────────────────────
       const cache = loadUsbPrinterCache();
-      if (cache?.vendorId === this.device.vendorId && cache.productId === this.device.productId && cache.protocol) {
-        this.protocol = cache.protocol;
-      } else if (this.protocol === 'auto') {
-        this.protocol = this.detectProtocol(this.device);
+      let protocol = this.protocol;
+      if (cache?.vendorId === device.vendorId && cache.productId === device.productId && cache.protocol) {
+        protocol = cache.protocol;
+      } else if (protocol === 'auto') {
+        protocol = this.detectProtocol(device);
       }
 
       saveUsbPrinterCache({
-        vendorId: this.device.vendorId,
-        productId: this.device.productId,
-        deviceName: this.device.productName || 'USB Printer',
-        manufacturer: this.device.manufacturerName || undefined,
-        protocol: this.protocol,
-        endpointOut: this.endpointOut,
-        interfaceNumber: this.interfaceNumber,
+        vendorId: device.vendorId,
+        productId: device.productId,
+        deviceName: device.productName || 'USB Printer',
+        manufacturer: device.manufacturerName || undefined,
+        protocol,
+        endpointOut: endpointNumber,
+        interfaceNumber: iface,
       });
 
-      console.log(`✅ USB ready (protocol: ${this.protocol.toUpperCase()}, endpoint: ${this.endpointOut})`);
-      emitStatus({ connected: true, deviceName: this.device.productName || undefined });
+      // Listen for unplug — use a static handler so add/remove use the same ref
+      navigator.usb.removeEventListener('disconnect', WebUsbPrinter.onSharedDisconnect);
+      navigator.usb.addEventListener('disconnect', WebUsbPrinter.onSharedDisconnect);
 
-      // Listen for unplug (Chrome fires 'disconnect' on navigator.usb)
-      navigator.usb.addEventListener('disconnect', this.handleDisconnect);
+      emitStatus({ connected: true, deviceName: device.productName || undefined });
+      console.log(`✅ USB ready (protocol: ${protocol.toUpperCase()}, endpoint: ${endpointNumber})`);
+      return { device, endpointOut: endpointNumber, interfaceNumber: iface, protocol };
 
-      return true;
     } catch (error) {
       console.error('❌ WebUSB connection failed:', error);
       emitStatus({
         connected: false,
         reason: error instanceof Error ? error.message : String(error),
       });
-      if (silent) return false;
+      if (silent) return null;
       throw error;
     }
   }
 
+  /** Static unplug handler — clears the shared connection. */
+  private static onSharedDisconnect = (event: USBConnectionEvent): void => {
+    if (sharedUsb && event.device === sharedUsb.device) {
+      const name = sharedUsb.device.productName || 'USB printer';
+      clearSharedUsb(`device unplugged: ${name}`);
+      emitStatus({ connected: false, deviceName: name, reason: 'device unplugged' });
+    }
+  };
+
   private async sendBytes(bytes: Uint8Array): Promise<void> {
-    if (!this.device || this.endpointOut === null) {
+    // Always use the shared connection — multiple WebUsbPrinter instances
+    // share one open USB session so they never need their own picker prompt.
+    const conn = sharedUsb;
+    if (!conn || !conn.device.opened) {
       throw new Error('WebUSB printer is not connected');
     }
-    const CHUNK = 4096; // USB bulk transfer max packet size varies; 4KB is safe
+    const CHUNK = 4096;
     for (let i = 0; i < bytes.length; i += CHUNK) {
       const slice = bytes.slice(i, Math.min(i + CHUNK, bytes.length));
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const result = await this.device!.transferOut(this.endpointOut, slice);
+      const result = await conn.device.transferOut(conn.endpointOut, slice);
       if (result.status !== 'ok') {
         throw new Error(`USB transferOut failed with status: ${result.status}`);
       }
@@ -287,8 +363,13 @@ export class WebUsbPrinter implements PrinterDriver {
   }
 
   async print(labelData: LabelPrintData): Promise<boolean> {
-    if (!this.device || this.endpointOut === null) {
-      await this.connect();
+    if (!sharedUsb?.device.opened) {
+      const ok = await this.connect(true); // silent — no picker mid-print
+      if (!ok) {
+        throw new Error(
+          'No USB printer paired. Open Settings → Printer Management to pair one.'
+        );
+      }
     }
 
     const payload: Uint8Array = this.protocol === 'escpos'
@@ -301,7 +382,14 @@ export class WebUsbPrinter implements PrinterDriver {
   }
 
   async printBatch(labels: LabelPrintData[]): Promise<boolean> {
-    if (!this.device || this.endpointOut === null) await this.connect();
+    if (!sharedUsb?.device.opened) {
+      const ok = await this.connect(true); // silent
+      if (!ok) {
+        throw new Error(
+          'No USB printer paired. Open Settings → Printer Management to pair one.'
+        );
+      }
+    }
     for (const label of labels) {
       const payload: Uint8Array = this.protocol === 'escpos'
         ? this.generateESCPOS(label)
@@ -313,23 +401,26 @@ export class WebUsbPrinter implements PrinterDriver {
   }
 
   async disconnect(): Promise<void> {
-    if (this.device?.opened) {
+    const device = sharedUsb?.device ?? this.device;
+    const iface = sharedUsb?.interfaceNumber ?? this.interfaceNumber;
+    if (device?.opened) {
       try {
-        if (this.interfaceNumber !== null) {
-          await this.device.releaseInterface(this.interfaceNumber);
+        if (iface !== null && iface !== undefined) {
+          await device.releaseInterface(iface);
         }
-        await this.device.close();
+        await device.close();
       } catch (e) {
         console.warn('USB disconnect error:', e);
       }
     }
+    clearSharedUsb('explicit disconnect');
     this.device = null;
     this.endpointOut = null;
     this.interfaceNumber = null;
   }
 
   isConnected(): boolean {
-    return this.device !== null && this.device.opened === true;
+    return sharedUsb !== null && sharedUsb.device.opened === true;
   }
 
   getSettings(): PrinterSettings {
@@ -377,21 +468,10 @@ export class WebUsbPrinter implements PrinterDriver {
     }
   }
 
-  /** Bound handler so add/removeListener use the same reference. */
-  private handleDisconnect = (event: USBConnectionEvent): void => {
-    if (event.device === this.device) {
-      console.log('⚠️ USB device disconnected');
-      const deviceName = this.device?.productName || undefined;
-      this.device = null;
-      this.endpointOut = null;
-      this.interfaceNumber = null;
-      emitStatus({ connected: false, deviceName, reason: 'device unplugged' });
-    }
-  };
-
   /** Forget the USB cache so the next connect shows the picker. */
   static forget(): void {
     clearUsbPrinterCache();
+    clearSharedUsb('forget');
   }
 }
 

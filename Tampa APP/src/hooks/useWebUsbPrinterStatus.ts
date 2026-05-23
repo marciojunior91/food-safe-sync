@@ -46,7 +46,7 @@ export function useWebUsbPrinterStatus(): WebUsbPrinterStatus {
 
     try {
       const printer = new WebUsbPrinter(cache.deviceName);
-      return await printer.connect(true);
+      return await printer.connect(true); // silent — no picker
     } catch (e) {
       setReason(e instanceof Error ? e.message : String(e));
       return false;

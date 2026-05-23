@@ -53,6 +53,34 @@ const ALL_OPTIONAL_SERVICES = [
 
 export type PrinterProtocol = 'zpl' | 'escpos' | 'auto';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Module-level singleton: one Bluetooth connection per browser tab, shared by
+// every BluetoothUniversalPrinter instance.
+//
+// Why: each component using usePrinter('some-context') instantiates its own
+// BluetoothUniversalPrinter. Without a shared singleton, each instance kept
+// its own this.device/this.characteristic — meaning a fresh component (e.g.
+// navigating from Settings to Labeling) had no connection and would
+// re-prompt the user via the picker. The singleton makes the connection
+// process-wide so the user pairs ONCE and every component reuses it.
+// ─────────────────────────────────────────────────────────────────────────────
+interface SharedConnection {
+  device: BluetoothDevice;
+  characteristic: BluetoothRemoteGATTCharacteristic;
+  protocol: PrinterProtocol;
+}
+let sharedConn: SharedConnection | null = null;
+
+/** In-flight connect promise — concurrent calls await the same result. */
+let inflightConnect: Promise<SharedConnection | null> | null = null;
+
+function clearSharedConn(reason: string): void {
+  if (sharedConn) {
+    console.log(`🔌 Clearing shared Bluetooth connection: ${reason}`);
+  }
+  sharedConn = null;
+}
+
 export class BluetoothUniversalPrinter implements PrinterDriver {
   type: 'bluetooth' = 'bluetooth';
   name: string;
@@ -235,104 +263,140 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   }
 
   /**
-   * Connect to ANY Bluetooth printer.
+   * Connect to the Bluetooth printer.
    *
-   * Three-tier strategy, fastest path first:
-   *   1. **Silent reconnect via cache** — look up the previously paired
-   *      device by id through navigator.bluetooth.getDevices(); reuse the
-   *      GATT service/characteristic UUIDs we saved last time. No picker,
-   *      no enumeration, sub-second on a warm Bluetooth stack.
-   *   2. **Cached device, fresh GATT discovery** — paired device found but
-   *      cached UUIDs no longer respond; enumerate services to find a new
-   *      writable characteristic and update the cache.
-   *   3. **Fresh pairing** — no paired device known; show the picker.
+   * Shared-connection model: all instances of BluetoothUniversalPrinter
+   * share a single underlying GATT connection (module-level `sharedConn`),
+   * so navigating between components / opening the print queue / etc. does
+   * NOT re-prompt the device picker. Concurrent connect() calls coalesce
+   * into a single in-flight promise.
    *
-   * Whichever tier succeeds, the device id + GATT UUIDs are saved so the
-   * next call goes straight to tier 1.
+   * @param silent  When true (default), never shows the device picker —
+   *                returns false instead. Picker is only shown when the
+   *                user explicitly initiates pairing via the Settings UI
+   *                (which passes silent=false).
    */
-  async connect(silent: boolean = false): Promise<boolean> {
+  async connect(silent: boolean = true): Promise<boolean> {
+    // Fast path: shared connection is live and writable
+    if (sharedConn && sharedConn.device.gatt?.connected) {
+      this.device = sharedConn.device;
+      this.characteristic = sharedConn.characteristic;
+      this.protocol = sharedConn.protocol;
+      return true;
+    }
+
+    // Coalesce concurrent connects — multiple components hitting print at the
+    // same time should share one in-flight attempt, not race each other.
+    if (inflightConnect) {
+      const result = await inflightConnect;
+      if (result) {
+        this.device = result.device;
+        this.characteristic = result.characteristic;
+        this.protocol = result.protocol;
+        return true;
+      }
+      return false;
+    }
+
+    inflightConnect = this.doConnect(silent);
+    try {
+      const result = await inflightConnect;
+      if (!result) {
+        if (silent) return false;
+        throw new Error('Failed to connect to Bluetooth printer');
+      }
+      sharedConn = result;
+      this.device = result.device;
+      this.characteristic = result.characteristic;
+      this.protocol = result.protocol;
+      return true;
+    } finally {
+      inflightConnect = null;
+    }
+  }
+
+  /**
+   * Three-tier connect strategy. Called only by connect(); never re-entered
+   * while inflightConnect is pending.
+   */
+  private async doConnect(silent: boolean): Promise<SharedConnection | null> {
     try {
       if (!navigator.bluetooth) {
-        throw new Error('Web Bluetooth is not supported. Please use Chrome on Android.');
+        throw new Error('Web Bluetooth is not supported. Please use Chrome.');
       }
 
-      // ── Tier 1 + 2: try cached / paired device (no picker) ────────────────
-      this.device = await findCachedDevice();
-      if (this.device) {
-        console.log(`🔵 Found cached device: ${this.device.name || this.device.id}`);
+      // ── Tier 1: cached device via getDevices() (no picker) ────────────
+      let device = await findCachedDevice();
+      if (device) {
+        console.log(`🔵 Found cached device: ${device.name || device.id}`);
       }
 
-      // Fallback: getDevices() may return other paired devices (legacy code)
-      if (!this.device && 'getDevices' in navigator.bluetooth) {
+      // ── Tier 2: any previously-granted device with matching name ──────
+      if (!device && 'getDevices' in navigator.bluetooth) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const paired: BluetoothDevice[] = await (navigator.bluetooth as any).getDevices();
           const savedName = this.settings.connectionConfig?.bluetoothDeviceName || this.name;
-          this.device =
+          device =
             paired.find(d => d.name === savedName) ??
             paired.find(d => d.name === this.settings.name) ??
             paired[0] ??
             null;
-          if (this.device) {
-            console.log(`🔵 Found legacy paired device: ${this.device.name || this.device.id}`);
-          }
+          if (device) console.log(`🔵 Found paired device: ${device.name || device.id}`);
         } catch (e) {
           console.warn('getDevices() failed:', e);
         }
       }
 
-      // ── Tier 3: show picker (only if no cached device and not silent) ─────
-      if (!this.device) {
+      // ── Tier 3: show picker (only on explicit user action) ────────────
+      if (!device) {
         if (silent) {
-          // Silent reconnect attempt — do NOT show picker. Caller will see
-          // this as "not connected" and can decide whether to prompt.
-          return false;
+          emitStatus({ connected: false, reason: 'no paired printer' });
+          return null;
         }
         console.log('🔵 No paired device — showing Bluetooth picker…');
-        this.device = await navigator.bluetooth.requestDevice({
+        device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: ALL_OPTIONAL_SERVICES,
         });
       }
+      if (!device) throw new Error('No device selected');
 
-      if (!this.device) throw new Error('No device selected');
-      console.log(`✅ Device selected: ${this.device.name || 'Unknown'}`);
-
-      // Restore protocol from cache if we have one for this device
+      // Restore protocol from cache for this device
       const cache = loadPrinterCache();
-      if (cache && cache.deviceId === this.device.id && cache.protocol) {
-        this.protocol = cache.protocol;
-      } else if (this.protocol === 'auto' && this.device.name) {
-        this.protocol = this.detectProtocol(this.device.name);
+      let protocol = this.protocol;
+      if (cache && cache.deviceId === device.id && cache.protocol) {
+        protocol = cache.protocol;
+      } else if (protocol === 'auto' && device.name) {
+        protocol = this.detectProtocol(device.name);
       }
 
-      // ── Connect GATT ──────────────────────────────────────────────────────
-      const server = await this.device.gatt?.connect();
+      // ── Connect GATT (idempotent if already connected) ────────────────
+      const server = await device.gatt?.connect();
       if (!server) throw new Error('Failed to connect to GATT server');
-      console.log('✅ GATT server connected');
 
-      // ── Find writable characteristic (cached UUIDs first) ─────────────────
-      this.characteristic = await this.locateWritableCharacteristic(server, cache);
-
-      if (!this.characteristic) {
-        throw new Error('No writable characteristic found on this Bluetooth device');
+      const characteristic = await this.locateWritableCharacteristic(server, cache, device);
+      if (!characteristic) {
+        throw new Error('No writable characteristic found on this device');
       }
-      console.log(`✅ Characteristic ready (protocol: ${this.protocol.toUpperCase()})`);
 
-      // ── Persist what worked ───────────────────────────────────────────────
+      // ── Persist what worked ───────────────────────────────────────────
       savePrinterCache({
-        deviceId: this.device.id,
-        deviceName: this.device.name || 'Bluetooth Printer',
-        serviceUuid: this.characteristic.service.uuid,
-        characteristicUuid: this.characteristic.uuid,
-        protocol: this.protocol,
+        deviceId: device.id,
+        deviceName: device.name || 'Bluetooth Printer',
+        serviceUuid: characteristic.service.uuid,
+        characteristicUuid: characteristic.uuid,
+        protocol,
       });
 
-      // ── Listen for disconnection ──────────────────────────────────────────
-      this.device.addEventListener('gattserverdisconnected', this.handleDisconnect);
+      // ── Listen for disconnection on the shared device ─────────────────
+      // Remove first in case we already wired it on a previous connect
+      (device as unknown as EventTarget).removeEventListener('gattserverdisconnected', BluetoothUniversalPrinter.onSharedDisconnect);
+      (device as unknown as EventTarget).addEventListener('gattserverdisconnected', BluetoothUniversalPrinter.onSharedDisconnect);
 
-      emitStatus({ connected: true, deviceName: this.device.name || undefined });
-      return true;
+      emitStatus({ connected: true, deviceName: device.name || undefined });
+      console.log(`✅ Bluetooth ready (protocol: ${protocol.toUpperCase()})`);
+      return { device, characteristic, protocol };
 
     } catch (error) {
       console.error('❌ Bluetooth connection failed:', error);
@@ -340,10 +404,18 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
         connected: false,
         reason: error instanceof Error ? error.message : String(error),
       });
-      if (silent) return false;
+      if (silent) return null;
       throw error;
     }
   }
+
+  /** Static handler so add/remove use the same reference across instances. */
+  private static onSharedDisconnect = (event: Event): void => {
+    const device = (event.target as unknown as BluetoothDevice | null);
+    const name = device?.name || 'printer';
+    clearSharedConn(`gattserverdisconnected from ${name}`);
+    emitStatus({ connected: false, deviceName: device?.name || undefined, reason: 'device disconnected' });
+  };
 
   /**
    * Find a writable GATT characteristic. Tries the cached UUIDs first
@@ -353,9 +425,10 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   private async locateWritableCharacteristic(
     server: BluetoothRemoteGATTServer,
     cache: ReturnType<typeof loadPrinterCache>,
+    device: BluetoothDevice,
   ): Promise<BluetoothRemoteGATTCharacteristic | null> {
     // ── Fast path: try cached UUIDs ──────────────────────────────────────
-    if (cache?.serviceUuid && cache?.characteristicUuid && this.device && cache.deviceId === this.device.id) {
+    if (cache?.serviceUuid && cache?.characteristicUuid && cache.deviceId === device.id) {
       try {
         const svc = await server.getPrimaryService(cache.serviceUuid);
         const ch = await svc.getCharacteristic(cache.characteristicUuid);
@@ -421,23 +494,22 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
     return null;
   }
 
-  /** Bound handler so we can add/remove it as the same reference. */
-  private handleDisconnect = (): void => {
-    console.log('⚠️ Bluetooth device disconnected');
-    const deviceName = this.device?.name || undefined;
-    this.device = null;
-    this.characteristic = null;
-    emitStatus({ connected: false, deviceName, reason: 'device disconnected' });
-  };
-
   /**
-   * Send data to printer (auto-detects protocol)
+   * Send data to printer (auto-detects protocol).
+   * Connect step uses silent=true so the picker NEVER pops up mid-print.
+   * If no printer is paired, throws a clear error directing the user to
+   * the Settings page.
    */
   private async sendData(data: string | Uint8Array): Promise<boolean> {
     try {
-      if (!this.characteristic) {
-        console.log('📡 Not connected, attempting to connect...');
-        await this.connect();
+      if (!this.characteristic || !sharedConn?.device.gatt?.connected) {
+        console.log('📡 Not connected, attempting silent reconnect…');
+        const ok = await this.connect(true); // silent — no picker
+        if (!ok) {
+          throw new Error(
+            'No printer paired. Open Settings → Printer Management to pair a Bluetooth printer.'
+          );
+        }
       }
 
       if (!this.characteristic) {
@@ -464,11 +536,13 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
             await this.characteristic.writeValue(chunk);
           }
         } catch (writeErr) {
-          // Retry once after reconnecting (GATT can drop mid-transfer)
+          // Retry once after reconnecting (GATT can drop mid-transfer).
+          // Silent reconnect — no picker; if cache is gone, fail clearly.
           console.warn('⚠️ Write failed, reconnecting and retrying...', writeErr);
+          clearSharedConn('write retry');
           this.characteristic = null;
-          await this.connect();
-          if (!this.characteristic) throw new Error('Reconnect failed');
+          const reconnected = await this.connect(true);
+          if (!reconnected || !this.characteristic) throw new Error('Reconnect failed');
           if (useWOR) {
             await (this.characteristic as any).writeValueWithoutResponse(chunk);
           } else {
@@ -487,28 +561,30 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
 
     } catch (error) {
       console.error('❌ Failed to send data via Bluetooth:', error);
-      
-      // Reset connection on error
+      // Reset connection on error so the next attempt does a fresh reconnect.
+      // The picker still won't appear (sendData/connect both use silent mode).
+      clearSharedConn('sendData error');
       this.device = null;
       this.characteristic = null;
-      
       throw error;
     }
   }
 
   /**
-   * Print label (auto-selects protocol)
+   * Print label (auto-selects protocol). Uses silent reconnect — the
+   * device picker is NEVER shown from print(). If no printer is paired,
+   * this throws and the UI directs the user to Settings to pair one.
    */
   async print(labelData: LabelPrintData): Promise<boolean> {
     try {
-      // STEP 1: Ensure BLE connection BEFORE detecting protocol.
-      // On the first call this.device is null, so connect() shows the
-      // Bluetooth picker, pairs the device, discovers GATT services/chars,
-      // and — crucially — runs detectProtocol() so this.protocol is set
-      // correctly BEFORE we generate ZPL or ESC/POS data.
-      if (!this.characteristic) {
-        console.log('📡 Not connected — connecting before generating label data...');
-        await this.connect();
+      if (!this.characteristic || !sharedConn?.device.gatt?.connected) {
+        console.log('📡 Not connected — silent reconnect before printing…');
+        const ok = await this.connect(true); // silent
+        if (!ok) {
+          throw new Error(
+            'No Bluetooth printer paired. Open Settings → Printer Management to pair one.'
+          );
+        }
       }
 
       // STEP 2: Determine protocol (connect() already updated this.protocol
@@ -560,15 +636,19 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   }
 
   /**
-   * Print multiple labels
+   * Print multiple labels. Same silent-reconnect contract as print().
    */
   async printBatch(labels: LabelPrintData[]): Promise<boolean> {
     try {
       console.log(`🖨️ Batch printing ${labels.length} labels via Bluetooth...`);
 
-      // Connect once for the batch
-      if (!this.characteristic) {
-        await this.connect();
+      if (!this.characteristic || !sharedConn?.device.gatt?.connected) {
+        const ok = await this.connect(true); // silent
+        if (!ok) {
+          throw new Error(
+            'No Bluetooth printer paired. Open Settings → Printer Management to pair one.'
+          );
+        }
       }
 
       // Print each label
@@ -593,22 +673,26 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   }
 
   /**
-   * Disconnect from printer
+   * Disconnect from printer (also clears the module-level shared
+   * connection so every other instance reflects the new state).
    */
   async disconnect(): Promise<void> {
-    if (this.device?.gatt?.connected) {
-      this.device.gatt.disconnect();
+    const device = sharedConn?.device ?? this.device;
+    if (device?.gatt?.connected) {
+      device.gatt.disconnect();
       console.log('🔌 Bluetooth disconnected');
     }
+    clearSharedConn('explicit disconnect');
     this.device = null;
     this.characteristic = null;
   }
 
   /**
-   * Check if connected
+   * Returns true when the shared connection is live AND this instance has
+   * picked up the current characteristic reference.
    */
   isConnected(): boolean {
-    return this.device?.gatt?.connected === true;
+    return sharedConn?.device.gatt?.connected === true && !!this.characteristic;
   }
 
   /**
@@ -673,5 +757,10 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
       console.error('❌ Test print failed:', error);
       return false;
     }
+  }
+
+  /** Forget the Bluetooth cache so the next connect shows the picker. */
+  static forget(): void {
+    clearSharedConn('forget');
   }
 }

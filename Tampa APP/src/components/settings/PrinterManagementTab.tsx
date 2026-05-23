@@ -27,6 +27,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useBluetoothPrinterStatus } from '@/hooks/useBluetoothPrinterStatus';
 import { useWebUsbPrinterStatus } from '@/hooks/useWebUsbPrinterStatus';
 import { savePrinterCache as saveBluetoothCache } from '@/lib/printers/bluetoothPrinterCache';
+import { BluetoothUniversalPrinter } from '@/lib/printers/BluetoothUniversalPrinter';
+import { WebUsbPrinter } from '@/lib/printers/WebUsbPrinter';
 
 const STORAGE_KEY = 'printer_settings';
 const PRINTER_SETTINGS_CHANGED_EVENT = 'printer-settings-changed';
@@ -146,6 +148,9 @@ export function PrinterManagementTab() {
           deviceId: device.id,
           deviceName: device.name || 'Bluetooth Printer',
         });
+        // Drop any stale module-level connection (e.g. paired with a different
+        // device earlier) so the next print uses the freshly picked one.
+        BluetoothUniversalPrinter.forget();
         setPrinterName(device.name || 'Bluetooth Printer');
         toast({ title: 'Paired', description: `${device.name || 'Bluetooth Printer'} is ready to use.` });
       }
@@ -171,9 +176,11 @@ export function PrinterManagementTab() {
     setIsScanning(true);
     try {
       const printer = PrinterFactory.createPrinter('webusb', { name: printerName });
-      // connect() in non-silent mode shows the device picker.
-      await printer.connect();
-      toast({ title: 'USB Printer Connected', description: 'Ready to print.' });
+      // silent=false → shows the device picker (this is the only non-silent USB path).
+      const ok = await (printer as WebUsbPrinter).connect(false);
+      if (ok) {
+        toast({ title: 'USB Printer Connected', description: 'Ready to print.' });
+      }
     } catch (err) {
       if (err instanceof Error && !err.message.toLowerCase().includes('no device selected')) {
         toast({ title: 'Connection Failed', description: err.message, variant: 'destructive' });

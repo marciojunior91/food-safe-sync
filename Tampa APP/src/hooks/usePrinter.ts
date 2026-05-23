@@ -36,7 +36,7 @@ export function usePrinter(context?: string) {
       // Load user preference from localStorage
       // 1. Try context-specific key first
       // 2. Fall back to global 'printer_settings' (set by Settings > Printer tab)
-      // 3. Fall back to Zebra defaults
+      // 3. Fall back to Bluetooth defaults
       let stored = localStorage.getItem(STORAGE_KEY);
       if (!stored && context) {
         // No context-specific settings → inherit from global printer config
@@ -48,33 +48,33 @@ export function usePrinter(context?: string) {
       
       if (stored) {
         const parsedSettings = JSON.parse(stored) as PrinterSettings;
-        setSettings(parsedSettings);
-        
-        // Initialize printer with stored settings
-        const printerInstance = PrinterFactory.createPrinter(parsedSettings.type, parsedSettings);
-        setPrinter(printerInstance);
-        
-        console.log(`✅ Printer loaded: ${parsedSettings.type} for context: ${context || 'default'}`);
+        // Migrate any pre-removal type ('zebra' / 'universal' / 'pdf' / 'generic')
+        // to 'bluetooth' so old localStorage entries don't crash PrinterFactory.
+        const safeType: PrinterType =
+          parsedSettings.type === 'bluetooth' || parsedSettings.type === 'webusb'
+            ? parsedSettings.type
+            : 'bluetooth';
+        const safeSettings: PrinterSettings = { ...parsedSettings, type: safeType };
+        setSettings(safeSettings);
+        setPrinter(PrinterFactory.createPrinter(safeType, safeSettings));
+        console.log(`✅ Printer loaded: ${safeType} for context: ${context || 'default'}`);
       } else {
-        // Default to Zebra printer (recommended for production)
-        const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
+        // Default to Bluetooth (primary supported transport)
+        const defaultSettings = PrinterFactory.getDefaultSettings('bluetooth');
         setSettings(defaultSettings);
-        setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
-        
-        console.log(`✅ Default Zebra printer loaded for context: ${context || 'default'}`);
+        setPrinter(PrinterFactory.createPrinter('bluetooth', defaultSettings));
+        console.log(`✅ Default Bluetooth printer loaded for context: ${context || 'default'}`);
       }
     } catch (error) {
       console.error('Failed to load printer settings:', error);
       toast({
         title: 'Settings Error',
-        description: 'Failed to load printer settings. Using default Zebra printer.',
-        variant: 'destructive'
+        description: 'Failed to load printer settings. Using default Bluetooth printer.',
+        variant: 'destructive',
       });
-      
-      // Fallback to Zebra
-      const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
+      const defaultSettings = PrinterFactory.getDefaultSettings('bluetooth');
       setSettings(defaultSettings);
-      setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
+      setPrinter(PrinterFactory.createPrinter('bluetooth', defaultSettings));
     }
   }, [STORAGE_KEY, context, toast]);
 
