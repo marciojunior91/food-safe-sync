@@ -1,31 +1,28 @@
-// Printer type definitions for Tampa APP
-// Universal printer SDK supporting multiple connection types and protocols
+// Printer type definitions for Tampa APP.
+//
+// Two driver types are supported, both browser-direct (no local server):
+//   - 'bluetooth' → Web Bluetooth (BLE)
+//   - 'webusb'   → WebUSB (USB OTG cable)
 
-export type PrinterType = 'zebra' | 'pdf' | 'generic' | 'bluetooth' | 'universal';
+export type PrinterType = 'bluetooth' | 'webusb';
 
-export type ConnectionType = 
-  | 'bluetooth-le'        // Bluetooth Low Energy (BLE)
-  | 'bluetooth-classic'   // Bluetooth Classic (SPP)
-  | 'tcp-ip'              // TCP/IP network connection
-  | 'wifi'                // WiFi direct or network
-  | 'usb'                 // USB connection
-  | 'bridge'              // Bluetooth-to-TCP bridge/adapter
-  | 'cloud'               // Cloud print service
-  | 'browser';            // Browser native print
+export type ConnectionType =
+  | 'bluetooth-le'        // Bluetooth Low Energy
+  | 'bluetooth-classic'   // Bluetooth Classic (SPP) — legacy, BLE preferred
+  | 'usb';                // WebUSB
 
-export type PrinterProtocol = 
+export type PrinterProtocol =
   | 'zpl'                 // Zebra Programming Language
-  | 'escpos'              // ESC/POS (Epson, Star, etc.)
-  | 'cpcl'                // Citizen Printer Command Language
-  | 'tspl'                // TSC Programming Language
-  | 'pdf'                 // PDF generation
-  | 'auto';               // Auto-detect protocol
+  | 'escpos'              // ESC/POS (Epson, Star, MPT-II, Xprinter, …)
+  | 'auto';               // Auto-detect from device name / metadata
 
 export interface PrinterCapabilities {
   supportsZPL: boolean;
   supportsPDF: boolean;
   supportsColor: boolean;
-  maxWidth: number; // in dots or mm
+  /** Max width in dots (203 DPI) */
+  maxWidth: number;
+  /** Max height in dots (203 DPI) */
   maxHeight: number;
   supportedProtocols: PrinterProtocol[];
   supportedConnections: ConnectionType[];
@@ -33,7 +30,8 @@ export interface PrinterCapabilities {
 
 export interface PrintJob {
   id: string;
-  labelData: any; // Will use LabelData from labels.ts
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  labelData: any;
   timestamp: Date;
   status: 'pending' | 'printing' | 'completed' | 'failed';
   error?: string;
@@ -41,89 +39,64 @@ export interface PrintJob {
 }
 
 export interface ConnectionConfig {
-  // Bluetooth settings
+  // Bluetooth (Web Bluetooth GATT)
   bluetoothDeviceId?: string;
   bluetoothDeviceName?: string;
   bluetoothServiceUUID?: string;
   bluetoothCharacteristicUUID?: string;
-  
-  // Network settings (TCP/IP, WiFi)
-  ipAddress?: string;
-  port?: number;
-  hostname?: string;
-  
-  // Bridge/Adapter settings (for Bluetooth-to-TCP adapters)
-  bridgeIpAddress?: string;
-  bridgePort?: number;
-  bridgeMacAddress?: string;
-  
-  // USB settings
-  usbVendorId?: string;
-  usbProductId?: string;
-  
-  // Connection preferences
-  preferredConnection?: ConnectionType;
-  fallbackConnections?: ConnectionType[];
+
+  // USB (WebUSB)
+  usbVendorId?: number;
+  usbProductId?: number;
+
+  // Behavior
   autoReconnect?: boolean;
-  timeout?: number; // Connection timeout in ms
+  /** Connection timeout in ms */
+  timeout?: number;
 }
 
 export interface PrinterDriver {
-  // Printer identity
   type: PrinterType;
   name: string;
   capabilities: PrinterCapabilities;
-  
-  // Core methods
-  connect(): Promise<boolean>;
+
+  connect(silent?: boolean): Promise<boolean>;
   disconnect(): Promise<void>;
   isConnected(): boolean;
-  
-  // Printing
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   print(labelData: any): Promise<boolean>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   printBatch(labels: any[]): Promise<boolean>;
-  
-  // Configuration
+
   getSettings(): PrinterSettings;
   updateSettings(settings: Partial<PrinterSettings>): Promise<void>;
-  
-  // Status
   getStatus(): Promise<PrinterStatus>;
-  
-  // Discovery (optional)
-  discover?(): Promise<DiscoveredPrinter[]>;
 }
 
 export interface PrinterSettings {
-  // Basic info
-  id?: string; // Unique identifier for saved printers
+  id?: string;
   type: PrinterType;
   name: string;
-  model?: string; // e.g., "Zebra D411", "Zebra ZD421"
-  manufacturer?: string; // e.g., "Zebra", "Epson"
-  
-  // Protocol settings
+  model?: string;
+  manufacturer?: string;
   protocol?: PrinterProtocol;
-  
-  // Connection configuration
   connectionType?: ConnectionType;
   connectionConfig?: ConnectionConfig;
-  
-  // Paper settings
-  paperWidth: number; // in mm
+
+  /** Paper width in millimetres (default: 50) */
+  paperWidth: number;
+  /** Paper height in millimetres (default: 50) */
   paperHeight: number;
-  
-  // Print quality settings
-  darkness?: number; // 0-30 for Zebra
-  speed?: number; // Print speed
-  dpi?: number; // Dots per inch (203, 300, 600)
-  
-  // Behavior settings
+
+  /** Zebra-only darkness, 0–30 */
+  darkness?: number;
+  /** Print speed (Zebra: 2–12) */
+  speed?: number;
+  /** Dots per inch (203 / 300 / 600) */
+  dpi?: number;
+
   defaultQuantity: number;
-  
-  // Legacy compatibility (deprecated - use connectionConfig instead)
-  ipAddress?: string;
-  port?: number;
 }
 
 export interface PrinterStatus {
@@ -143,6 +116,7 @@ export interface DiscoveredPrinter {
   connectionType: ConnectionType;
   connectionConfig: ConnectionConfig;
   isAvailable: boolean;
-  signalStrength?: number; // For wireless connections
+  /** RSSI for BLE devices, if known */
+  signalStrength?: number;
   capabilities?: Partial<PrinterCapabilities>;
 }

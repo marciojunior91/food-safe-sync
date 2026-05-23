@@ -3,6 +3,30 @@
 
 import type { PrinterDriver, PrinterSettings, PrinterCapabilities, PrinterStatus } from '@/types/printer';
 import type { LabelPrintData } from '@/utils/zebraPrinter';
+import { generateLabelZPL, formatDateDMY } from '@/utils/labelZpl';
+import {
+  loadPrinterCache,
+  savePrinterCache,
+  updatePrinterCache,
+  findCachedDevice,
+} from './bluetoothPrinterCache';
+
+/** Browser-wide event fired when the active Bluetooth connection changes. */
+export const BLUETOOTH_PRINTER_STATUS_EVENT = 'bluetooth-printer-status';
+
+export interface BluetoothPrinterStatusDetail {
+  connected: boolean;
+  deviceName?: string;
+  reason?: string;
+}
+
+function emitStatus(detail: BluetoothPrinterStatusDetail): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<BluetoothPrinterStatusDetail>(
+    BLUETOOTH_PRINTER_STATUS_EVENT,
+    { detail }
+  ));
+}
 
 // Common Bluetooth Serial Port Profile (SPP) UUID
 const SPP_SERVICE_UUID = '00001101-0000-1000-8000-00805f9b34fb';
@@ -101,149 +125,15 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   }
 
   /**
-   * Format date as DD/MM/YYYY (input may be YYYY-MM-DD or ISO).
-   */
-  private formatDateDMY(dateStr: string | undefined): string {
-    if (!dateStr) return 'N/A';
-    const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
-    if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      return `${dd}/${mm}/${d.getFullYear()}`;
-    }
-    return dateStr;
-  }
-
-  /**
-   * Generate ZPL code for Zebra printers.
-   * Tuned for 50mm × 50mm thermal labels (no QR code):
-   *   PRODUCT NAME (large)
-   *   CATEGORY - SUBCATEGORY
-   *   ──────────────────────
-   *   PREPARED DATE: DD/MM/YYYY   (BOLD)
-   *   EXPIRE DATE:   DD/MM/YYYY   (BOLD)
-   *   ──────────────────────
-   *   PRINTED BY:    Name
-   *   QUANTITY:      1 UNIT
-   *   CONDITION:     REFRIGERATED
-   *   ──────────────────────
-   *   ALLERGENS
-   *   MILK, SHELLFISH
+   * Generate ZPL code for Zebra printers — delegates to the shared generator
+   * in @/utils/labelZpl so Bluetooth and TCP/IP produce identical labels.
    */
   private generateZPL(data: LabelPrintData): string {
-    const {
-      productName,
-      categoryName,
-      subcategoryName,
-      condition,
-      prepDate,
-      expiryDate,
-      preparedByName,
-      quantity,
-      unit,
-      allergens,
-    } = data;
-
-    const allergenText = allergens && allergens.length > 0
-      ? allergens.map(a => a.name.toUpperCase()).join(', ')
-      : '';
-
-    // Use saved label dimensions (mm → dots at 203dpi: 1mm = 8 dots)
-    const DPI = 203;
-    const MM_TO_DOT = DPI / 25.4;
-    const labelWidthMm = this.settings.paperWidth || 50;
-    const labelHeightMm = this.settings.paperHeight || 50;
-    const PW = Math.round(labelWidthMm * MM_TO_DOT);
-    const LL = Math.round(labelHeightMm * MM_TO_DOT);
-
-    const isSmall = labelWidthMm <= 60;
-    const ML = isSmall ? 12 : 30;
-    const CW = PW - ML * 2;
-
-    // Font sizes (dots) — larger to fill 50mm label without blank space.
-    const titleFont = isSmall ? 44 : 50;
-    const subFont = isSmall ? 24 : 28;
-    const dateFont = isSmall ? 26 : 30;
-    const bodyFont = isSmall ? 24 : 28;
-    const allergenLabelFont = isSmall ? 22 : 26;
-
-    const rows: string[] = [];
-
-    // Double-print at +1 dot offset to simulate BOLD in ZPL's bitmap font.
-    const boldRow = (x: number, y: number, h: number, w: number, text: string): string[] => [
-      `^FO${x},${y}^A0N,${h},${w}^FD${text}^FS`,
-      `^FO${x + 1},${y}^A0N,${h},${w}^FD${text}^FS`,
-    ];
-
-    let y = isSmall ? 12 : 20;
-
-    // ── PRODUCT NAME (bold large title) ───────────────────
-    rows.push(...boldRow(ML, y, titleFont, titleFont, productName));
-    y += titleFont + 8;
-
-    // ── CATEGORY - SUBCATEGORY ─────────────────────────────
-    const catParts: string[] = [];
-    if (categoryName) catParts.push(categoryName);
-    if (subcategoryName) catParts.push(subcategoryName);
-    if (catParts.length > 0) {
-      rows.push(`^FO${ML},${y}^A0N,${subFont},${subFont}^FD${catParts.join(' - ')}^FS`);
-      y += subFont + 10;
-    }
-
-    // ── Separator ──────────────────────────────────────────
-    rows.push(`^FO${ML},${y}^GB${CW},3,3^FS`);
-    y += 12;
-
-    // ── DATES (BOLD) ───────────────────────────────────────
-    rows.push(...boldRow(ML, y, dateFont, dateFont, `PREPARED DATE: ${this.formatDateDMY(prepDate)}`));
-    y += dateFont + 8;
-
-    rows.push(...boldRow(ML, y, dateFont, dateFont, `EXPIRE DATE: ${this.formatDateDMY(expiryDate)}`));
-    y += dateFont + 10;
-
-    // ── Separator between dates and other info ─────────────
-    rows.push(`^FO${ML},${y}^GB${CW},3,3^FS`);
-    y += 12;
-
-    // ── BODY (printed by / quantity / condition) ───────────
-    const lineGap = bodyFont + 8;
-
-    rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDPRINTED BY: ${preparedByName || 'Unknown'}^FS`);
-    y += lineGap;
-
-    if (quantity) {
-      const qtyText = `QUANTITY: ${quantity}${unit ? ' ' + unit.toUpperCase() : ''}`;
-      rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FD${qtyText}^FS`);
-      y += lineGap;
-    }
-
-    if (condition) {
-      rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDCONDITION: ${condition.toUpperCase()}^FS`);
-      y += lineGap;
-    }
-
-    // ── Separator + ALLERGENS ──────────────────────────────
-    if (allergenText) {
-      rows.push(`^FO${ML},${y}^GB${CW},3,3^FS`);
-      y += 12;
-
-      rows.push(...boldRow(ML, y, allergenLabelFont, allergenLabelFont, 'ALLERGENS'));
-      y += allergenLabelFont + 6;
-
-      rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FD${allergenText}^FS`);
-      y += bodyFont + 6;
-    }
-
-    return `^XA
-^MMT
-^PW${PW}
-^LL${LL}
-^LS0
-^CI28
-${rows.join('\n')}
-^XZ`;
+    return generateLabelZPL(data, {
+      widthMm: this.settings.paperWidth || 50,
+      heightMm: this.settings.paperHeight || 50,
+      dpi: this.settings.dpi || 203,
+    });
   }
 
   /**
@@ -302,8 +192,8 @@ ${rows.join('\n')}
     // ── DATES (BOLD + slightly larger) ─────────────────────
     commands.push(0x1D, 0x21, 0x01); // GS ! - Double height
     commands.push(0x1B, 0x45, 0x01); // Bold on
-    commands.push(...this.stringToBytes(`PREPARED DATE: ${this.formatDateDMY(prepDate)}\n`));
-    commands.push(...this.stringToBytes(`EXPIRE DATE: ${this.formatDateDMY(expiryDate)}\n`));
+    commands.push(...this.stringToBytes(`PREPARED DATE: ${formatDateDMY(prepDate)}\n`));
+    commands.push(...this.stringToBytes(`EXPIRE DATE: ${formatDateDMY(expiryDate)}\n`));
     commands.push(0x1B, 0x45, 0x00); // Bold off
     commands.push(0x1D, 0x21, 0x00); // Normal size
 
@@ -346,173 +236,199 @@ ${rows.join('\n')}
 
   /**
    * Connect to ANY Bluetooth printer.
-   * Tries getDevices() first (reconnect without picker), then requestDevice().
+   *
+   * Three-tier strategy, fastest path first:
+   *   1. **Silent reconnect via cache** — look up the previously paired
+   *      device by id through navigator.bluetooth.getDevices(); reuse the
+   *      GATT service/characteristic UUIDs we saved last time. No picker,
+   *      no enumeration, sub-second on a warm Bluetooth stack.
+   *   2. **Cached device, fresh GATT discovery** — paired device found but
+   *      cached UUIDs no longer respond; enumerate services to find a new
+   *      writable characteristic and update the cache.
+   *   3. **Fresh pairing** — no paired device known; show the picker.
+   *
+   * Whichever tier succeeds, the device id + GATT UUIDs are saved so the
+   * next call goes straight to tier 1.
    */
-  async connect(): Promise<boolean> {
+  async connect(silent: boolean = false): Promise<boolean> {
     try {
       if (!navigator.bluetooth) {
         throw new Error('Web Bluetooth is not supported. Please use Chrome on Android.');
       }
 
-      // ── 1. Try to reconnect to an already-paired device (no UI picker) ────
-      const savedName = this.settings.connectionConfig?.bluetoothDeviceName || this.name;
-      console.log(`🔵 Trying to reconnect to previously paired device: "${savedName}"`);
-
-      try {
-        if ('getDevices' in navigator.bluetooth) {
-          const pairedDevices = await (navigator.bluetooth as any).getDevices();
-          console.log(`📋 Found ${pairedDevices.length} previously paired device(s):`,
-            pairedDevices.map((d: BluetoothDevice) => d.name || d.id));
-
-          // Find our device by name
-          for (const dev of pairedDevices) {
-            if (dev.name === savedName || dev.name === this.settings.name) {
-              console.log(`✅ Found paired device: ${dev.name}`);
-              this.device = dev;
-              break;
-            }
-          }
-
-          // If no name match, try first available paired device
-          if (!this.device && pairedDevices.length > 0) {
-            this.device = pairedDevices[0];
-            console.log(`✅ Using first paired device: ${this.device!.name || this.device!.id}`);
-          }
-        }
-      } catch (e) {
-        console.warn('⚠️ getDevices() not available or failed:', e);
+      // ── Tier 1 + 2: try cached / paired device (no picker) ────────────────
+      this.device = await findCachedDevice();
+      if (this.device) {
+        console.log(`🔵 Found cached device: ${this.device.name || this.device.id}`);
       }
 
-      // ── 2. Fall back to requestDevice() picker if no paired device ────────
+      // Fallback: getDevices() may return other paired devices (legacy code)
+      if (!this.device && 'getDevices' in navigator.bluetooth) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const paired: BluetoothDevice[] = await (navigator.bluetooth as any).getDevices();
+          const savedName = this.settings.connectionConfig?.bluetoothDeviceName || this.name;
+          this.device =
+            paired.find(d => d.name === savedName) ??
+            paired.find(d => d.name === this.settings.name) ??
+            paired[0] ??
+            null;
+          if (this.device) {
+            console.log(`🔵 Found legacy paired device: ${this.device.name || this.device.id}`);
+          }
+        } catch (e) {
+          console.warn('getDevices() failed:', e);
+        }
+      }
+
+      // ── Tier 3: show picker (only if no cached device and not silent) ─────
       if (!this.device) {
-        console.log('🔵 No paired device found, showing Bluetooth picker...');
+        if (silent) {
+          // Silent reconnect attempt — do NOT show picker. Caller will see
+          // this as "not connected" and can decide whether to prompt.
+          return false;
+        }
+        console.log('🔵 No paired device — showing Bluetooth picker…');
         this.device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: ALL_OPTIONAL_SERVICES,
         });
       }
 
-      if (!this.device) {
-        throw new Error('No device selected');
-      }
-
+      if (!this.device) throw new Error('No device selected');
       console.log(`✅ Device selected: ${this.device.name || 'Unknown'}`);
 
-      // Auto-detect protocol if set to 'auto'
-      if (this.protocol === 'auto' && this.device.name) {
+      // Restore protocol from cache if we have one for this device
+      const cache = loadPrinterCache();
+      if (cache && cache.deviceId === this.device.id && cache.protocol) {
+        this.protocol = cache.protocol;
+      } else if (this.protocol === 'auto' && this.device.name) {
         this.protocol = this.detectProtocol(this.device.name);
       }
 
-      // ── 3. Connect GATT and find writable characteristic ──────────────────
+      // ── Connect GATT ──────────────────────────────────────────────────────
       const server = await this.device.gatt?.connect();
-      if (!server) {
-        throw new Error('Failed to connect to GATT server');
-      }
-
+      if (!server) throw new Error('Failed to connect to GATT server');
       console.log('✅ GATT server connected');
 
-      // Try services in order: Zebra Parser, ISS/Zebra, SPP, then enumerate all
-      const SERVICE_UUIDS = [
-        ZEBRA_BLE_PARSER_SERVICE,
-        ZEBRA_SERVICE_UUID,
-        SPP_SERVICE_UUID,
-        'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
-        '000018f0-0000-1000-8000-00805f9b34fb',
-        '0000fff0-0000-1000-8000-00805f9b34fb',
-        '0000ff00-0000-1000-8000-00805f9b34fb',
-      ];
-      const CHAR_UUIDS = [
-        ZEBRA_BLE_PARSER_CHAR,
-        ZEBRA_CHARACTERISTIC_UUID,
-        'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
-        '0000fff2-0000-1000-8000-00805f9b34fb',
-      ];
+      // ── Find writable characteristic (cached UUIDs first) ─────────────────
+      this.characteristic = await this.locateWritableCharacteristic(server, cache);
 
-      let foundChar: BluetoothRemoteGATTCharacteristic | null = null;
-
-      // Try known service+char pairs
-      for (const svcUUID of SERVICE_UUIDS) {
-        try {
-          const svc = await server.getPrimaryService(svcUUID);
-          console.log(`✅ Service found: ${svcUUID.slice(0, 8)}...`);
-
-          // Keep detected protocol (don't override based on service)
-          console.log(`📌 Keeping protocol: ${this.protocol}`);
-
-          // Try known characteristic UUIDs
-          for (const charUUID of CHAR_UUIDS) {
-            try {
-              const ch = await svc.getCharacteristic(charUUID);
-              if (ch.properties.write || ch.properties.writeWithoutResponse) {
-                foundChar = ch;
-                console.log(`✅ Writable char found: ${charUUID.slice(0, 8)}...`);
-                break;
-              }
-            } catch { /* next */ }
-          }
-          if (foundChar) break;
-
-          // Enumerate all characteristics of this service
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
-            for (const ch of chars) {
-              if (ch.properties.write || ch.properties.writeWithoutResponse) {
-                foundChar = ch;
-                console.log(`✅ Enum writable char: ${ch.uuid.slice(0, 8)}...`);
-                break;
-              }
-            }
-          } catch { /* can't enumerate */ }
-          if (foundChar) break;
-        } catch { /* service not found, next */ }
-      }
-
-      // Last resort: enumerate all services
-      if (!foundChar) {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const allServices: BluetoothRemoteGATTService[] = await (server as any)['getPrimaryServices']();
-          console.log('📋 All services:', allServices.map(s => s.uuid));
-          for (const svc of allServices) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
-            for (const ch of chars) {
-              if (ch.properties.write || ch.properties.writeWithoutResponse) {
-                foundChar = ch;
-                console.log(`✅ Full-enum char: svc=${svc.uuid.slice(0,8)} char=${ch.uuid.slice(0,8)}`);
-                break;
-              }
-            }
-            if (foundChar) break;
-          }
-        } catch (e) {
-          console.warn('Cannot enumerate all services:', e);
-        }
-      }
-
-      if (!foundChar) {
+      if (!this.characteristic) {
         throw new Error('No writable characteristic found on this Bluetooth device');
       }
+      console.log(`✅ Characteristic ready (protocol: ${this.protocol.toUpperCase()})`);
 
-      this.characteristic = foundChar;
-      console.log('✅ Characteristic ready for writing');
-      console.log(`📝 Using protocol: ${this.protocol.toUpperCase()}`);
-
-      // Listen for disconnection
-      this.device.addEventListener('gattserverdisconnected', () => {
-        console.log('⚠️ Bluetooth device disconnected');
-        this.device = null;
-        this.characteristic = null;
+      // ── Persist what worked ───────────────────────────────────────────────
+      savePrinterCache({
+        deviceId: this.device.id,
+        deviceName: this.device.name || 'Bluetooth Printer',
+        serviceUuid: this.characteristic.service.uuid,
+        characteristicUuid: this.characteristic.uuid,
+        protocol: this.protocol,
       });
 
+      // ── Listen for disconnection ──────────────────────────────────────────
+      this.device.addEventListener('gattserverdisconnected', this.handleDisconnect);
+
+      emitStatus({ connected: true, deviceName: this.device.name || undefined });
       return true;
 
     } catch (error) {
       console.error('❌ Bluetooth connection failed:', error);
+      emitStatus({
+        connected: false,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+      if (silent) return false;
       throw error;
     }
   }
+
+  /**
+   * Find a writable GATT characteristic. Tries the cached UUIDs first
+   * (fast path — single getPrimaryService + getCharacteristic call) and
+   * falls back to enumerating known UUIDs, then all services.
+   */
+  private async locateWritableCharacteristic(
+    server: BluetoothRemoteGATTServer,
+    cache: ReturnType<typeof loadPrinterCache>,
+  ): Promise<BluetoothRemoteGATTCharacteristic | null> {
+    // ── Fast path: try cached UUIDs ──────────────────────────────────────
+    if (cache?.serviceUuid && cache?.characteristicUuid && this.device && cache.deviceId === this.device.id) {
+      try {
+        const svc = await server.getPrimaryService(cache.serviceUuid);
+        const ch = await svc.getCharacteristic(cache.characteristicUuid);
+        if (ch.properties.write || ch.properties.writeWithoutResponse) {
+          console.log('⚡ Cached GATT UUIDs worked — skipping enumeration');
+          return ch;
+        }
+      } catch {
+        console.log('Cached GATT UUIDs no longer valid; falling back to discovery');
+      }
+    }
+
+    // ── Slow path: known UUIDs ───────────────────────────────────────────
+    const SERVICE_UUIDS = [
+      ZEBRA_BLE_PARSER_SERVICE,
+      ZEBRA_SERVICE_UUID,
+      SPP_SERVICE_UUID,
+      'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+      '000018f0-0000-1000-8000-00805f9b34fb',
+      '0000fff0-0000-1000-8000-00805f9b34fb',
+      '0000ff00-0000-1000-8000-00805f9b34fb',
+    ];
+    const CHAR_UUIDS = [
+      ZEBRA_BLE_PARSER_CHAR,
+      ZEBRA_CHARACTERISTIC_UUID,
+      'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+      '0000fff2-0000-1000-8000-00805f9b34fb',
+    ];
+
+    for (const svcUUID of SERVICE_UUIDS) {
+      try {
+        const svc = await server.getPrimaryService(svcUUID);
+        for (const charUUID of CHAR_UUIDS) {
+          try {
+            const ch = await svc.getCharacteristic(charUUID);
+            if (ch.properties.write || ch.properties.writeWithoutResponse) return ch;
+          } catch { /* next */ }
+        }
+        // Enumerate this service's characteristics
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+          const writable = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+          if (writable) return writable;
+        } catch { /* can't enumerate */ }
+      } catch { /* service not found, next */ }
+    }
+
+    // ── Last resort: enumerate ALL services ──────────────────────────────
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allServices: BluetoothRemoteGATTService[] = await (server as any)['getPrimaryServices']();
+      for (const svc of allServices) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+        const writable = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+        if (writable) return writable;
+      }
+    } catch (e) {
+      console.warn('Cannot enumerate all services:', e);
+    }
+
+    return null;
+  }
+
+  /** Bound handler so we can add/remove it as the same reference. */
+  private handleDisconnect = (): void => {
+    console.log('⚠️ Bluetooth device disconnected');
+    const deviceName = this.device?.name || undefined;
+    this.device = null;
+    this.characteristic = null;
+    emitStatus({ connected: false, deviceName, reason: 'device disconnected' });
+  };
 
   /**
    * Send data to printer (auto-detects protocol)
