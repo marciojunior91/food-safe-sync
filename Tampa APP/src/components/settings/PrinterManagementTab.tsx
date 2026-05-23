@@ -97,8 +97,8 @@ export function PrinterManagementTab() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [darkness, setDarkness] = useState(() => loadSavedSettings().darkness ?? 20);
   const [speed, setSpeed] = useState(() => loadSavedSettings().speed ?? 4);
-  const [paperWidth, setPaperWidth] = useState(() => loadSavedSettings().paperWidth ?? 102);
-  const [paperHeight, setPaperHeight] = useState(() => loadSavedSettings().paperHeight ?? 180);
+  const [paperWidth, setPaperWidth] = useState(() => loadSavedSettings().paperWidth ?? 50);
+  const [paperHeight, setPaperHeight] = useState(() => loadSavedSettings().paperHeight ?? 50);
   const [printerName, setPrinterName] = useState(() => loadSavedSettings().name || 'My Printer');
   const [printerType, setPrinterType] = useState<PrinterType>(() => loadSavedSettings().type || 'zebra');
 
@@ -897,7 +897,8 @@ export function PrinterManagementTab() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="102x180">102 × 180 mm (Standard)</SelectItem>
+                    <SelectItem value="50x50">50 × 50 mm (Standard)</SelectItem>
+                    <SelectItem value="102x180">102 × 180 mm</SelectItem>
                     <SelectItem value="102x152">102 × 152 mm (4×6 in)</SelectItem>
                     <SelectItem value="76x127">76 × 127 mm (3×5 in)</SelectItem>
                     <SelectItem value="57x32">57 × 32 mm (Small)</SelectItem>

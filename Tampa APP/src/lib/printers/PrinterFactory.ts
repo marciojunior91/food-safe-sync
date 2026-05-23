@@ -80,8 +80,8 @@ export class PrinterFactory {
     const baseSettings = {
       type,
       name: '',
-      paperWidth: 102,
-      paperHeight: 180,
+      paperWidth: 50,
+      paperHeight: 50,
       defaultQuantity: 1
     };
 

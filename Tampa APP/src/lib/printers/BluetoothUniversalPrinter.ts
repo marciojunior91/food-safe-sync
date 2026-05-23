@@ -53,8 +53,8 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
     this.settings = {
       type: 'bluetooth',
       name,
-      paperWidth: 58, // Common thermal paper size (58mm or 80mm)
-      paperHeight: 180,
+      paperWidth: 50, // Standard label: 50mm × 50mm
+      paperHeight: 50,
       defaultQuantity: 1,
       darkness: 20,
       speed: 4,
@@ -101,119 +101,128 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   }
 
   /**
-   * Generate ZPL code for Zebra printers
+   * Format date as DD/MM/YYYY (input may be YYYY-MM-DD or ISO).
+   */
+  private formatDateDMY(dateStr: string | undefined): string {
+    if (!dateStr) return 'N/A';
+    const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateStr);
+    if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${d.getFullYear()}`;
+    }
+    return dateStr;
+  }
+
+  /**
+   * Generate ZPL code for Zebra printers.
+   * Tuned for 50mm × 50mm thermal labels (no QR code):
+   *   PRODUCT NAME
+   *   CATEGORY – SUBCATEGORY
+   *   ──────────────────────
+   *   PREPARED DATE: DD/MM/YYYY
+   *   EXPIRE DATE:   DD/MM/YYYY
+   *   PRINTED BY:    Name
+   *   QUANTITY:      1 UNIT
+   *   CONDITION:     REFRIGERATED
+   *   ──────────────────────
+   *   ALLERGENS
+   *   MILK, SHELLFISH
    */
   private generateZPL(data: LabelPrintData): string {
-    const { 
-      productName, 
-      categoryName, 
-      condition, 
-      prepDate, 
-      expiryDate, 
-      preparedByName, 
-      quantity, 
-      unit, 
+    const {
+      productName,
+      categoryName,
+      subcategoryName,
+      condition,
+      prepDate,
+      expiryDate,
+      preparedByName,
+      quantity,
+      unit,
       allergens,
-      labelId,
     } = data;
-    
-    // QR code URL to label preview (same as zebraPrinter.ts)
-    const qrValue = labelId
-      ? `https://app.tampaapp.com.br/labels/${labelId}/preview`
-      : JSON.stringify({ product: productName, prep: prepDate, exp: expiryDate });
-    
+
     const allergenText = allergens && allergens.length > 0
-      ? allergens.map(a => a.name).join(', ')
+      ? allergens.map(a => a.name.toUpperCase()).join(', ')
       : '';
-    
+
     // Use saved label dimensions (mm → dots at 203dpi: 1mm = 8 dots)
     const DPI = 203;
-    const MM_TO_DOT = DPI / 25.4; // ~8 dots per mm
+    const MM_TO_DOT = DPI / 25.4;
     const labelWidthMm = this.settings.paperWidth || 102;
     const labelHeightMm = this.settings.paperHeight || 180;
     const PW = Math.round(labelWidthMm * MM_TO_DOT);
 
-    // Responsive sizing based on label width
-    const isSmall = labelWidthMm <= 60; // 50mm labels
-    const ML = isSmall ? 10 : 30; // left margin
-    const CW = PW - ML * 2;       // content width
+    const isSmall = labelWidthMm <= 60;
+    const ML = isSmall ? 10 : 30;
+    const CW = PW - ML * 2;
 
-    // Font sizes adapt to label size
-    const titleFont = isSmall ? 28 : 40;
-    const normalFont = isSmall ? 18 : 25;
-    const smallFont = isSmall ? 16 : 20;
-    const tinyFont = isSmall ? 14 : 18;
-
-    // QR code: magnification 3 for small labels, 5 for large
-    const qrMag = isSmall ? 3 : 5;
-    const qrW = qrMag * 25 + 20; // approximate QR pixel width
-    const leftColW = CW - qrW - 10;
+    // Font sizes (dots). User-requested product font: 24.
+    const titleFont = 24;
+    const subFont = isSmall ? 16 : 20;
+    const bodyFont = isSmall ? 18 : 22;
+    const allergenLabelFont = isSmall ? 16 : 20;
 
     const rows: string[] = [];
     let y = isSmall ? 10 : 20;
 
-    // Product name (truncate for small labels)
-    const maxNameLen = isSmall ? 18 : 30;
-    const displayName = productName.length > maxNameLen ? productName.substring(0, maxNameLen - 1) + '...' : productName;
-    rows.push(`^FO${ML},${y}^A0N,${titleFont},${titleFont}^FD${displayName}^FS`);
+    // ── PRODUCT NAME ────────────────────────────────────────
+    rows.push(`^FO${ML},${y}^A0N,${titleFont},${titleFont}^FD${productName}^FS`);
     y += titleFont + 6;
 
-    // Category
-    if (categoryName) {
-      rows.push(`^FO${ML},${y}^A0N,${normalFont},${normalFont}^FD${categoryName}^FS`);
-      y += normalFont + 4;
+    // ── CATEGORY – SUBCATEGORY ─────────────────────────────
+    const catParts: string[] = [];
+    if (categoryName) catParts.push(categoryName);
+    if (subcategoryName) catParts.push(subcategoryName);
+    if (catParts.length > 0) {
+      const catLine = catParts.join(' - ');
+      rows.push(`^FO${ML},${y}^A0N,${subFont},${subFont}^FD${catLine}^FS`);
+      y += subFont + 6;
     }
 
-    // Separator
+    // ── Separator ──────────────────────────────────────────
     rows.push(`^FO${ML},${y}^GB${CW},1,1^FS`);
-    y += 6;
+    y += 8;
 
-    const contentStartY = y;
+    // ── PREPARED DATE / EXPIRE DATE / PRINTED BY / CONDITION ──
+    const lineGap = bodyFont + 6;
 
-    // Prep date
-    rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FDPrep: ${prepDate || 'N/A'}^FS`);
-    y += smallFont + 4;
+    rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDPREPARED DATE: ${this.formatDateDMY(prepDate)}^FS`);
+    y += lineGap;
 
-    // Expiry date
-    rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FDExp: ${expiryDate || 'N/A'}^FS`);
-    y += smallFont + 4;
+    rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDEXPIRE DATE: ${this.formatDateDMY(expiryDate)}^FS`);
+    y += lineGap;
 
-    // Prepared by
-    rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FDBy: ${preparedByName || 'Unknown'}^FS`);
-    y += smallFont + 4;
+    rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDPRINTED BY: ${preparedByName || 'Unknown'}^FS`);
+    y += lineGap;
 
-    // Quantity + unit
     if (quantity) {
-      rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FD${quantity} ${unit || 'Unit'}^FS`);
-      y += smallFont + 4;
+      const qtyText = `QUANTITY: ${quantity}${unit ? ' ' + unit.toUpperCase() : ''}`;
+      rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FD${qtyText}^FS`);
+      y += lineGap;
     }
 
-    // Condition
     if (condition) {
-      rows.push(`^FO${ML},${y}^A0N,${smallFont},${smallFont}^FD${condition}^FS`);
-      y += smallFont + 4;
+      rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FDCONDITION: ${condition.toUpperCase()}^FS`);
+      y += lineGap;
     }
 
-    // Allergens
+    // ── Separator + ALLERGENS ──────────────────────────────
     if (allergenText) {
-      if (isSmall) {
-        // Single line, truncated
-        const truncAllergens = allergenText.length > 30 ? allergenText.substring(0, 29) + '…' : allergenText;
-        rows.push(`^FO${ML},${y}^A0N,${tinyFont},${tinyFont}^FD${truncAllergens}^FS`);
-        y += tinyFont + 4;
-      } else {
-        rows.push(`^FO${ML},${y}^A0N,${tinyFont},${tinyFont}^FDAllergens: ${allergenText}^FS`);
-        y += tinyFont + 4;
-      }
+      rows.push(`^FO${ML},${y}^GB${CW},1,1^FS`);
+      y += 8;
+
+      rows.push(`^FO${ML},${y}^A0N,${allergenLabelFont},${allergenLabelFont}^FDALLERGENS^FS`);
+      y += allergenLabelFont + 4;
+
+      rows.push(`^FO${ML},${y}^A0N,${bodyFont},${bodyFont}^FD${allergenText}^FS`);
+      y += bodyFont + 4;
     }
 
-    // QR code on right side, aligned to content start
-    const qrX = ML + leftColW + 5;
-    rows.push(`^FO${qrX},${contentStartY}^BQN,2,${qrMag}^FDQA,${qrValue}^FS`);
-
-    // Label height: max of content Y and QR bottom, plus margin
-    const qrHeight = qrMag * 25 + 10;
-    const finalY = Math.max(y, contentStartY + qrHeight) + (isSmall ? 10 : 20);
+    const finalY = y + (isSmall ? 10 : 20);
     const LL = Math.min(Math.round(labelHeightMm * MM_TO_DOT), finalY);
 
     return `^XA
@@ -227,115 +236,83 @@ ${rows.join('\n')}
   }
 
   /**
-   * Generate ESC/POS commands for thermal printers (MPT-II, Xprinter, etc.)
+   * Generate ESC/POS commands for thermal printers (MPT-II, Xprinter, etc.).
+   * Layout matches ZPL layout — no QR code:
+   *   PRODUCT NAME (large, bold)
+   *   CATEGORY – SUBCATEGORY
+   *   ──────────────────────
+   *   PREPARED DATE: DD/MM/YYYY
+   *   EXPIRE DATE:   DD/MM/YYYY
+   *   PRINTED BY:    Name
+   *   CONDITION:     REFRIGERATED
+   *   ──────────────────────
+   *   ALLERGENS
+   *   MILK, SHELLFISH
    */
   private generateESCPOS(data: LabelPrintData): Uint8Array {
-    const { 
-      productName, 
-      categoryName, 
-      condition, 
-      prepDate, 
-      expiryDate, 
-      preparedByName, 
-      quantity, 
-      unit, 
-      allergens
+    const {
+      productName,
+      categoryName,
+      subcategoryName,
+      condition,
+      prepDate,
+      expiryDate,
+      preparedByName,
+      quantity,
+      unit,
+      allergens,
     } = data;
-    
-    // ESC/POS command sequence
+
     const commands: number[] = [];
-    
+    const sep = '------------------------------\n';
+
     // Initialize printer
     commands.push(0x1B, 0x40); // ESC @ - Initialize
-    
-    // Set character size (double width + double height for title)
-    commands.push(0x1D, 0x21, 0x11); // GS ! - Double size
-    
-    // Print product name (bold)
+    commands.push(0x1B, 0x61, 0x00); // ESC a 0 - Left align
+
+    // ── PRODUCT NAME (double size + bold) ──────────────────
+    commands.push(0x1D, 0x21, 0x11); // GS ! - Double width + double height
     commands.push(0x1B, 0x45, 0x01); // ESC E - Bold on
     commands.push(...this.stringToBytes(productName + '\n'));
     commands.push(0x1B, 0x45, 0x00); // ESC E - Bold off
-    
-    // Reset to normal size
     commands.push(0x1D, 0x21, 0x00); // GS ! - Normal size
-    
-    // Print category
-    commands.push(...this.stringToBytes(`Category: ${categoryName}\n`));
-    
-    // Print prep date
-    commands.push(...this.stringToBytes(`Prep: ${prepDate}\n`));
-    
-    // Print expiry date (bold + larger)
-    commands.push(0x1B, 0x45, 0x01); // Bold on
-    commands.push(0x1D, 0x21, 0x01); // GS ! - Double height
-    commands.push(...this.stringToBytes(`Exp: ${expiryDate}\n`));
-    commands.push(0x1B, 0x45, 0x00); // Bold off
-    commands.push(0x1D, 0x21, 0x00); // Normal size
-    
-    // Print prepared by
-    commands.push(...this.stringToBytes(`By: ${preparedByName}\n`));
-    
-    // Print quantity if present
+
+    // ── CATEGORY – SUBCATEGORY ─────────────────────────────
+    const catParts: string[] = [];
+    if (categoryName) catParts.push(categoryName);
+    if (subcategoryName) catParts.push(subcategoryName);
+    if (catParts.length > 0) {
+      commands.push(...this.stringToBytes(catParts.join(' - ') + '\n'));
+    }
+
+    // ── Separator ──────────────────────────────────────────
+    commands.push(...this.stringToBytes(sep));
+
+    // ── Fields ─────────────────────────────────────────────
+    commands.push(...this.stringToBytes(`PREPARED DATE: ${this.formatDateDMY(prepDate)}\n`));
+    commands.push(...this.stringToBytes(`EXPIRE DATE: ${this.formatDateDMY(expiryDate)}\n`));
+    commands.push(...this.stringToBytes(`PRINTED BY: ${preparedByName || 'Unknown'}\n`));
     if (quantity) {
-      commands.push(...this.stringToBytes(`Qty: ${quantity} ${unit || ''}\n`));
+      commands.push(...this.stringToBytes(`QUANTITY: ${quantity}${unit ? ' ' + unit.toUpperCase() : ''}\n`));
     }
-    
-    // Print condition
-    commands.push(...this.stringToBytes(`Condition: ${condition}\n`));
-    
-    // Print allergens if present
+    if (condition) {
+      commands.push(...this.stringToBytes(`CONDITION: ${condition.toUpperCase()}\n`));
+    }
+
+    // ── ALLERGENS ──────────────────────────────────────────
     if (allergens && allergens.length > 0) {
-      const allergenText = allergens.map(a => a.name).join(', ');
-      commands.push(...this.stringToBytes(`Allergens: ${allergenText}\n`));
+      const allergenText = allergens.map(a => a.name.toUpperCase()).join(', ');
+      commands.push(...this.stringToBytes(sep));
+      commands.push(0x1B, 0x45, 0x01); // Bold on
+      commands.push(...this.stringToBytes('ALLERGENS\n'));
+      commands.push(0x1B, 0x45, 0x00); // Bold off
+      commands.push(...this.stringToBytes(allergenText + '\n'));
     }
-    
-    // Add spacing before QR code
-    commands.push(0x0A); // Line feed
-    
-    // Generate QR Code data (JSON with label info)
-    const qrData = JSON.stringify({
-      product: productName,
-      prep: prepDate,
-      exp: expiryDate,
-      by: preparedByName,
-    });
-    
-    console.log(`📊 QR Code data: ${qrData}`);
-    console.log(`📏 QR Code length: ${qrData.length} characters`);
-    
-    // ESC/POS QR Code commands (Model 2) - ORIGINAL WORKING VERSION
-    // Select QR code model
-    commands.push(0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00); // GS ( k - Model 2
-    
-    // Set QR code size (module size = 6)
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x06); // GS ( k - Size 6
-    
-    // Set error correction level (H = 51) - Sprint 4 T9.1: High error correction (30%)
-    // Changed from M (49/0x31) to H (51/0x33) for maximum reliability
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x33); // GS ( k - Error correction H
-    
-    // Store QR code data
-    const qrBytes = this.stringToBytes(qrData);
-    const qrLength = qrBytes.length + 3;
-    const pL = qrLength % 256;
-    const pH = Math.floor(qrLength / 256);
-    
-    console.log(`📦 QR bytes length: ${qrBytes.length}, pL: ${pL}, pH: ${pH}`);
-    
-    commands.push(0x1D, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30); // GS ( k - Store data
-    commands.push(...qrBytes);
-    
-    // Print QR code
-    commands.push(0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30); // GS ( k - Print
-    
-    console.log(`✅ QR Code commands added (ORIGINAL VERSION)`);
-    
-    // Add spacing after QR code
-    commands.push(0x0A, 0x0A); // Line feeds
-    
-    // Cut paper (if supported)
+
+    // Feed paper and cut
+    commands.push(0x0A, 0x0A, 0x0A);
     commands.push(0x1D, 0x56, 0x00); // GS V - Full cut
-    
+
     return new Uint8Array(commands);
   }
 

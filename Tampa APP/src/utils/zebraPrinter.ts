@@ -25,6 +25,7 @@ export interface LabelPrintData {
   categoryId: string | null;
   categoryName: string;
   subcategoryId?: string | null; // UUID for subcategory
+  subcategoryName?: string;
   preparedBy: string;
   preparedByName: string;
   prepDate: string;
