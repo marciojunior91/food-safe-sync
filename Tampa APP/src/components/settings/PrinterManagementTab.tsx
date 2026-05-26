@@ -27,6 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useBluetoothPrinterStatus } from '@/hooks/useBluetoothPrinterStatus';
 import { useWebUsbPrinterStatus } from '@/hooks/useWebUsbPrinterStatus';
 import { savePrinterCache as saveBluetoothCache } from '@/lib/printers/bluetoothPrinterCache';
+import { setSharedBluetoothDevice } from '@/lib/printers/BluetoothUniversalPrinter';
 
 const STORAGE_KEY = 'printer_settings';
 const PRINTER_SETTINGS_CHANGED_EVENT = 'printer-settings-changed';
@@ -140,12 +141,16 @@ export function PrinterManagementTab() {
         ],
       });
       if (device) {
-        // Persist immediately so any subsequent reload / print-from-Labeling
-        // reuses the same device without a picker.
+        // Persist to localStorage so reloads can still find the device via
+        // navigator.bluetooth.getDevices() — and stash the live ref in the
+        // module-level singleton so the very next print() in this session
+        // (test print, Quick Print, Print Queue, label form, etc.) reuses
+        // the same BluetoothDevice without re-prompting the picker.
         saveBluetoothCache({
           deviceId: device.id,
           deviceName: device.name || 'Bluetooth Printer',
         });
+        setSharedBluetoothDevice(device);
         setPrinterName(device.name || 'Bluetooth Printer');
         toast({ title: 'Paired', description: `${device.name || 'Bluetooth Printer'} is ready to use.` });
       }

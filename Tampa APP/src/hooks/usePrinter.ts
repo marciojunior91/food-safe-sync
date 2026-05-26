@@ -48,33 +48,40 @@ export function usePrinter(context?: string) {
       
       if (stored) {
         const parsedSettings = JSON.parse(stored) as PrinterSettings;
-        setSettings(parsedSettings);
-        
-        // Initialize printer with stored settings
-        const printerInstance = PrinterFactory.createPrinter(parsedSettings.type, parsedSettings);
+        // Migrate legacy 'zebra' / 'tcp-ip' settings to bluetooth, since
+        // PrinterFactory now only supports 'bluetooth' and 'webusb'.
+        const safeType: PrinterType =
+          parsedSettings.type === 'bluetooth' || parsedSettings.type === 'webusb'
+            ? parsedSettings.type
+            : 'bluetooth';
+        const migrated = safeType === parsedSettings.type
+          ? parsedSettings
+          : { ...parsedSettings, type: safeType };
+        setSettings(migrated);
+
+        const printerInstance = PrinterFactory.createPrinter(safeType, migrated);
         setPrinter(printerInstance);
-        
-        console.log(`✅ Printer loaded: ${parsedSettings.type} for context: ${context || 'default'}`);
+
+        console.log(`✅ Printer loaded: ${safeType} for context: ${context || 'default'}`);
       } else {
-        // Default to Zebra printer (recommended for production)
-        const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
+        // Default to Bluetooth (recommended for production — see PrinterFactory).
+        const defaultSettings = PrinterFactory.getDefaultSettings('bluetooth');
         setSettings(defaultSettings);
-        setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
-        
-        console.log(`✅ Default Zebra printer loaded for context: ${context || 'default'}`);
+        setPrinter(PrinterFactory.createPrinter('bluetooth', defaultSettings));
+
+        console.log(`✅ Default Bluetooth printer loaded for context: ${context || 'default'}`);
       }
     } catch (error) {
       console.error('Failed to load printer settings:', error);
       toast({
         title: 'Settings Error',
-        description: 'Failed to load printer settings. Using default Zebra printer.',
+        description: 'Failed to load printer settings. Using default Bluetooth printer.',
         variant: 'destructive'
       });
-      
-      // Fallback to Zebra
-      const defaultSettings = PrinterFactory.getDefaultSettings('zebra');
+
+      const defaultSettings = PrinterFactory.getDefaultSettings('bluetooth');
       setSettings(defaultSettings);
-      setPrinter(PrinterFactory.createPrinter('zebra', defaultSettings));
+      setPrinter(PrinterFactory.createPrinter('bluetooth', defaultSettings));
     }
   }, [STORAGE_KEY, context, toast]);
 

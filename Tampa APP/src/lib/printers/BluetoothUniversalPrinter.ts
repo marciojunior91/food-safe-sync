@@ -7,7 +7,6 @@ import { generateLabelZPL, formatDateDMY } from '@/utils/labelZpl';
 import {
   loadPrinterCache,
   savePrinterCache,
-  updatePrinterCache,
   findCachedDevice,
 } from './bluetoothPrinterCache';
 
@@ -26,6 +25,40 @@ function emitStatus(detail: BluetoothPrinterStatusDetail): void {
     BLUETOOTH_PRINTER_STATUS_EVENT,
     { detail }
   ));
+}
+
+// ── Module-level singleton ──────────────────────────────────────────────────
+// React recreates BluetoothUniversalPrinter instances on every settings reload
+// and each usePrinter() context (quick-print, print-queue, label-form) gets
+// its own. Without a shared reference, every fresh instance would have to
+// re-discover the paired device through navigator.bluetooth.getDevices() —
+// an API that returns [] on desktop Chrome unless an experimental flag is on,
+// forcing the picker.
+//
+// Holding the BluetoothDevice + writable characteristic at module scope means:
+//   - Picker is shown at most once per page session.
+//   - GATT idle drops null only the characteristic; device ref persists, so
+//     the next print does device.gatt.connect() silently.
+//   - The pair flow in PrinterManagementTab can pre-populate the singleton
+//     via setSharedBluetoothDevice() so the first print uses it directly.
+let sharedDevice: BluetoothDevice | null = null;
+let sharedCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
+
+/** Inject a freshly-picked device into the shared singleton. Called by the
+ *  pair flow in PrinterManagementTab so the next print() reuses it without
+ *  re-prompting the picker. */
+export function setSharedBluetoothDevice(device: BluetoothDevice): void {
+  sharedDevice = device;
+  sharedCharacteristic = null; // GATT not opened yet — first print will open it
+}
+
+/** Clear the shared singleton (used by Forget). */
+export function clearSharedBluetoothDevice(): void {
+  if (sharedDevice?.gatt?.connected) {
+    try { sharedDevice.gatt.disconnect(); } catch { /* ignore */ }
+  }
+  sharedDevice = null;
+  sharedCharacteristic = null;
 }
 
 // Common Bluetooth Serial Port Profile (SPP) UUID
@@ -68,8 +101,15 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   };
   
   private settings: PrinterSettings;
-  private device: BluetoothDevice | null = null;
-  private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+
+  // Instance-level proxies into the module-level singleton — every
+  // BluetoothUniversalPrinter created in this page shares the same
+  // BluetoothDevice + GATT characteristic, so the picker is shown at most
+  // once per session regardless of how many printer instances React spawns.
+  private get device(): BluetoothDevice | null { return sharedDevice; }
+  private set device(d: BluetoothDevice | null) { sharedDevice = d; }
+  private get characteristic(): BluetoothRemoteGATTCharacteristic | null { return sharedCharacteristic; }
+  private set characteristic(c: BluetoothRemoteGATTCharacteristic | null) { sharedCharacteristic = c; }
 
   constructor(name: string, settings?: Partial<PrinterSettings>, protocol: PrinterProtocol = 'auto') {
     this.name = name;
@@ -256,10 +296,23 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
         throw new Error('Web Bluetooth is not supported. Please use Chrome on Android.');
       }
 
+      // ── Tier 0: in-memory singleton (this is the hot path) ────────────────
+      // If a previous instance — or the pair flow — already stashed the device,
+      // skip the cache lookup entirely. If the characteristic is also still
+      // alive on a connected GATT, we're done before we started.
+      if (this.device && this.characteristic && this.device.gatt?.connected) {
+        console.log(`⚡ Reusing live Bluetooth connection: ${this.device.name || this.device.id}`);
+        return true;
+      }
+
       // ── Tier 1 + 2: try cached / paired device (no picker) ────────────────
-      this.device = await findCachedDevice();
-      if (this.device) {
-        console.log(`🔵 Found cached device: ${this.device.name || this.device.id}`);
+      // Only run findCachedDevice() if the singleton is empty — once we have a
+      // device ref, we never throw it away (handleDisconnect keeps it).
+      if (!this.device) {
+        this.device = await findCachedDevice();
+        if (this.device) {
+          console.log(`🔵 Found cached device: ${this.device.name || this.device.id}`);
+        }
       }
 
       // Fallback: getDevices() may return other paired devices (legacy code)
@@ -421,11 +474,13 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
     return null;
   }
 
-  /** Bound handler so we can add/remove it as the same reference. */
+  /** Bound handler so we can add/remove it as the same reference.
+   *  Keeps the BluetoothDevice reference alive on idle GATT drop — only the
+   *  characteristic is invalidated. Next print() will call gatt.connect()
+   *  again (no picker needed for a known device). */
   private handleDisconnect = (): void => {
-    console.log('⚠️ Bluetooth device disconnected');
+    console.log('⚠️ Bluetooth GATT dropped — device ref preserved for silent reconnect');
     const deviceName = this.device?.name || undefined;
-    this.device = null;
     this.characteristic = null;
     emitStatus({ connected: false, deviceName, reason: 'device disconnected' });
   };
@@ -487,11 +542,11 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
 
     } catch (error) {
       console.error('❌ Failed to send data via Bluetooth:', error);
-      
-      // Reset connection on error
-      this.device = null;
+
+      // Only invalidate the characteristic — keep the device ref so the next
+      // print can silently re-open GATT without a picker.
       this.characteristic = null;
-      
+
       throw error;
     }
   }
@@ -593,15 +648,11 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   }
 
   /**
-   * Disconnect from printer
+   * Disconnect from printer (intentional teardown, e.g. user clicked Forget).
    */
   async disconnect(): Promise<void> {
-    if (this.device?.gatt?.connected) {
-      this.device.gatt.disconnect();
-      console.log('🔌 Bluetooth disconnected');
-    }
-    this.device = null;
-    this.characteristic = null;
+    clearSharedBluetoothDevice();
+    console.log('🔌 Bluetooth disconnected (singleton cleared)');
   }
 
   /**

@@ -10,6 +10,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   BLUETOOTH_PRINTER_STATUS_EVENT,
+  clearSharedBluetoothDevice,
   type BluetoothPrinterStatusDetail,
 } from '@/lib/printers/BluetoothUniversalPrinter';
 import {
@@ -80,6 +81,7 @@ export function useBluetoothPrinterStatus(): BluetoothPrinterStatus {
 
   const forget = useCallback(() => {
     clearPrinterCache();
+    clearSharedBluetoothDevice();
     setConnected(false);
     setDeviceName(null);
     setHasPairedDevice(false);
