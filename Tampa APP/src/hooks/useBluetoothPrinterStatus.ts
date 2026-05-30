@@ -28,6 +28,10 @@ export interface BluetoothPrinterStatus {
   deviceName: string | null;
   /** True if a paired device exists in the cache (regardless of connection). */
   hasPairedDevice: boolean;
+  /** True while the on-mount silent reconnect probe is still running.
+   *  UI should suppress the Reconnect button (and any "unavailable" copy)
+   *  until this flips false so we don't flash a stale state. */
+  probing: boolean;
   /** ISO timestamp of last successful connect (for "last used" display). */
   lastConnectedAt: string | null;
   /** Optional human-readable reason for the current state. */
@@ -47,6 +51,10 @@ export function useBluetoothPrinterStatus(): BluetoothPrinterStatus {
   );
   const [reason, setReason] = useState<string | undefined>();
   const [hasPairedDevice, setHasPairedDevice] = useState(!!initialCache);
+  // Probing starts true iff we have a cache to probe; otherwise there's
+  // nothing to wait for and the form can render its "Not Configured" state
+  // immediately.
+  const [probing, setProbing] = useState<boolean>(!!initialCache);
   const [lastConnectedAt, setLastConnectedAt] = useState<string | null>(
     initialCache?.lastConnectedAt ?? null,
   );
@@ -117,9 +125,16 @@ export function useBluetoothPrinterStatus(): BluetoothPrinterStatus {
     return () => window.removeEventListener(BLUETOOTH_PRINTER_STATUS_EVENT, handler);
   }, []);
 
-  // Silent reconnect on first mount so UI shows real status, not stale cache
+  // Silent reconnect on first mount so UI shows real status, not stale cache.
+  // `probing` stays true until this resolves so the form can avoid flashing
+  // a Reconnect button before we actually know the connection is dead.
   useEffect(() => {
-    if (initialCache) reconnect();
+    if (!initialCache) return;
+    let cancelled = false;
+    reconnect().finally(() => {
+      if (!cancelled) setProbing(false);
+    });
+    return () => { cancelled = true; };
     // We intentionally run once — reconnect is stable, initialCache is a snapshot.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -128,6 +143,7 @@ export function useBluetoothPrinterStatus(): BluetoothPrinterStatus {
     connected,
     deviceName,
     hasPairedDevice,
+    probing,
     lastConnectedAt,
     reason,
     forget,

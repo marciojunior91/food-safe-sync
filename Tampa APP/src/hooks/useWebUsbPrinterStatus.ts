@@ -17,6 +17,10 @@ export interface WebUsbPrinterStatus {
   connected: boolean;
   deviceName: string | null;
   hasPairedDevice: boolean;
+  /** True while the on-mount silent reconnect probe is still running.
+   *  Mirrors useBluetoothPrinterStatus.probing so the UI can gate the
+   *  Reconnect button until we actually know the link is dead. */
+  probing: boolean;
   lastConnectedAt: string | null;
   reason?: string;
   forget: () => void;
@@ -29,6 +33,7 @@ export function useWebUsbPrinterStatus(): WebUsbPrinterStatus {
   const [deviceName, setDeviceName] = useState<string | null>(initial?.deviceName ?? null);
   const [reason, setReason] = useState<string | undefined>();
   const [hasPairedDevice, setHasPairedDevice] = useState(!!initial);
+  const [probing, setProbing] = useState<boolean>(!!initial);
   const [lastConnectedAt, setLastConnectedAt] = useState<string | null>(
     initial?.lastConnectedAt ?? null,
   );
@@ -78,9 +83,14 @@ export function useWebUsbPrinterStatus(): WebUsbPrinterStatus {
   }, []);
 
   useEffect(() => {
-    if (initial) reconnect();
+    if (!initial) return;
+    let cancelled = false;
+    reconnect().finally(() => {
+      if (!cancelled) setProbing(false);
+    });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { connected, deviceName, hasPairedDevice, lastConnectedAt, reason, forget, reconnect };
+  return { connected, deviceName, hasPairedDevice, probing, lastConnectedAt, reason, forget, reconnect };
 }

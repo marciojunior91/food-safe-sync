@@ -311,6 +311,7 @@ export function PrinterManagementTab() {
               {btStatus.hasPairedDevice && (
                 <PairedPrinterCard
                   connected={btStatus.connected}
+                  probing={btStatus.probing}
                   deviceName={btStatus.deviceName}
                   reason={btStatus.reason}
                   icon={<Bluetooth className="h-5 w-5" />}
@@ -384,6 +385,7 @@ export function PrinterManagementTab() {
               {usbStatus.hasPairedDevice && (
                 <PairedPrinterCard
                   connected={usbStatus.connected}
+                  probing={usbStatus.probing}
                   deviceName={usbStatus.deviceName}
                   reason={usbStatus.reason}
                   icon={<Usb className="h-5 w-5" />}
@@ -436,20 +438,24 @@ export function PrinterManagementTab() {
           {/* ── Status row + actions ─────────────────────────────────── */}
           <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
             <StatusIcon className={`h-5 w-5 ${statusIconClass} ${
-              !activeStatus.connected && activeStatus.hasPairedDevice ? 'animate-pulse' : ''
+              activeStatus.probing || (!activeStatus.connected && activeStatus.hasPairedDevice)
+                ? 'animate-pulse'
+                : ''
             }`} />
             <div className="flex-1">
               <p className="text-sm font-medium">
                 {activeStatus.connected
                   ? 'Connected'
-                  : activeStatus.hasPairedDevice
-                    ? 'Saved — will reconnect on next print'
-                    : 'Not Configured'}
+                  : activeStatus.probing
+                    ? 'Checking connection…'
+                    : activeStatus.hasPairedDevice
+                      ? 'Saved — will reconnect on next print'
+                      : 'Not Configured'}
               </p>
-              {(activeStatus.deviceName || activeStatus.reason) && (
+              {(activeStatus.deviceName || (activeStatus.reason && !activeStatus.probing)) && (
                 <p className="text-xs text-muted-foreground">
                   {activeStatus.deviceName}
-                  {activeStatus.reason ? ` — ${activeStatus.reason}` : ''}
+                  {!activeStatus.probing && activeStatus.reason ? ` — ${activeStatus.reason}` : ''}
                 </p>
               )}
             </div>
@@ -562,6 +568,10 @@ export function PrinterManagementTab() {
 // ── Reusable status card ──────────────────────────────────────────────────
 interface PairedPrinterCardProps {
   connected: boolean;
+  /** True while the on-mount probe is still in flight. While true, suppress
+   *  the Reconnect button and any "unavailable" copy so we don't flash a
+   *  stale state before the sentinel resolves. */
+  probing: boolean;
   deviceName: string | null;
   reason?: string;
   icon: React.ReactNode;
@@ -570,25 +580,36 @@ interface PairedPrinterCardProps {
 }
 
 function PairedPrinterCard({
-  connected, deviceName, reason, icon, onReconnect, onForget,
+  connected, probing, deviceName, reason, icon, onReconnect, onForget,
 }: PairedPrinterCardProps) {
+  // Three visual states: connected (green) · probing (neutral) · offline (amber)
+  const tone = connected
+    ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900'
+    : probing
+      ? 'bg-muted/40 border-border'
+      : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900';
+  const iconTone = connected
+    ? 'text-green-600'
+    : probing
+      ? 'text-muted-foreground'
+      : 'text-amber-600';
+  const subtitle = connected
+    ? 'Connected — ready to print'
+    : probing
+      ? 'Checking connection…'
+      : reason || 'Saved, will reconnect on next print';
+
   return (
-    <div className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${
-      connected
-        ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900'
-        : 'bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-900'
-    }`}>
+    <div className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${tone}`}>
       <div className="flex items-center gap-3 min-w-0">
-        <div className={connected ? 'text-green-600' : 'text-amber-600'}>{icon}</div>
+        <div className={iconTone}>{icon}</div>
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{deviceName || 'Printer'}</p>
-          <p className="text-xs text-muted-foreground">
-            {connected ? 'Connected — ready to print' : reason || 'Saved, will reconnect on next print'}
-          </p>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       <div className="flex gap-2 flex-shrink-0">
-        {!connected && (
+        {!connected && !probing && (
           <Button size="sm" variant="outline" onClick={onReconnect}>
             <RefreshCw className="h-3 w-3 mr-1" /> Reconnect
           </Button>
