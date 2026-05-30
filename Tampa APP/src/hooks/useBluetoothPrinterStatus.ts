@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   BLUETOOTH_PRINTER_STATUS_EVENT,
   clearSharedBluetoothDevice,
+  hasSharedBluetoothDevice,
   type BluetoothPrinterStatusDetail,
 } from '@/lib/printers/BluetoothUniversalPrinter';
 import {
@@ -54,15 +55,26 @@ export function useBluetoothPrinterStatus(): BluetoothPrinterStatus {
   // to bring the cached printer back online (e.g. on app mount or after sleep).
   const reconnect = useCallback(async (): Promise<boolean> => {
     const cache = loadPrinterCache();
-    if (!cache) return false;
-
-    // Verify the device is still visible to the browser's Web Bluetooth
-    // permission registry before bothering to spin up a printer instance.
-    const device = await findCachedDevice();
-    if (!device) {
-      setConnected(false);
-      setReason('paired device not available (permission may be revoked)');
+    if (!cache) {
+      console.log('[BT] reconnect: no cache, skipping');
       return false;
+    }
+
+    // Defer the device-availability check to `connect(silent=true)` itself —
+    // the singleton may already hold the live device (e.g. just paired in this
+    // session), in which case findCachedDevice() is irrelevant. The printer's
+    // own connect() does the right tiered lookup.
+    if (!hasSharedBluetoothDevice()) {
+      // Singleton empty → confirm the browser still knows the device before
+      // spinning anything up. If it doesn't, we're forced to wait for the user
+      // to re-pair, no point trying.
+      const device = await findCachedDevice();
+      if (!device) {
+        console.log('[BT] reconnect: device not visible to browser, asking user to re-pair');
+        setConnected(false);
+        setReason('paired device not available (permission may be revoked)');
+        return false;
+      }
     }
 
     try {

@@ -44,21 +44,36 @@ function emitStatus(detail: BluetoothPrinterStatusDetail): void {
 let sharedDevice: BluetoothDevice | null = null;
 let sharedCharacteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
+// Connect-in-flight promise. Two parallel print buttons (e.g. Quick Print +
+// Print Queue) used to race into connect() simultaneously — both would see an
+// empty singleton, both would call requestDevice() in serial, and the user got
+// two pickers. Funneling every connect call through a single shared promise
+// removes the race: the second caller waits for the first to finish.
+let connectInFlight: Promise<boolean> | null = null;
+
 /** Inject a freshly-picked device into the shared singleton. Called by the
  *  pair flow in PrinterManagementTab so the next print() reuses it without
  *  re-prompting the picker. */
 export function setSharedBluetoothDevice(device: BluetoothDevice): void {
+  console.log('[BT] singleton ← device', device.name || device.id);
   sharedDevice = device;
   sharedCharacteristic = null; // GATT not opened yet — first print will open it
 }
 
 /** Clear the shared singleton (used by Forget). */
 export function clearSharedBluetoothDevice(): void {
+  console.log('[BT] singleton ← cleared');
   if (sharedDevice?.gatt?.connected) {
     try { sharedDevice.gatt.disconnect(); } catch { /* ignore */ }
   }
   sharedDevice = null;
   sharedCharacteristic = null;
+  connectInFlight = null;
+}
+
+/** Diagnostic: returns whether the singleton currently holds a paired device. */
+export function hasSharedBluetoothDevice(): boolean {
+  return !!sharedDevice;
 }
 
 // Common Bluetooth Serial Port Profile (SPP) UUID
@@ -87,7 +102,7 @@ const ALL_OPTIONAL_SERVICES = [
 export type PrinterProtocol = 'zpl' | 'escpos' | 'auto';
 
 export class BluetoothUniversalPrinter implements PrinterDriver {
-  type: 'bluetooth' = 'bluetooth';
+  type = 'bluetooth' as const;
   name: string;
   protocol: PrinterProtocol = 'auto';
   capabilities: PrinterCapabilities = {
@@ -277,45 +292,64 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
   /**
    * Connect to ANY Bluetooth printer.
    *
-   * Three-tier strategy, fastest path first:
-   *   1. **Silent reconnect via cache** — look up the previously paired
-   *      device by id through navigator.bluetooth.getDevices(); reuse the
-   *      GATT service/characteristic UUIDs we saved last time. No picker,
-   *      no enumeration, sub-second on a warm Bluetooth stack.
-   *   2. **Cached device, fresh GATT discovery** — paired device found but
-   *      cached UUIDs no longer respond; enumerate services to find a new
-   *      writable characteristic and update the cache.
-   *   3. **Fresh pairing** — no paired device known; show the picker.
+   * Lifecycle (fastest path first):
+   *   • **Hot reuse** — singleton has a live device + live GATT + characteristic.
+   *     Return immediately. Sub-millisecond.
+   *   • **Warm reopen** — singleton has the device ref but GATT is closed (idle
+   *     drop, sleep, etc.). Open GATT silently; reuse cached service /
+   *     characteristic UUIDs if we have them so we skip enumeration. No picker.
+   *   • **Cold cache lookup** — singleton empty (fresh page load). Look the
+   *     device up by id through navigator.bluetooth.getDevices(); if that works,
+   *     proceed as warm. If `getDevices()` fails or returns nothing AND silent
+   *     mode is off, show the picker. Silent mode returns false.
    *
-   * Whichever tier succeeds, the device id + GATT UUIDs are saved so the
-   * next call goes straight to tier 1.
+   * Whichever path succeeds, the device id + GATT UUIDs are persisted to
+   * localStorage so the next page load goes straight to "warm reopen".
+   *
+   * Concurrency: every call funnels through `connectInFlight` so two parallel
+   * print buttons can't open two pickers / race on the same GATT.
    */
   async connect(silent: boolean = false): Promise<boolean> {
+    if (connectInFlight) {
+      console.log('[BT] connect: joining in-flight attempt');
+      return connectInFlight;
+    }
+    connectInFlight = this.doConnect(silent).finally(() => {
+      connectInFlight = null;
+    });
+    return connectInFlight;
+  }
+
+  private async doConnect(silent: boolean): Promise<boolean> {
     try {
       if (!navigator.bluetooth) {
         throw new Error('Web Bluetooth is not supported. Please use Chrome on Android.');
       }
 
-      // ── Tier 0: in-memory singleton (this is the hot path) ────────────────
-      // If a previous instance — or the pair flow — already stashed the device,
-      // skip the cache lookup entirely. If the characteristic is also still
-      // alive on a connected GATT, we're done before we started.
+      console.log(`[BT] connect(silent=${silent}) — singleton: device=${this.device?.name || this.device?.id || 'none'} characteristic=${this.characteristic ? 'set' : 'none'} gatt=${this.device?.gatt?.connected ? 'open' : 'closed'}`);
+
+      // ── Hot reuse: device + characteristic + GATT all live ───────────────
       if (this.device && this.characteristic && this.device.gatt?.connected) {
-        console.log(`⚡ Reusing live Bluetooth connection: ${this.device.name || this.device.id}`);
+        console.log(`[BT] ⚡ hot reuse — ${this.device.name || this.device.id}`);
+        emitStatus({ connected: true, deviceName: this.device.name || undefined });
         return true;
       }
 
-      // ── Tier 1 + 2: try cached / paired device (no picker) ────────────────
+      // ── Cold cache lookup: singleton empty, ask the browser by id ────────
       // Only run findCachedDevice() if the singleton is empty — once we have a
       // device ref, we never throw it away (handleDisconnect keeps it).
       if (!this.device) {
+        console.log('[BT] singleton empty — checking browser permission registry');
         this.device = await findCachedDevice();
         if (this.device) {
-          console.log(`🔵 Found cached device: ${this.device.name || this.device.id}`);
+          console.log(`[BT] 🔵 recovered cached device: ${this.device.name || this.device.id}`);
+          sharedDevice = this.device;
         }
       }
 
-      // Fallback: getDevices() may return other paired devices (legacy code)
+      // Legacy: navigator.bluetooth.getDevices() may surface other paired
+      // devices we didn't write to our cache (e.g. paired before the cache
+      // shipped). Fall back to a name match.
       if (!this.device && 'getDevices' in navigator.bluetooth) {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -327,29 +361,30 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
             paired[0] ??
             null;
           if (this.device) {
-            console.log(`🔵 Found legacy paired device: ${this.device.name || this.device.id}`);
+            console.log(`[BT] 🔵 recovered legacy paired device: ${this.device.name || this.device.id}`);
+            sharedDevice = this.device;
           }
         } catch (e) {
-          console.warn('getDevices() failed:', e);
+          console.warn('[BT] getDevices() failed:', e);
         }
       }
 
-      // ── Tier 3: show picker (only if no cached device and not silent) ─────
+      // ── Picker: only if we still have no device AND not silent ──────────
       if (!this.device) {
         if (silent) {
-          // Silent reconnect attempt — do NOT show picker. Caller will see
-          // this as "not connected" and can decide whether to prompt.
+          console.log('[BT] silent reconnect: no cached device, returning false');
           return false;
         }
-        console.log('🔵 No paired device — showing Bluetooth picker…');
+        console.log('[BT] no paired device — showing Bluetooth picker (first pair)');
         this.device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: ALL_OPTIONAL_SERVICES,
         });
+        sharedDevice = this.device;
       }
 
       if (!this.device) throw new Error('No device selected');
-      console.log(`✅ Device selected: ${this.device.name || 'Unknown'}`);
+      console.log(`[BT] ✅ device ready: ${this.device.name || 'Unknown'}`);
 
       // Restore protocol from cache if we have one for this device
       const cache = loadPrinterCache();
@@ -359,20 +394,33 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
         this.protocol = this.detectProtocol(this.device.name);
       }
 
-      // ── Connect GATT ──────────────────────────────────────────────────────
-      const server = await this.device.gatt?.connect();
-      if (!server) throw new Error('Failed to connect to GATT server');
-      console.log('✅ GATT server connected');
+      // ── Warm reopen: open GATT if not already open ──────────────────────
+      if (!this.device.gatt?.connected) {
+        console.log('[BT] opening GATT server…');
+        const server = await this.device.gatt?.connect();
+        if (!server) throw new Error('Failed to connect to GATT server');
+        console.log('[BT] ✅ GATT server connected');
+      } else {
+        console.log('[BT] GATT already connected — reusing');
+      }
 
-      // ── Find writable characteristic (cached UUIDs first) ─────────────────
-      this.characteristic = await this.locateWritableCharacteristic(server, cache);
+      const server = this.device.gatt;
+      if (!server) throw new Error('GATT unavailable after connect');
+
+      // ── Find writable characteristic (cached UUIDs first) ────────────────
+      // If the characteristic from a previous connect is still bound to the
+      // live GATT, reuse it — `locateWritableCharacteristic` will try the
+      // cached UUIDs first and the fast path is one round-trip.
+      if (!this.characteristic) {
+        this.characteristic = await this.locateWritableCharacteristic(server, cache);
+      }
 
       if (!this.characteristic) {
         throw new Error('No writable characteristic found on this Bluetooth device');
       }
-      console.log(`✅ Characteristic ready (protocol: ${this.protocol.toUpperCase()})`);
+      console.log(`[BT] ✅ characteristic ready (protocol: ${this.protocol.toUpperCase()})`);
 
-      // ── Persist what worked ───────────────────────────────────────────────
+      // ── Persist what worked ──────────────────────────────────────────────
       savePrinterCache({
         deviceId: this.device.id,
         deviceName: this.device.name || 'Bluetooth Printer',
@@ -381,14 +429,15 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
         protocol: this.protocol,
       });
 
-      // ── Listen for disconnection ──────────────────────────────────────────
+      // ── Listen for disconnection ─────────────────────────────────────────
+      this.device.removeEventListener('gattserverdisconnected', this.handleDisconnect);
       this.device.addEventListener('gattserverdisconnected', this.handleDisconnect);
 
       emitStatus({ connected: true, deviceName: this.device.name || undefined });
       return true;
 
     } catch (error) {
-      console.error('❌ Bluetooth connection failed:', error);
+      console.error('[BT] ❌ connect failed:', error);
       emitStatus({
         connected: false,
         reason: error instanceof Error ? error.message : String(error),
@@ -449,8 +498,7 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
         }
         // Enumerate this service's characteristics
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+          const chars = await svc.getCharacteristics();
           const writable = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
           if (writable) return writable;
         } catch { /* can't enumerate */ }
@@ -459,11 +507,9 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
 
     // ── Last resort: enumerate ALL services ──────────────────────────────
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allServices: BluetoothRemoteGATTService[] = await (server as any)['getPrimaryServices']();
+      const allServices = await server.getPrimaryServices();
       for (const svc of allServices) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const chars: BluetoothRemoteGATTCharacteristic[] = await (svc as any)['getCharacteristics']();
+        const chars = await svc.getCharacteristics();
         const writable = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
         if (writable) return writable;
       }
@@ -479,7 +525,7 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
    *  characteristic is invalidated. Next print() will call gatt.connect()
    *  again (no picker needed for a known device). */
   private handleDisconnect = (): void => {
-    console.log('⚠️ Bluetooth GATT dropped — device ref preserved for silent reconnect');
+    console.log('[BT] ⚠️ GATT dropped — device ref preserved for silent reconnect');
     const deviceName = this.device?.name || undefined;
     this.characteristic = null;
     emitStatus({ connected: false, deviceName, reason: 'device disconnected' });
@@ -490,8 +536,8 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
    */
   private async sendData(data: string | Uint8Array): Promise<boolean> {
     try {
-      if (!this.characteristic) {
-        console.log('📡 Not connected, attempting to connect...');
+      if (!this.characteristic || !this.device?.gatt?.connected) {
+        console.log('[BT] sendData: not connected — connecting first');
         await this.connect();
       }
 
@@ -514,7 +560,7 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
         
         try {
           if (useWOR) {
-            await (this.characteristic as any).writeValueWithoutResponse(chunk);
+            await this.characteristic.writeValueWithoutResponse(chunk);
           } else {
             await this.characteristic.writeValue(chunk);
           }
@@ -525,7 +571,7 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
           await this.connect();
           if (!this.characteristic) throw new Error('Reconnect failed');
           if (useWOR) {
-            await (this.characteristic as any).writeValueWithoutResponse(chunk);
+            await this.characteristic.writeValueWithoutResponse(chunk);
           } else {
             await this.characteristic.writeValue(chunk);
           }
@@ -556,13 +602,15 @@ export class BluetoothUniversalPrinter implements PrinterDriver {
    */
   async print(labelData: LabelPrintData): Promise<boolean> {
     try {
+      console.log(`[BT] print() requested for "${labelData.productName}" — characteristic=${this.characteristic ? 'set' : 'none'} device=${this.device?.name || 'none'} gatt=${this.device?.gatt?.connected ? 'open' : 'closed'}`);
+
       // STEP 1: Ensure BLE connection BEFORE detecting protocol.
-      // On the first call this.device is null, so connect() shows the
-      // Bluetooth picker, pairs the device, discovers GATT services/chars,
-      // and — crucially — runs detectProtocol() so this.protocol is set
-      // correctly BEFORE we generate ZPL or ESC/POS data.
-      if (!this.characteristic) {
-        console.log('📡 Not connected — connecting before generating label data...');
+      // If the singleton already holds a live device+characteristic+GATT,
+      // connect() returns in microseconds. Otherwise it walks the lifecycle
+      // (hot/warm/cold) and either reuses the cached identity silently or —
+      // first time ever on this device — pops the picker.
+      if (!this.characteristic || !this.device?.gatt?.connected) {
+        console.log('[BT] print: connection not live, connecting first');
         await this.connect();
       }
 

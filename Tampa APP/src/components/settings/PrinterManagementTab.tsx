@@ -27,7 +27,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useBluetoothPrinterStatus } from '@/hooks/useBluetoothPrinterStatus';
 import { useWebUsbPrinterStatus } from '@/hooks/useWebUsbPrinterStatus';
 import { savePrinterCache as saveBluetoothCache } from '@/lib/printers/bluetoothPrinterCache';
-import { setSharedBluetoothDevice } from '@/lib/printers/BluetoothUniversalPrinter';
+import {
+  BluetoothUniversalPrinter,
+  setSharedBluetoothDevice,
+} from '@/lib/printers/BluetoothUniversalPrinter';
 
 const STORAGE_KEY = 'printer_settings';
 const PRINTER_SETTINGS_CHANGED_EVENT = 'printer-settings-changed';
@@ -140,19 +143,48 @@ export function PrinterManagementTab() {
           '0000ae30-0000-1000-8000-00805f9b34fb',
         ],
       });
-      if (device) {
-        // Persist to localStorage so reloads can still find the device via
-        // navigator.bluetooth.getDevices() — and stash the live ref in the
-        // module-level singleton so the very next print() in this session
-        // (test print, Quick Print, Print Queue, label form, etc.) reuses
-        // the same BluetoothDevice without re-prompting the picker.
-        saveBluetoothCache({
-          deviceId: device.id,
-          deviceName: device.name || 'Bluetooth Printer',
+      if (!device) return;
+
+      // Persist device identity + stash the live ref in the singleton so
+      // every subsequent print() in this session reuses it without re-prompting
+      // the picker. The basic save (id + name) is enough to survive a page
+      // reload via navigator.bluetooth.getDevices().
+      saveBluetoothCache({
+        deviceId: device.id,
+        deviceName: device.name || 'Bluetooth Printer',
+      });
+      setSharedBluetoothDevice(device);
+      setPrinterName(device.name || 'Bluetooth Printer');
+
+      // Immediately open GATT + discover the writable characteristic. Without
+      // this the next print() — even if same session — has to do GATT-connect
+      // + service enumeration on its own, which can take several seconds for
+      // a Zebra D411 and races against any other Print button the user taps.
+      // Doing it here while we're still in the user-activation context means
+      // the next print is a single write() with no setup latency.
+      try {
+        const driver = new BluetoothUniversalPrinter(
+          device.name || 'Bluetooth Printer',
+          { ...buildSettings(), name: device.name || 'Bluetooth Printer' },
+        );
+        const ok = await driver.connect(false);
+        if (ok) {
+          toast({
+            title: 'Paired & Connected',
+            description: `${device.name || 'Bluetooth Printer'} is ready. You can print without pairing again.`,
+          });
+        } else {
+          toast({
+            title: 'Paired',
+            description: `${device.name || 'Bluetooth Printer'} saved. It will connect on first print.`,
+          });
+        }
+      } catch (connectErr) {
+        console.warn('[BT] pair-time GATT connect failed (will retry on first print):', connectErr);
+        toast({
+          title: 'Paired',
+          description: `${device.name || 'Bluetooth Printer'} saved. It will connect on first print.`,
         });
-        setSharedBluetoothDevice(device);
-        setPrinterName(device.name || 'Bluetooth Printer');
-        toast({ title: 'Paired', description: `${device.name || 'Bluetooth Printer'} is ready to use.` });
       }
     } catch (err) {
       if (err instanceof Error && !err.message.toLowerCase().includes('cancel')) {

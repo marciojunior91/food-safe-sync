@@ -34,6 +34,10 @@ declare global {
       type: 'gattserverdisconnected',
       listener: (event: Event) => void
     ): void;
+    removeEventListener(
+      type: 'gattserverdisconnected',
+      listener: (event: Event) => void
+    ): void;
   }
 
   interface BluetoothRemoteGATTServer {
@@ -42,6 +46,7 @@ declare global {
     connect(): Promise<BluetoothRemoteGATTServer>;
     disconnect(): void;
     getPrimaryService(service: BluetoothServiceUUID): Promise<BluetoothRemoteGATTService>;
+    getPrimaryServices(): Promise<BluetoothRemoteGATTService[]>;
   }
 
   interface BluetoothRemoteGATTService {
@@ -51,6 +56,7 @@ declare global {
     getCharacteristic(
       characteristic: BluetoothCharacteristicUUID
     ): Promise<BluetoothRemoteGATTCharacteristic>;
+    getCharacteristics(): Promise<BluetoothRemoteGATTCharacteristic[]>;
   }
 
   interface BluetoothRemoteGATTCharacteristic {
@@ -59,6 +65,7 @@ declare global {
     properties: BluetoothCharacteristicProperties;
     value?: DataView;
     writeValue(value: BufferSource): Promise<void>;
+    writeValueWithoutResponse(value: BufferSource): Promise<void>;
     readValue(): Promise<DataView>;
   }
 

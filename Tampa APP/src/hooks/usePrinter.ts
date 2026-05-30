@@ -175,10 +175,12 @@ export function usePrinter(context?: string) {
       return false;
     }
 
+    console.log(`[print] ▶ ${labelData?.productName || 'label'} via ${printer.type} (context: ${context || 'default'})`);
     setIsLoading(true);
-    
+
     try {
       const success = await printer.print(labelData);
+      console.log(`[print] ${success ? '✅' : '❌'} job for ${labelData?.productName}`);
       
       if (success) {
         toast({
