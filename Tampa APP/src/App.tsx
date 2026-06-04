@@ -28,6 +28,7 @@ import Settings from "./pages/Settings";
 import ExpiringSoon from "./pages/ExpiringSoon";
 import QRLabelAction from "./pages/QRLabelAction";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import KnowledgeBaseArticle from "./pages/KnowledgeBaseArticle";
 import TestEmail from "./pages/TestEmail";
 import Compliance from "./pages/Compliance";
 import LabelPreviewPage from "./pages/LabelPreviewPage";
@@ -66,6 +67,7 @@ const App = () => (
                 <Route path="people" element={<People />} />
                 <Route path="feed" element={<FeedModule />} />
                 <Route path="knowledge-base" element={<KnowledgeBase />} />
+                <Route path="knowledge-base/article/:slug" element={<KnowledgeBaseArticle />} />
                 <Route path="training" element={<Training />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="label-categories" element={<LabelCategories />} />

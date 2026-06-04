@@ -1,295 +1,209 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, Search, Plus, Star, Clock, ExternalLink } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+// Knowledge Base index page. Lists articles for the current org, filterable
+// by category + search. Admins get full CRUD via the editor dialog; staff
+// see a read-only view that links to the per-article reader page.
 
-interface Article {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  created_at: string;
-  updated_at: string;
-  author_id: string;
-  is_published: boolean;
-  views: number;
-}
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  BookOpen, Search, Plus, Clock, Eye, Edit, Loader2,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { useUserRole } from '@/hooks/useUserRole';
+import {
+  useArticleCategories,
+  useArticles,
+  type KbArticle,
+} from '@/hooks/useKnowledgeBase';
+import { ArticleEditorDialog } from '@/components/knowledge/ArticleEditorDialog';
 
 export default function KnowledgeBase() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [filteredArticles, setFilteredArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
+  const { categories } = useArticleCategories();
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [search, setSearch] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<KbArticle | null>(null);
 
-  // Placeholder categories (will be from database later)
-  const categories = [
-    "Food Safety",
-    "Equipment Operation",
-    "Recipes & Procedures",
-    "Health & Hygiene",
-    "Emergency Procedures",
-    "Allergen Management",
-    "Storage Guidelines",
-    "Cleaning Protocols"
-  ];
+  const { articles, loading, refetch } = useArticles({
+    categoryId: selectedCategory,
+    search,
+    includeDrafts: isAdmin,
+  });
 
-  useEffect(() => {
-    fetchArticles();
-  }, [user]);
+  // Stats are computed off whatever the user can see (admins see drafts too).
+  const stats = useMemo(() => {
+    const total = articles.length;
+    const totalViews = articles.reduce((s, a) => s + a.views, 0);
+    const mostPopular = articles.reduce((max, a) => (a.views > max ? a.views : max), 0);
+    return { total, totalViews, mostPopular };
+  }, [articles]);
 
-  useEffect(() => {
-    filterArticles();
-  }, [searchQuery, selectedCategory, articles]);
-
-  const fetchArticles = async () => {
-    try {
-      if (!user?.id) return;
-
-      // TODO: Create knowledge_base_articles table in Supabase
-      // For now, using placeholder data
-      
-      const placeholderArticles: Article[] = [
-        {
-          id: "1",
-          title: "Food Temperature Safety Guidelines",
-          content: "Complete guide to safe food storage temperatures...",
-          category: "Food Safety",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          author_id: user.id,
-          is_published: true,
-          views: 42
-        },
-        {
-          id: "2",
-          title: "How to Use the Zebra Printer",
-          content: "Step-by-step guide for printing labels...",
-          category: "Equipment Operation",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          author_id: user.id,
-          is_published: true,
-          views: 28
-        },
-        {
-          id: "3",
-          title: "Allergen Cross-Contamination Prevention",
-          content: "Best practices to prevent allergen cross-contamination...",
-          category: "Allergen Management",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          author_id: user.id,
-          is_published: true,
-          views: 35
-        },
-        {
-          id: "4",
-          title: "Deep Cleaning Procedures",
-          content: "Weekly and monthly deep cleaning checklists...",
-          category: "Cleaning Protocols",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          author_id: user.id,
-          is_published: true,
-          views: 19
-        }
-      ];
-
-      setArticles(placeholderArticles);
-      
-    } catch (error) {
-      console.error('Error fetching articles:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load knowledge base articles",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+  const handleNew = () => {
+    setEditingArticle(null);
+    setEditorOpen(true);
   };
 
-  const filterArticles = () => {
-    let filtered = [...articles];
-
-    // Search filter
-    if (searchQuery) {
-      filtered = filtered.filter(article =>
-        article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        article.content.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Category filter
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter(article => article.category === selectedCategory);
-    }
-
-    setFilteredArticles(filtered);
+  const handleEdit = (article: KbArticle, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingArticle(article);
+    setEditorOpen(true);
   };
-
-  if (loading) {
-    return (
-      <div className="p-6 md:p-8">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-muted rounded w-1/4"></div>
-          <div className="h-32 bg-muted rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 md:p-8 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <BookOpen className="h-8 w-8 text-blue-500" />
             Knowledge Base
           </h1>
           <p className="text-muted-foreground mt-1">
-            Documentation, guides, and best practices
+            Documentation, guides, and best practices for your team.
           </p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          New Article
-        </Button>
+        {isAdmin && (
+          <Button onClick={handleNew} className="gap-2">
+            <Plus className="h-4 w-4" /> New Article
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Articles</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{articles.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Categories</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{categories.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Views</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {articles.reduce((sum, a) => sum + a.views, 0)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Most Popular</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.max(...articles.map(a => a.views), 0)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">views</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <StatCard label={isAdmin ? 'Articles + Drafts' : 'Published Articles'} value={stats.total} />
+        <StatCard label="Categories" value={categories.length} />
+        <StatCard label="Total Views" value={stats.totalViews} />
+        <StatCard label="Most Popular" value={stats.mostPopular} hint="views" />
       </div>
 
-      {/* Search and Filters */}
+      {/* Search + categories */}
       <Card>
         <CardHeader>
-          <CardTitle>Search & Filter</CardTitle>
+          <CardTitle className="text-base">Search &amp; Filter</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12"
+              placeholder="Search articles…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-10"
             />
           </div>
 
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mb-1">
             <Button
               size="sm"
-              variant={selectedCategory === "all" ? "default" : "outline"}
-              onClick={() => setSelectedCategory("all")}
+              variant={selectedCategory === 'all' ? 'default' : 'outline'}
+              onClick={() => setSelectedCategory('all')}
+              className="flex-shrink-0"
             >
-              All Categories
+              All
             </Button>
-            {categories.map((category) => (
+            {categories.map(c => (
               <Button
-                key={category}
+                key={c.id}
                 size="sm"
-                variant={selectedCategory === category ? "default" : "outline"}
-                onClick={() => setSelectedCategory(category)}
+                variant={selectedCategory === c.id ? 'default' : 'outline'}
+                onClick={() => setSelectedCategory(c.id)}
+                className="flex-shrink-0 gap-1"
               >
-                {category}
+                {c.icon && <span>{c.icon}</span>}
+                {c.name}
               </Button>
             ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* Articles Grid */}
-      {filteredArticles.length === 0 ? (
+      {/* Articles grid */}
+      {loading ? (
+        <Card>
+          <CardContent className="py-12 flex justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </CardContent>
+        </Card>
+      ) : articles.length === 0 ? (
         <Card>
           <CardContent className="py-12">
             <div className="text-center text-muted-foreground">
               <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium">No articles found</p>
               <p className="text-sm mt-1">
-                {searchQuery || selectedCategory !== "all" 
-                  ? "Try adjusting your search or filters"
-                  : "Create your first article to get started"}
+                {search || selectedCategory !== 'all'
+                  ? 'Try adjusting your search or filters.'
+                  : isAdmin
+                  ? 'Create your first article to get started.'
+                  : 'Your admin hasn\'t published any articles yet.'}
               </p>
+              {isAdmin && !search && selectedCategory === 'all' && (
+                <Button onClick={handleNew} className="mt-4 gap-2">
+                  <Plus className="h-4 w-4" /> Create first article
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredArticles.map((article) => (
-            <Card key={article.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <Badge variant="secondary">{article.category}</Badge>
-                  <Button variant="ghost" size="icon">
-                    <Star className="h-4 w-4" />
-                  </Button>
+          {articles.map(article => (
+            <Card
+              key={article.id}
+              className="hover:shadow-lg transition-shadow cursor-pointer flex flex-col"
+              onClick={() => navigate(`/knowledge-base/article/${article.slug}`)}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap gap-1">
+                    {article.category && (
+                      <Badge variant="secondary" className="gap-1">
+                        {article.category.icon && <span>{article.category.icon}</span>}
+                        {article.category.name}
+                      </Badge>
+                    )}
+                    {!article.is_published && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-200">
+                        Draft
+                      </Badge>
+                    )}
+                  </div>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 flex-shrink-0"
+                      onClick={e => handleEdit(article, e)}
+                      aria-label="Edit article"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-                <CardTitle className="text-lg line-clamp-2 mt-2">
-                  {article.title}
-                </CardTitle>
-                <CardDescription className="line-clamp-3">
-                  {article.content}
-                </CardDescription>
+                <CardTitle className="text-lg line-clamp-2 mt-2">{article.title}</CardTitle>
+                {article.excerpt && (
+                  <CardDescription className="line-clamp-3 mt-1">
+                    {article.excerpt}
+                  </CardDescription>
+                )}
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <CardContent className="mt-auto">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {new Date(article.updated_at).toLocaleDateString()}
+                    {format(new Date(article.updated_at), 'MMM d, yyyy')}
                   </div>
                   <div className="flex items-center gap-1">
-                    <ExternalLink className="h-3 w-3" />
-                    {article.views} views
+                    <Eye className="h-3 w-3" />
+                    {article.views}
                   </div>
                 </div>
               </CardContent>
@@ -298,21 +212,29 @@ export default function KnowledgeBase() {
         </div>
       )}
 
-      {/* Coming Soon Notice */}
-      <Card className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20">
-        <CardHeader>
-          <CardTitle className="text-blue-600 dark:text-blue-400">
-            🚧 Knowledge Base - Coming Soon
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Full knowledge base functionality including article creation, editing, 
-            categories management, and search will be available soon. Currently showing 
-            placeholder data for UI preview.
-          </p>
-        </CardContent>
-      </Card>
+      {isAdmin && (
+        <ArticleEditorDialog
+          open={editorOpen}
+          onOpenChange={setEditorOpen}
+          article={editingArticle}
+          categories={categories}
+          onSaved={refetch}
+        />
+      )}
     </div>
+  );
+}
+
+function StatCard({ label, value, hint }: { label: string; value: number; hint?: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+        {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
+      </CardContent>
+    </Card>
   );
 }
