@@ -369,30 +369,39 @@ export default function Recipes() {
 
       {/* ── CATEGORIES VIEW ── */}
       {pageView === 'categories' && !selectedCategoryView && (
-        <div className="recipe-categories-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+        // Same tile pattern as the Labels Quick Print category tiles
+        <div className="recipe-categories-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {Object.entries(CATEGORY_EMOJIS).map(([cat, emoji]) => {
             const count = recipes.filter(r => r.category?.trim().toLowerCase() === cat.toLowerCase()).length;
             return (
-              <button
+              <Button
                 key={cat}
+                variant="outline"
+                className="h-40 sm:h-44 md:h-48 w-full flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
                 onClick={() => { setSelectedCategoryView(cat); setPageView('recipes'); }}
-                className="flex flex-col items-center justify-center gap-1.5 p-4 md:p-5 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
               >
-                <span className="recipe-category-emoji text-3xl md:text-4xl">{emoji}</span>
-                <span className="recipe-category-label font-semibold text-sm">{cat}</span>
-                <Badge variant="secondary" className="text-xs">{count} recipe{count !== 1 ? 's' : ''}</Badge>
-              </button>
+                <div className="text-4xl sm:text-5xl mb-3 group-hover:scale-110 transition-transform leading-none">
+                  {emoji}
+                </div>
+                <span className="text-sm font-medium text-center line-clamp-2 leading-tight">{cat}</span>
+                <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
+                  {count} {count === 1 ? 'recipe' : 'recipes'}
+                </span>
+              </Button>
             );
           })}
           {/* All Recipes tile */}
-          <button
+          <Button
+            variant="outline"
+            className="h-40 sm:h-44 md:h-48 w-full flex flex-col items-center justify-center p-4 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md"
             onClick={() => { setSelectedCategoryView(null); setPageView('recipes'); }}
-            className="flex flex-col items-center justify-center gap-1.5 p-4 md:p-5 rounded-xl border bg-card hover:bg-accent hover:shadow-md transition-all text-center"
           >
-            <span className="recipe-category-emoji text-3xl md:text-4xl">📋</span>
-            <span className="recipe-category-label font-semibold text-sm">All Recipes</span>
-            <Badge variant="outline" className="text-xs">{recipes.length} total</Badge>
-          </button>
+            <div className="text-4xl sm:text-5xl mb-3 group-hover:scale-110 transition-transform leading-none">📋</div>
+            <span className="text-sm font-medium text-center line-clamp-2 leading-tight">All Recipes</span>
+            <span className="text-xs text-muted-foreground group-hover:text-primary-foreground/80 mt-2">
+              {recipes.length} total
+            </span>
+          </Button>
         </div>
       )}
 
@@ -445,20 +454,22 @@ export default function Recipes() {
               {filteredRecipes.map((recipe) => (
                 <Card
                   key={recipe.id}
-                  className="hover:shadow-md transition-shadow cursor-pointer flex flex-col"
+                  className="rounded-xl hover:shadow-md transition-shadow cursor-pointer flex flex-col"
                   onClick={() => setSelectedRecipeDetail(recipe)}
                 >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-lg">{CATEGORY_EMOJIS[recipe.category] || '📂'}</p>
-                        <CardTitle className="text-sm font-semibold leading-tight line-clamp-2 mt-1">
-                          {recipe.name}
-                        </CardTitle>
-                      </div>
-                      {(recipe.allergens || []).length > 0 && (
-                        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-1" />
-                      )}
+                  {/* Tampa tile header — prominent centred emoji + name, matching the
+                     Quick Print label tiles for a consistent look across modules. */}
+                  <CardHeader className="pb-2 relative">
+                    {(recipe.allergens || []).length > 0 && (
+                      <AlertTriangle className="w-4 h-4 text-amber-500 absolute top-3 right-3" />
+                    )}
+                    <div className="flex flex-col items-center text-center gap-1.5">
+                      <span className="text-4xl leading-none">
+                        {recipe.icon || CATEGORY_EMOJIS[recipe.category] || '📂'}
+                      </span>
+                      <CardTitle className="text-sm font-semibold leading-tight line-clamp-2">
+                        {recipe.name}
+                      </CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0 flex flex-col gap-2 flex-1">

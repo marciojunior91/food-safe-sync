@@ -798,27 +798,9 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
       }
     }
 
-    // Save label to database first
     try {
-      const savedLabelId = await saveLabelToDatabase({
-        productId: labelData.productId,
-        productName: labelData.productName,
-        categoryId: labelData.categoryId === "all" ? null : labelData.categoryId,
-        categoryName: labelData.categoryName,
-        subcategoryId: labelData.subcategoryId || null, // Include subcategory!
-        preparedBy: labelData.preparedBy,
-        preparedByName: labelData.preparedByName,
-        prepDate: labelData.prepDate,
-        expiryDate: labelData.expiryDate,
-        condition: labelData.condition,
-        quantity: labelData.quantity,
-        unit: labelData.unit,
-        batchNumber: labelData.batchNumber,
-        organizationId: organizationId || "", // Required for RLS
-        allergens: selectedAllergensForPreview,
-      });
-
-      // Print using the new printer system
+      // Print FIRST — only persist a printed_labels row if the print succeeds,
+      // so failed/cancelled prints don't create phantom history.
       const success = await print({
         productName: labelData.productName,
         categoryName: labelData.categoryName,
@@ -831,11 +813,30 @@ export function LabelForm({ onSave, onPrint, onCancel, selectedUser }: LabelForm
         unit: labelData.unit,
         allergens: selectedAllergensForPreview,
         batchNumber: labelData.batchNumber,
-        labelId: savedLabelId || undefined,
       });
 
-      if (success && onPrint) {
-        onPrint(labelData);
+      if (success) {
+        await saveLabelToDatabase({
+          productId: labelData.productId,
+          productName: labelData.productName,
+          categoryId: labelData.categoryId === "all" ? null : labelData.categoryId,
+          categoryName: labelData.categoryName,
+          subcategoryId: labelData.subcategoryId || null, // Include subcategory!
+          preparedBy: labelData.preparedBy,
+          preparedByName: labelData.preparedByName,
+          prepDate: labelData.prepDate,
+          expiryDate: labelData.expiryDate,
+          condition: labelData.condition,
+          quantity: labelData.quantity,
+          unit: labelData.unit,
+          batchNumber: labelData.batchNumber,
+          organizationId: organizationId || "", // Required for RLS
+          allergens: selectedAllergensForPreview,
+        });
+
+        if (onPrint) {
+          onPrint(labelData);
+        }
       }
     } catch (error) {
       console.error("Error in print process:", error);

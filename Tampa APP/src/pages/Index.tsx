@@ -61,7 +61,7 @@ const Index = () => {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <TampaIcon className="w-12 h-12" />
-              <h1 className="font-bold text-xl">Tampa APP</h1>
+              <h1 className="font-bold text-xl">Tampa Hospo</h1>
             </div>
             <Button variant="hero" asChild className="text-white">
               <a href="/auth">
@@ -178,10 +178,10 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <TampaIcon className="w-12 h-12" />
-              <span className="font-bold text-lg">Tampa APP</span>
+              <span className="font-bold text-lg">Tampa Hospo</span>
             </div>
             <p className="text-muted-foreground">
-              © 2024 Tampa APP. Smart Food Safety & Kitchen Management.
+              © 2024 Tampa Hospo. Smart Food Safety & Kitchen Management.
             </p>
           </div>
         </div>

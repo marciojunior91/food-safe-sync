@@ -53,6 +53,8 @@ export interface TrainingEnrollment {
   id: string;
   course_id: string;
   user_id: string;
+  team_member_id: string | null;
+  organization_id: string | null;
   progress: number;
   score: number | null;
   enrolled_at: string;
@@ -61,6 +63,16 @@ export interface TrainingEnrollment {
   certificate_url: string | null;
   expires_at: string | null;
   course: TrainingCourse;
+}
+
+// A course a member is obliged to complete, by department or by individual.
+export interface TrainingObligation {
+  id: string;
+  organization_id: string;
+  course_id: string;
+  department_id: string | null;
+  team_member_id: string | null;
+  created_at: string;
 }
 
 // Coerce the JSON `content` column into a typed section array.
@@ -109,8 +121,10 @@ export function useTrainingCourses(opts: { includeUnpublished?: boolean } = {}):
   return { courses, loading, refetch };
 }
 
-// ── Current user's enrollments ──────────────────────────────────────────────
-export function useTrainingEnrollments(): {
+// ── Enrollments for the selected team member ────────────────────────────────
+// Pass the team_member_id of the person using the (shared) tablet. When null,
+// nothing is loaded — a member must be selected first.
+export function useTrainingEnrollments(teamMemberId?: string | null): {
   enrollments: TrainingEnrollment[];
   loading: boolean;
   refetch: () => Promise<void>;
@@ -119,10 +133,12 @@ export function useTrainingEnrollments(): {
   const [loading, setLoading] = useState(true);
 
   const refetch = useCallback(async () => {
+    if (!teamMemberId) { setEnrollments([]); setLoading(false); return; }
     setLoading(true);
     const { data } = await supabase
       .from('training_enrollments')
       .select('*, course:training_courses(*)')
+      .eq('team_member_id', teamMemberId)
       .order('enrolled_at', { ascending: false });
     const rows = (data || [])
       .filter(r => r.course) // drop orphans if a course was deleted
@@ -132,7 +148,7 @@ export function useTrainingEnrollments(): {
       }));
     setEnrollments(rows);
     setLoading(false);
-  }, []);
+  }, [teamMemberId]);
 
   useEffect(() => { void refetch(); }, [refetch]);
 
@@ -214,16 +230,27 @@ export function useCourseMutations() {
   return { createCourse, updateCourse, deleteCourse };
 }
 
-// ── Enrollment actions (self-service) ───────────────────────────────────────
+// ── Enrollment actions (per team member) ────────────────────────────────────
 export function useEnrollmentActions() {
-  const enroll = useCallback(async (courseId: string): Promise<void> => {
+  const { organizationId } = useOrganizationId();
+
+  // Enrol the selected team member. user_id stays the (shared) auth account;
+  // team_member_id is the individual whose progress this tracks.
+  const enroll = useCallback(async (courseId: string, teamMemberId: string): Promise<void> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not signed in');
+    if (!teamMemberId) throw new Error('No team member selected');
     const { error } = await supabase
       .from('training_enrollments')
-      .insert({ course_id: courseId, user_id: user.id, progress: 0 });
+      .insert({
+        course_id: courseId,
+        user_id: user.id,
+        team_member_id: teamMemberId,
+        organization_id: organizationId,
+        progress: 0,
+      });
     if (error) throw error;
-  }, []);
+  }, [organizationId]);
 
   const saveProgress = useCallback(async (
     enrollmentId: string, progress: number,
@@ -258,6 +285,81 @@ export function useEnrollmentActions() {
   }, []);
 
   return { enroll, saveProgress, completeCourse };
+}
+
+// ── Course obligations (admin) ──────────────────────────────────────────────
+export function useTrainingObligations() {
+  const { organizationId } = useOrganizationId();
+  const [obligations, setObligations] = useState<TrainingObligation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    if (!organizationId) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from('training_obligations')
+      .select('*')
+      .eq('organization_id', organizationId);
+    setObligations((data || []) as unknown as TrainingObligation[]);
+    setLoading(false);
+  }, [organizationId]);
+
+  useEffect(() => { void refetch(); }, [refetch]);
+
+  const addObligation = useCallback(async (
+    courseId: string,
+    target: { departmentId?: string | null; teamMemberId?: string | null },
+  ): Promise<void> => {
+    if (!organizationId) return;
+    const { error } = await supabase.from('training_obligations').insert({
+      organization_id: organizationId,
+      course_id: courseId,
+      department_id: target.departmentId ?? null,
+      team_member_id: target.teamMemberId ?? null,
+    });
+    if (error) throw error;
+    await refetch();
+  }, [organizationId, refetch]);
+
+  const removeObligation = useCallback(async (id: string): Promise<void> => {
+    const { error } = await supabase.from('training_obligations').delete().eq('id', id);
+    if (error) throw error;
+    await refetch();
+  }, [refetch]);
+
+  return { obligations, loading, refetch, addObligation, removeObligation };
+}
+
+// ── All org enrollments with member info (admin report) ─────────────────────
+export interface EnrollmentWithMember extends TrainingEnrollment {
+  member: { id: string; display_name: string | null; department_id: string | null } | null;
+}
+
+export function useAllEnrollments() {
+  const { organizationId } = useOrganizationId();
+  const [enrollments, setEnrollments] = useState<EnrollmentWithMember[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    if (!organizationId) return;
+    setLoading(true);
+    const { data } = await supabase
+      .from('training_enrollments')
+      .select('*, course:training_courses(*), member:team_members(id, display_name, department_id)')
+      .eq('organization_id', organizationId);
+    const mapped = (data || [])
+      .filter(r => r.course)
+      .map(r => ({
+        ...(r as unknown as EnrollmentWithMember),
+        course: normalizeCourse((r as Record<string, unknown>).course as Record<string, unknown>),
+      }));
+    setEnrollments(mapped);
+    setLoading(false);
+  }, [organizationId]);
+
+  useEffect(() => { void refetch(); }, [refetch]);
+
+  return { enrollments, loading, refetch };
 }
 
 // ── Shared metadata helpers (used by page, editor, player) ──────────────────

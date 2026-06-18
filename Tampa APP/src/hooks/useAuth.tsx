@@ -10,6 +10,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: any; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
+  updatePassword: (newPassword: string) => Promise<{ error: any }>;
   // Team Member support
   selectedTeamMember: TeamMember | null;
   selectTeamMember: (member: TeamMember) => void;
@@ -105,8 +107,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Clear team member selection
     setSelectedTeamMember(null);
     sessionStorage.removeItem('selected_team_member');
-    
+
     await supabase.auth.signOut();
+  };
+
+  // Send a password-reset email. The link returns the user to /reset-password
+  // where updatePassword() sets the new password.
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return { error };
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    return { error };
   };
 
   // Team Member functions
@@ -127,6 +143,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp,
     signIn,
     signOut,
+    resetPassword,
+    updatePassword,
     selectedTeamMember,
     selectTeamMember,
     clearTeamMember,

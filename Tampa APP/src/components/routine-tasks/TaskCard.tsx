@@ -68,7 +68,7 @@ export function TaskCard({
   selected = false,
   onSelect,
 }: TaskCardProps) {
-  const taskIcon = TASK_TYPE_ICONS[task.task_type] || "📋";
+  const taskIcon = task.icon || TASK_TYPE_ICONS[task.task_type] || "📋";
   const statusColor = STATUS_COLORS[task.status];
   const priorityColor = PRIORITY_COLORS[task.priority];
 
@@ -77,8 +77,10 @@ export function TaskCard({
 
   return (
     <Card
+      onClick={onView ? () => onView(task) : undefined}
       className={cn(
         "transition-all hover:shadow-md overflow-hidden",
+        onView && "cursor-pointer",
         isCompleted && "opacity-75",
         selected && "ring-2 ring-primary shadow-lg",
         isOverdue && "border-red-500 border-2 bg-red-50/30 shadow-red-100"
@@ -88,7 +90,7 @@ export function TaskCard({
         <div className="flex items-start justify-between gap-2">
           {/* Selection Checkbox (if selectable) */}
           {selectable && (
-            <div className="pt-1 flex-shrink-0">
+            <div className="pt-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
               <Checkbox
                 checked={selected}
                 onCheckedChange={(checked) => onSelect?.(task.id, checked as boolean)}
@@ -148,7 +150,7 @@ export function TaskCard({
           {showActions && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -270,7 +272,7 @@ export function TaskCard({
             variant="outline"
             size="sm"
             className="w-full mt-3"
-            onClick={() => onComplete(task)}
+            onClick={(e) => { e.stopPropagation(); onComplete(task); }}
           >
             <Check className="w-4 h-4 mr-2" />
             Mark as Complete

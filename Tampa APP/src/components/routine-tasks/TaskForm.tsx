@@ -40,6 +40,8 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ImageUpload } from "./ImageUpload";
+import { AssigneePicker } from "./AssigneePicker";
+import { CategoryEmojiPicker } from "@/components/labels/CategoryEmojiPicker";
 import { useDepartments } from "@/hooks/useUserContext";
 
 import {
@@ -75,6 +77,7 @@ const taskFormSchema = z.object({
     "maintenance",
     "others",
   ] as const),
+  icon: z.string().optional(),
   custom_task_type: z.string().optional(),
   priority: z.enum(["critical", "important", "normal"] as const),
   assigned_to: z.array(z.string()).min(1, "Please assign this task to at least one person"),
@@ -111,6 +114,7 @@ interface TaskFormProps {
   isEditing?: boolean; // New prop to determine if we're editing
   taskId?: string; // Task ID when editing (for attachments)
   userRole?: string; // Current user's role for permissions
+  hideRecurrence?: boolean; // Hide the recurrence section (editing one occurrence/series)
 }
 
 export function TaskForm({
@@ -122,6 +126,7 @@ export function TaskForm({
   isEditing = false,
   taskId,
   userRole,
+  hideRecurrence = false,
 }: TaskFormProps) {
   const { toast } = useToast();
   const { departments, loading: departmentsLoading } = useDepartments();
@@ -228,6 +233,7 @@ export function TaskForm({
       description: defaultValues?.description || "",
       subtasks: defaultValues?.subtasks || [],
       task_type: defaultValues?.task_type || "others",
+      icon: defaultValues?.icon || "",
       custom_task_type: "",
       priority: defaultValues?.priority || "normal",
       assigned_to: Array.isArray(defaultValues?.assigned_to)
@@ -294,6 +300,7 @@ export function TaskForm({
           : data.description,
         subtasks: subtasks.length > 0 ? subtasks : undefined,
         task_type: data.task_type,
+        icon: data.icon || undefined,
         priority: data.priority,
         scheduled_date: format(data.scheduled_date, "yyyy-MM-dd"),
         scheduled_time: data.scheduled_time || undefined,
@@ -424,6 +431,27 @@ export function TaskForm({
           </FormDescription>
         </div>
 
+        {/* Task Icon — same emoji-picker workflow as labels/recipes */}
+        <FormField
+          control={form.control}
+          name="icon"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="block">Icon</FormLabel>
+              <div>
+                <CategoryEmojiPicker
+                  value={field.value || ""}
+                  onChange={(emoji) => field.onChange(emoji)}
+                />
+              </div>
+              <FormDescription>
+                Pick an emoji for this task. Leave empty to use the default for its type.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         {/* Task Type and Priority - Side by Side */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Task Type */}
@@ -538,17 +566,6 @@ export function TaskForm({
           name="assigned_to"
           render={({ field }) => {
             const selected: string[] = field.value ?? [];
-
-            const toggleUser = (userId: string) => {
-              const next = selected.includes(userId)
-                ? selected.filter((id) => id !== userId)
-                : [...selected, userId];
-              field.onChange(next);
-            };
-
-            const selectAll = () => field.onChange(users.map((u) => u.user_id));
-            const clearAll = () => field.onChange([]);
-
             return (
               <FormItem>
                 <FormLabel className="flex items-center gap-1">
@@ -557,106 +574,7 @@ export function TaskForm({
                   <span className="text-destructive">*</span>
                 </FormLabel>
 
-                {/* Department group buttons */}
-                <div className="flex flex-wrap gap-1.5 mb-2">
-                  {departments.map((dept) => {
-                    const deptMemberIds = users
-                      .filter((u) => u.department_id === dept.id)
-                      .map((u) => u.user_id);
-                    const allSelected = deptMemberIds.length > 0 && deptMemberIds.every((id) => selected.includes(id));
-                    return (
-                      <Button
-                        key={dept.id}
-                        type="button"
-                        size="sm"
-                        variant={allSelected ? "default" : "outline"}
-                        className="h-7 text-xs px-2"
-                        onClick={() => {
-                          if (allSelected) {
-                            // Deselect all members of this department
-                            field.onChange(selected.filter((id) => !deptMemberIds.includes(id)));
-                          } else {
-                            // Select all members of this department
-                            const merged = Array.from(new Set([...selected, ...deptMemberIds]));
-                            field.onChange(merged);
-                          }
-                        }}
-                        disabled={deptMemberIds.length === 0}
-                      >
-                        <Building2 className="w-3 h-3 mr-1" />
-                        {dept.name}
-                        {deptMemberIds.length > 0 && (
-                          <span className="ml-1 opacity-70">({deptMemberIds.length})</span>
-                        )}
-                      </Button>
-                    );
-                  })}
-                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2"
-                    onClick={selectAll}>
-                    👥 All
-                  </Button>
-                  {selected.length > 0 && (
-                    <Button type="button" size="sm" variant="ghost" className="h-7 text-xs px-2 text-muted-foreground"
-                      onClick={clearAll}>
-                      Clear
-                    </Button>
-                  )}
-                </div>
-
-                {/* Selected badges */}
-                {selected.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {selected.map((id) => {
-                      const user = users.find((u) => u.user_id === id);
-                      return user ? (
-                        <Badge key={id} variant="secondary" className="gap-1">
-                          {user.display_name}
-                          <button type="button" onClick={() => toggleUser(id)} className="ml-1 text-muted-foreground hover:text-foreground">×</button>
-                        </Badge>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-
-                {/* User checklist */}
-                <FormControl>
-                  <div
-                    data-testid="assign-to-select"
-                    className={cn(
-                      "rounded-md border max-h-48 overflow-y-auto divide-y",
-                      selected.length === 0 && "border-destructive"
-                    )}
-                  >
-                    {users.length === 0 ? (
-                      <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-yellow-500" />
-                        <p className="font-medium">No team members found</p>
-                        <p className="text-xs mt-1">Please add team members first</p>
-                      </div>
-                    ) : (
-                      users.map((user) => (
-                        <label
-                          key={user.user_id}
-                          className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/50 transition-colors"
-                        >
-                          <UICheckbox
-                            checked={selected.includes(user.user_id)}
-                            onCheckedChange={() => toggleUser(user.user_id)}
-                          />
-                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <span className="text-xs font-semibold">
-                              {user.display_name.charAt(0).toUpperCase()}
-                            </span>
-                          </div>
-                          <span className="text-sm">{user.display_name}</span>
-                          {user.role && (
-                            <span className="ml-auto text-xs text-muted-foreground capitalize">{user.role.replace('_', ' ')}</span>
-                          )}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </FormControl>
+                <AssigneePicker users={users} value={selected} onChange={field.onChange} />
 
                 <FormDescription>
                   {selected.length === 0 ? (
@@ -800,7 +718,9 @@ export function TaskForm({
           )}
         />
 
-        {/* Recurrence Section */}
+        {/* Recurrence Section — hidden when editing a single occurrence/series */}
+        {!hideRecurrence && (
+        <>
         <Separator className="my-6" />
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -1018,6 +938,8 @@ export function TaskForm({
             </>
           )}
         </div>
+        </>
+        )}
 
         {/* Photo Attachments - Only show when editing */}
         {isEditing && taskId && (

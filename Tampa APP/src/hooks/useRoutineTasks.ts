@@ -101,6 +101,7 @@ export function useRoutineTasks(organizationId?: string) {
         title: input.title,
         description: input.description,
         task_type: input.task_type,
+        icon: input.icon || null,
         priority: input.priority || 'normal',
         scheduled_date: input.scheduled_date,
         scheduled_time: input.scheduled_time || null,

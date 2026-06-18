@@ -32,6 +32,20 @@ interface Props {
 const sectionIcon = (type: CourseSection['type']) =>
   type === 'video' ? PlayCircle : type === 'quiz' ? HelpCircle : FileText;
 
+// Turn a pasted video URL into something embeddable: YouTube/Vimeo become an
+// iframe; direct media files use a <video> tag; anything else falls back to the
+// "open in new tab" link.
+function getVideoEmbed(rawUrl: string): { kind: 'iframe' | 'file' | 'none'; src: string } {
+  const url = (rawUrl || '').trim();
+  if (!url) return { kind: 'none', src: '' };
+  const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  if (yt) return { kind: 'iframe', src: `https://www.youtube.com/embed/${yt[1]}` };
+  const vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) return { kind: 'iframe', src: `https://player.vimeo.com/video/${vimeo[1]}` };
+  if (/\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(url)) return { kind: 'file', src: url };
+  return { kind: 'none', src: url };
+}
+
 export function CoursePlayerDialog({ open, onOpenChange, course, enrollment, onChanged }: Props) {
   const { toast } = useToast();
   const { saveProgress, completeCourse } = useEnrollmentActions();
@@ -190,19 +204,40 @@ export function CoursePlayerDialog({ open, onOpenChange, course, enrollment, onC
               </p>
             )}
 
-            {section.type === 'video' && (
-              <div className="space-y-2">
-                <div className="aspect-video rounded-lg border bg-muted flex items-center justify-center">
-                  <PlayCircle className="h-12 w-12 text-muted-foreground" />
+            {section.type === 'video' && (() => {
+              const embed = getVideoEmbed(section.url || '');
+              return (
+                <div className="space-y-2">
+                  {embed.kind === 'iframe' ? (
+                    <div className="aspect-video rounded-lg border overflow-hidden bg-black">
+                      <iframe
+                        src={embed.src}
+                        title={section.title || 'Video'}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : embed.kind === 'file' ? (
+                    <video
+                      src={embed.src}
+                      controls
+                      className="w-full aspect-video rounded-lg border bg-black"
+                    />
+                  ) : (
+                    <div className="aspect-video rounded-lg border bg-muted flex items-center justify-center">
+                      <PlayCircle className="h-12 w-12 text-muted-foreground" />
+                    </div>
+                  )}
+                  {section.url && (
+                    <a href={section.url} target="_blank" rel="noopener noreferrer"
+                      className="text-sm text-primary underline">
+                      Open video in new tab
+                    </a>
+                  )}
                 </div>
-                {section.url && (
-                  <a href={section.url} target="_blank" rel="noopener noreferrer"
-                    className="text-sm text-primary underline">
-                    Open video in new tab
-                  </a>
-                )}
-              </div>
-            )}
+              );
+            })()}
 
             {section.type === 'quiz' && section.questions && (
               <div className="space-y-5">

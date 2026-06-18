@@ -36,18 +36,18 @@ export async function sendWelcomeEmail(
 ) {
   return sendEmail({
     to: userEmail,
-    subject: '🎉 Bem-vindo ao Tampa APP!',
+    subject: '🎉 Bem-vindo ao Tampa Hospo!',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
-          <h1 style="color: #ea580c; margin: 0;">Tampa APP</h1>
+          <h1 style="color: #ea580c; margin: 0;">Tampa Hospo</h1>
           <p style="color: #6b7280; margin: 8px 0 0 0;">Food Safety Management System</p>
         </div>
         
         <h2 style="color: #1f2937;">Olá ${userName}! 👋</h2>
         
         <p style="color: #374151; line-height: 1.6;">
-          Seja bem-vindo ao <strong>Tampa APP</strong>! Estamos muito felizes em tê-lo conosco.
+          Seja bem-vindo ao <strong>Tampa Hospo</strong>! Estamos muito felizes em tê-lo conosco.
         </p>
         
         <p style="color: #374151; line-height: 1.6;">
@@ -80,7 +80,7 @@ export async function sendWelcomeEmail(
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
           <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-            © ${new Date().getFullYear()} Tampa APP. Todos os direitos reservados.
+            © ${new Date().getFullYear()} Tampa Hospo. Todos os direitos reservados.
           </p>
         </div>
       </div>
@@ -117,7 +117,7 @@ export async function sendExpiringItemsAlert(
 
   return sendEmail({
     to: userEmail,
-    subject: `⚠️ ${items.length} ${items.length === 1 ? 'item vencendo' : 'itens vencendo'} - Tampa APP`,
+    subject: `⚠️ ${items.length} ${items.length === 1 ? 'item vencendo' : 'itens vencendo'} - Tampa Hospo`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: #fef2f2; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626;">
@@ -154,7 +154,7 @@ export async function sendExpiringItemsAlert(
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
           <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-            © ${new Date().getFullYear()} Tampa APP. Todos os direitos reservados.
+            © ${new Date().getFullYear()} Tampa Hospo. Todos os direitos reservados.
           </p>
         </div>
       </div>
@@ -179,7 +179,7 @@ export async function sendTaskAssignmentEmail(
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <h1 style="color: #ea580c; margin: 0 0 8px 0;">📋 Nova Tarefa Atribuída</h1>
-        <p style="color: #6b7280; margin: 0;">Tampa APP - Sistema de Gestão</p>
+        <p style="color: #6b7280; margin: 0;">Tampa Hospo - Sistema de Gestão</p>
         
         <p style="color: #374151; margin-top: 24px;">Olá <strong>${userName}</strong>,</p>
         
@@ -207,7 +207,7 @@ export async function sendTaskAssignmentEmail(
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
           <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-            © ${new Date().getFullYear()} Tampa APP. Todos os direitos reservados.
+            © ${new Date().getFullYear()} Tampa Hospo. Todos os direitos reservados.
           </p>
         </div>
       </div>
@@ -272,7 +272,7 @@ export async function sendCertificateExpirationReminder(
         
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
           <p style="color: #9ca3af; font-size: 12px; margin: 0;">
-            © ${new Date().getFullYear()} Tampa APP. Todos os direitos reservados.
+            © ${new Date().getFullYear()} Tampa Hospo. Todos os direitos reservados.
           </p>
         </div>
       </div>

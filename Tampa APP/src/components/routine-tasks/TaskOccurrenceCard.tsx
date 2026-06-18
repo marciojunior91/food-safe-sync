@@ -162,7 +162,7 @@ export function TaskOccurrenceCard({
   assignedUserName,
   completedByName,
 }: TaskOccurrenceCardProps) {
-  const taskIcon = TASK_TYPE_ICONS[occurrence.task_type] || "📋";
+  const taskIcon = occurrence.icon || TASK_TYPE_ICONS[occurrence.task_type] || "📋";
   const statusColor = STATUS_COLORS[occurrence.status];
   const priorityColor = PRIORITY_COLORS[occurrence.priority];
 
@@ -190,10 +190,18 @@ export function TaskOccurrenceCard({
   // Recurrence label
   const recurrenceLabel = getRecurrenceLabel(occurrence);
 
+  const handleCardClick = onView
+    ? () => onView(occurrence)
+    : onEdit
+    ? () => onEdit(occurrence)
+    : undefined;
+
   return (
     <Card
+      onClick={handleCardClick}
       className={cn(
         "transition-all hover:shadow-md",
+        handleCardClick && "cursor-pointer",
         (isCompleted || isSkipped) && "opacity-75",
         selected && "ring-2 ring-primary shadow-lg",
         overdue && "border-red-500 border-2 bg-red-50/30 shadow-red-100"
@@ -203,7 +211,7 @@ export function TaskOccurrenceCard({
         <div className="flex items-start justify-between gap-3">
           {/* Selection Checkbox (if selectable) */}
           {selectable && (
-            <div className="pt-1">
+            <div className="pt-1" onClick={(e) => e.stopPropagation()}>
               <Checkbox
                 checked={selected}
                 onCheckedChange={(checked) =>
@@ -298,7 +306,7 @@ export function TaskOccurrenceCard({
           {showActions && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>

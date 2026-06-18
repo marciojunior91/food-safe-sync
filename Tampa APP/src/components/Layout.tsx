@@ -109,7 +109,7 @@ export function Layout() {
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-2">
               <TampaIcon className="w-8 h-8" />
-              <h1 className="font-bold text-lg">Tampa APP</h1>
+              <h1 className="font-bold text-lg">Tampa Hospo</h1>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
               <X className="w-5 h-5" />
@@ -132,7 +132,7 @@ export function Layout() {
         <div className="flex flex-col flex-1 bg-sidebar border-r shadow-card">
           <div className="flex items-center gap-2 p-6 border-b">
             <TampaIcon className="w-8 h-8" />
-            <h1 className="font-bold text-lg">Tampa APP</h1>
+            <h1 className="font-bold text-lg">Tampa Hospo</h1>
           </div>
           <nav className="flex-1 p-4 space-y-2">
             {filteredNav.map(item => {
@@ -156,7 +156,7 @@ export function Layout() {
           {/* Logo for mobile and tablet (T1.3) */}
           <Link to="/" className="lg:hidden flex items-center gap-2">
             <TampaIcon className="w-6 h-6 sm:w-7 sm:h-7" />
-            <h1 className="font-bold text-base sm:text-lg">Tampa APP</h1>
+            <h1 className="font-bold text-base sm:text-lg">Tampa Hospo</h1>
           </Link>
 
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">

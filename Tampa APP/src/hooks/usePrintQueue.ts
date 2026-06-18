@@ -273,27 +273,6 @@ export function usePrintQueue() {
             }
           }
 
-          // Save to database first (for each quantity)
-          for (let j = 0; j < item.quantity; j++) {
-            await saveLabelToDatabase({
-              productId: validProductId,
-              productName: item.labelData.productName,
-              categoryId: (item.labelData.categoryId && item.labelData.categoryId !== "all" && item.labelData.categoryId !== "") 
-                ? item.labelData.categoryId 
-                : null,
-              categoryName: item.labelData.categoryName,
-              preparedBy: preparedBy,
-              preparedByName: preparedByName,
-              prepDate: item.labelData.prepDate,
-              expiryDate: item.labelData.expiryDate,
-              condition: item.labelData.condition,
-              organizationId: organizationId, // Required for RLS
-              quantity: "1", // Each record is for 1 label
-              unit: item.labelData.unit,
-              batchNumber: item.labelData.batchNumber || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            });
-          }
-          
           // Transform LabelData to printer format
           const labelData = item.labelData as LabelData;
           const printerData = {
@@ -320,9 +299,30 @@ export function usePrintQueue() {
           
           // Print this batch
           const success = await printBatch(labelsForItem);
-          
+
           if (success) {
             printedLabels += item.quantity;
+            // Persist one printed_labels row per label — ONLY after a successful
+            // print, so failed jobs never create phantom history.
+            for (let j = 0; j < item.quantity; j++) {
+              await saveLabelToDatabase({
+                productId: validProductId,
+                productName: item.labelData.productName,
+                categoryId: (item.labelData.categoryId && item.labelData.categoryId !== "all" && item.labelData.categoryId !== "")
+                  ? item.labelData.categoryId
+                  : null,
+                categoryName: item.labelData.categoryName,
+                preparedBy: preparedBy,
+                preparedByName: preparedByName,
+                prepDate: item.labelData.prepDate,
+                expiryDate: item.labelData.expiryDate,
+                condition: item.labelData.condition,
+                organizationId: organizationId, // Required for RLS
+                quantity: "1", // Each record is for 1 label
+                unit: item.labelData.unit,
+                batchNumber: item.labelData.batchNumber || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              });
+            }
           } else {
             errors.push({
               itemId: item.id,

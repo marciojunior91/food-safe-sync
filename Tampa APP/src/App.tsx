@@ -16,6 +16,7 @@ import Inventory from "./pages/Inventory";
 import Analytics from "./pages/Analytics";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import RoutineTasks from "./pages/RoutineTasks";
 import Training from "./pages/Training";
@@ -46,6 +47,7 @@ const App = () => (
             <Routes>
               <Route path="/welcome" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={
                 <ProtectedRoute>
                   <Layout />

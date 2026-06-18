@@ -34,7 +34,7 @@ export default function PricingPage() {
       <footer className="border-t mt-16">
         <div className="container mx-auto py-8 text-center text-sm text-muted-foreground">
           <p>
-            Tampa APP - Food Safety Management System
+            Tampa Hospo - Food Safety Management System
           </p>
           <p className="mt-2">
             Secure payments powered by{' '}

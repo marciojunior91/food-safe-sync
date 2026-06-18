@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Filter, Calendar as CalendarIcon, AlertCircle, Search, X, List, Clock, ChevronLeft, ChevronRight, FileText, Repeat, CheckCircle2, User } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -47,8 +48,9 @@ import { TaskCard } from "@/components/routine-tasks/TaskCard";
 import { TaskDetailView } from "@/components/routine-tasks/TaskDetailView";
 import { EditDeleteContextModal } from "@/components/routine-tasks/EditDeleteContextModal";
 import { TaskOccurrenceCard } from "@/components/routine-tasks/TaskOccurrenceCard";
+import { SeriesDetailModal } from "@/components/routine-tasks/SeriesDetailModal";
 import { useRecurringTasks } from "@/hooks/useRecurringTasks";
-import type { TaskOccurrence, TaskSeries } from "@/types/recurring-tasks";
+import type { TaskOccurrence, TaskSeries, RecurrenceType } from "@/types/recurring-tasks";
 import { TaskTimeline } from "@/components/routine-tasks/TaskTimeline";
 import { BulkActionsToolbar } from "@/components/routine-tasks/BulkActionsToolbar";
 import { TemplatesManagement } from "@/components/routine-tasks/TemplatesManagement";
@@ -78,7 +80,10 @@ export default function TasksOverview() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<RoutineTask | null>(null);
   const [taskToEdit, setTaskToEdit] = useState<RoutineTask | null>(null);
-  
+  // When the edit dialog is opened for a recurring occurrence (from the Recurring
+  // tab), this holds the occurrence + chosen scope so the save routes correctly.
+  const [editingOccurrence, setEditingOccurrence] = useState<{ occ: TaskOccurrence; ctx: 'occurrence' | 'series' } | null>(null);
+
   // Bulk selection state
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
 
@@ -102,7 +107,22 @@ export default function TasksOverview() {
   } | null>(null);
 
   // Active tab state (controlled)
-  const [activeTab, setActiveTab] = useState("today");
+  const [searchParams] = useSearchParams();
+  const VALID_TABS = ["today", "overdue", "in-progress", "completed", "recurring"];
+  const [activeTab, setActiveTab] = useState(() => {
+    const t = searchParams.get("tab");
+    return t && VALID_TABS.includes(t) ? t : "today";
+  });
+
+  // Keep the active tab in sync if the URL ?tab= changes (e.g. Dashboard deep-links)
+  useEffect(() => {
+    const t = searchParams.get("tab");
+    if (t && VALID_TABS.includes(t)) setActiveTab(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // Recurring series detail/bulk-edit modal
+  const [seriesDetail, setSeriesDetail] = useState<TaskSeries | null>(null);
 
   // Assignee picker for "Mark as Complete"
   const [completingTask, setCompletingTask] = useState<RoutineTask | null>(null);
@@ -194,13 +214,27 @@ export default function TasksOverview() {
         });
       }
     } else {
-      // edit — for now, reload so the user can use the existing RoutineTask form
-      // TODO (Fase 3): open dedicated occurrence edit form
-      toast({
-        title: 'Edit coming soon',
-        description: 'Occurrence editing form is planned for Fase 3',
-        variant: 'default',
-      });
+      // edit — open the existing task edit dialog, pre-filled from this occurrence.
+      // The chosen scope (this occurrence vs whole series) routes the save in
+      // handleEditTask.
+      setEditingOccurrence({ occ, ctx });
+      setTaskToEdit({
+        id: occ.id,
+        organization_id: occ.organization_id,
+        title: occ.title,
+        description: occ.description ?? undefined,
+        task_type: occ.task_type,
+        icon: occ.icon ?? null,
+        priority: occ.priority,
+        status: occ.status as TaskStatus,
+        assignees: occ.assigned_to ?? [],
+        team_member_id: occ.assigned_to?.[0],
+        scheduled_date: occ.scheduled_date,
+        scheduled_time: occ.scheduled_time ?? undefined,
+        estimated_minutes: occ.estimated_minutes ?? undefined,
+        requires_approval: occ.requires_approval ?? false,
+      } as RoutineTask);
+      setIsEditDialogOpen(true);
     }
   };
   
@@ -345,10 +379,44 @@ export default function TasksOverview() {
     
     const newTask = await createTask(data);
     if (newTask) {
+      // When the task is recurring, also persist a task_series so it shows up in
+      // the Recurring tab's "Active Series" and can be viewed/bulk-edited there.
+      const rp = data.recurrence_pattern;
+      if (rp) {
+        let recurrence_type: RecurrenceType = 'daily';
+        let recurrence_interval: number | null = null;
+        if (rp.frequency === 'daily') {
+          if (rp.interval > 1) { recurrence_type = 'custom_days'; recurrence_interval = rp.interval; }
+          else recurrence_type = 'daily';
+        } else if (rp.frequency === 'weekly') {
+          recurrence_type = rp.interval === 2 ? 'fortnightly' : 'weekly';
+        } else if (rp.frequency === 'monthly') {
+          recurrence_type = 'monthly';
+        } else if (rp.frequency === 'custom') {
+          recurrence_type = 'custom_days';
+          recurrence_interval = rp.interval;
+        }
+
+        await recurringTasks.createRecurringSeries({
+          title: data.title,
+          description: data.description ?? null,
+          task_type: data.task_type,
+          icon: data.icon ?? null,
+          priority: data.priority,
+          assigned_to: data.assignees ?? [],
+          estimated_minutes: data.estimated_minutes ?? null,
+          requires_approval: data.requires_approval ?? false,
+          recurrence_type,
+          recurrence_interval,
+          series_start_date: data.scheduled_date,
+          series_end_date: rp.end_date ?? null,
+        });
+      }
+
       setIsCreateDialogOpen(false);
       toast({
         title: "Success!",
-        description: "Task created successfully",
+        description: rp ? "Recurring task created" : "Task created successfully",
       });
     }
   };
@@ -535,11 +603,50 @@ export default function TasksOverview() {
 
   // Handle task editing
   const handleEditTask = async (data: CreateTaskInput) => {
+    // Recurring occurrence/series edit (opened from the Recurring tab).
+    if (editingOccurrence) {
+      const { occ, ctx } = editingOccurrence;
+      let ok = false;
+      if (ctx === 'series' && occ.series_id) {
+        ok = await recurringTasks.updateSeries(occ.series_id, {
+          title: data.title,
+          description: data.description ?? null,
+          task_type: data.task_type,
+          icon: data.icon ?? null,
+          priority: data.priority,
+          assigned_to: data.assignees ?? [],
+          estimated_minutes: data.estimated_minutes ?? null,
+          requires_approval: data.requires_approval ?? false,
+        });
+      } else {
+        ok = await recurringTasks.updateOccurrence(occ, {
+          title: data.title,
+          description: data.description ?? null,
+          task_type: data.task_type,
+          icon: data.icon ?? null,
+          priority: data.priority,
+          assigned_to: data.assignees ?? [],
+          estimated_minutes: data.estimated_minutes ?? null,
+          requires_approval: data.requires_approval ?? false,
+          scheduled_time: data.scheduled_time || null,
+        }, 'occurrence');
+      }
+      setIsEditDialogOpen(false);
+      setTaskToEdit(null);
+      setEditingOccurrence(null);
+      toast(ok
+        ? { title: ctx === 'series' ? 'Series updated' : 'Task updated',
+            description: ctx === 'series' ? 'Future occurrences regenerated' : `"${data.title}" updated` }
+        : { title: 'Update failed', description: 'Could not update the task.', variant: 'destructive' });
+      return;
+    }
+
     if (!taskToEdit) return;
 
     const success = await updateTask(taskToEdit.id, {
       title: data.title,
       description: data.description,
+      icon: data.icon || null,
       priority: data.priority,
       team_member_id: data.team_member_id,
       assignees: data.assignees,
@@ -553,6 +660,7 @@ export default function TasksOverview() {
         const updates = {
           title: data.title,
           description: data.description,
+          icon: data.icon || null,
           priority: data.priority,
           team_member_id: data.team_member_id,
           assignees: data.assignees,
@@ -1449,7 +1557,7 @@ export default function TasksOverview() {
                   task={task}
                   onView={setSelectedTask}
                   onComplete={handleCompleteTask}
-                  onDelete={canManageTasks ? handleDeleteTask : undefined}
+                  /* Delete intentionally omitted on Completed — cards open details on tap */
                   selectable={true}
                   selected={selectedTaskIds.includes(task.id)}
                   onSelect={handleSelectTask}
@@ -1507,11 +1615,22 @@ export default function TasksOverview() {
                     .filter(o => o.series_id === s.id && o.status !== 'completed' && o.status !== 'skipped')
                     .sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))[0];
 
+                  const SERIES_TYPE_ICONS: Record<string, string> = {
+                    cleaning_daily: '🧹', cleaning_weekly: '🧼', temperature: '🌡️',
+                    opening: '🔓', closing: '🔒', maintenance: '🔧', others: '📋',
+                  };
+                  const seriesIcon = s.icon || SERIES_TYPE_ICONS[s.task_type] || '📋';
+
                   return (
-                    <Card key={s.id} className="hover:shadow-md transition-shadow">
+                    <Card
+                      key={s.id}
+                      className="hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => setSeriesDetail(s)}
+                    >
                       <CardHeader className="pb-2">
                         <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-sm font-semibold leading-tight line-clamp-2">
+                          <CardTitle className="text-sm font-semibold leading-tight line-clamp-2 flex items-center gap-2">
+                            <span className="text-lg leading-none flex-shrink-0">{seriesIcon}</span>
                             {s.title}
                           </CardTitle>
                           <Badge
@@ -1632,7 +1751,7 @@ export default function TasksOverview() {
                             showActions
                             onComplete={handleCompleteOccurrence}
                             onEdit={(o) => openOccModal(o, 'edit')}
-                            onDelete={(o) => openOccModal(o, 'delete')}
+                            /* Delete intentionally omitted — tapping the card opens its details/manage modal */
                             assignedUserName={
                               teamMembers.find(tm => tm.id === occ.assigned_to)?.display_name
                             }
@@ -1659,7 +1778,7 @@ export default function TasksOverview() {
 
       {/* Edit Task Dialog */}
       {isEditDialogOpen && taskToEdit && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) { setTaskToEdit(null); setEditingOccurrence(null); setEditSeriesMode(false); } }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Task</DialogTitle>
@@ -1672,12 +1791,14 @@ export default function TasksOverview() {
               users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role, department_id: tm.department_id }))}
               isLoading={teamMembersLoading}
               isEditing={true}
+              hideRecurrence={!!editingOccurrence}
               taskId={taskToEdit.id}
               userRole={context?.user_role}
               defaultValues={{
                 title: taskToEdit.title,
                 description: taskToEdit.description || "",
                 task_type: taskToEdit.task_type,
+                icon: taskToEdit.icon || "",
                 priority: taskToEdit.priority,
                 assigned_to: taskToEdit.assignees?.length
                   ? taskToEdit.assignees
@@ -1692,6 +1813,18 @@ export default function TasksOverview() {
             />
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Recurring series detail + bulk edit */}
+      {seriesDetail && (
+        <SeriesDetailModal
+          open={!!seriesDetail}
+          onOpenChange={(open) => { if (!open) setSeriesDetail(null); }}
+          series={seriesDetail}
+          occurrences={recurringTasks.getOccurrencesBySeries(seriesDetail.id)}
+          users={teamMembers.map(tm => ({ user_id: tm.id, display_name: tm.display_name, role: tm.role, department_id: tm.department_id }))}
+          onSave={recurringTasks.updateSeries}
+        />
       )}
 
       {/* Occurrence Edit/Delete Context Modal (task_occurrences system) */}

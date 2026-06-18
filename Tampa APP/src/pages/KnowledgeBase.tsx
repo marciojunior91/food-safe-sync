@@ -2,7 +2,7 @@
 // by category + search. Admins get full CRUD via the editor dialog; staff
 // see a read-only view that links to the per-article reader page.
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
@@ -37,14 +37,6 @@ export default function KnowledgeBase() {
     includeDrafts: isAdmin,
   });
 
-  // Stats are computed off whatever the user can see (admins see drafts too).
-  const stats = useMemo(() => {
-    const total = articles.length;
-    const totalViews = articles.reduce((s, a) => s + a.views, 0);
-    const mostPopular = articles.reduce((max, a) => (a.views > max ? a.views : max), 0);
-    return { total, totalViews, mostPopular };
-  }, [articles]);
-
   const handleNew = () => {
     setEditingArticle(null);
     setEditorOpen(true);
@@ -74,14 +66,6 @@ export default function KnowledgeBase() {
             <Plus className="h-4 w-4" /> New Article
           </Button>
         )}
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-        <StatCard label={isAdmin ? 'Articles + Drafts' : 'Published Articles'} value={stats.total} />
-        <StatCard label="Categories" value={categories.length} />
-        <StatCard label="Total Views" value={stats.totalViews} />
-        <StatCard label="Most Popular" value={stats.mostPopular} hint="views" />
       </div>
 
       {/* Search + categories */}
@@ -225,16 +209,3 @@ export default function KnowledgeBase() {
   );
 }
 
-function StatCard({ label, value, hint }: { label: string; value: number; hint?: string }) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
-      </CardContent>
-    </Card>
-  );
-}

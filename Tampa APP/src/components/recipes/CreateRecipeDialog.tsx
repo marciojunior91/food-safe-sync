@@ -10,6 +10,7 @@ import { X, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { CategoryEmojiPicker } from "@/components/labels/CategoryEmojiPicker";
 
 interface CreateRecipeDialogProps {
   open: boolean;
@@ -34,6 +35,7 @@ const recipeCategories = [
 export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit }: CreateRecipeDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
+    icon: "🍽️",
     yieldAmount: "",
     yieldUnit: "servings",
     holdTimeDays: "3",
@@ -58,6 +60,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
     if (recipeToEdit) {
       setFormData({
         name: recipeToEdit.name || "",
+        icon: recipeToEdit.icon || "🍽️",
         yieldAmount: recipeToEdit.yield_amount?.toString() || "",
         yieldUnit: recipeToEdit.yield_unit || "servings",
         holdTimeDays: recipeToEdit.hold_time_days?.toString() || "3",
@@ -75,10 +78,11 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
   }, [recipeToEdit, open]);
 
   const resetForm = () => {
-    setFormData({ 
-      name: "", 
-      yieldAmount: "", 
-      yieldUnit: "servings", 
+    setFormData({
+      name: "",
+      icon: "🍽️",
+      yieldAmount: "",
+      yieldUnit: "servings",
       holdTimeDays: "3",
       category: "Mains",
       estimatedPrepMinutes: "30",
@@ -171,6 +175,7 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
 
       const recipeData = {
         name: formData.name.trim(),
+        icon: formData.icon || null,
         ingredients,
         prep_steps: prepSteps,
         allergens: selectedAllergens,
@@ -238,14 +243,20 @@ export function CreateRecipeDialog({ open, onOpenChange, onSuccess, recipeToEdit
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div className="md:col-span-2 space-y-1">
               <Label htmlFor="name">Recipe Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter recipe name"
-                className="h-10"
-                required
-              />
+              <div className="flex gap-2">
+                <CategoryEmojiPicker
+                  value={formData.icon}
+                  onChange={(emoji) => setFormData({ ...formData, icon: emoji })}
+                />
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Enter recipe name"
+                  className="h-10 flex-1"
+                  required
+                />
+              </div>
             </div>
             <div className="space-y-1">
               <Label htmlFor="category">Category</Label>

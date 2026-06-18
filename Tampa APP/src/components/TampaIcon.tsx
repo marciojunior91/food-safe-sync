@@ -10,7 +10,7 @@ export const TampaIcon: React.FC<TampaIconProps> = ({ className = "w-5 h-5", rem
     return (
       <img 
         src="/tampa-logo.png" 
-        alt="Tampa APP" 
+        alt="Tampa Hospo"
         className={className}
         style={{ objectFit: 'contain' }}
       />
@@ -21,7 +21,7 @@ export const TampaIcon: React.FC<TampaIconProps> = ({ className = "w-5 h-5", rem
     <div className="bg-white rounded-lg flex items-center justify-center p-1">
       <img 
         src="/tampa-logo.png" 
-        alt="Tampa APP" 
+        alt="Tampa Hospo"
         className={className}
         style={{ objectFit: 'contain' }}
       />

@@ -6,16 +6,38 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ChefHat, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { TampaIcon } from '@/components/TampaIcon';
 
 const Auth = () => {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, signIn, signUp, resetPassword, loading } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showForgot, setShowForgot] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    const email = (new FormData(e.currentTarget).get('email') as string)?.trim();
+    const { error } = await resetPassword(email);
+
+    if (error) {
+      setError(error.message);
+    } else {
+      setResetSent(true);
+      toast({
+        title: "Check your email",
+        description: "If an account exists for that address, a password reset link is on its way.",
+      });
+    }
+    setIsLoading(false);
+  };
 
   // Redirect if already authenticated
   if (!loading && user) {
@@ -102,7 +124,7 @@ const Auth = () => {
           <div className="flex items-center h-16">
             <div className="flex items-center gap-2">
               <TampaIcon className="w-8 h-8" />
-              <h1 className="font-bold text-xl">Tampa APP</h1>
+              <h1 className="font-bold text-xl">Tampa Hospo</h1>
             </div>
           </div>
         </div>
@@ -112,15 +134,57 @@ const Auth = () => {
       <div className="flex items-center justify-center py-20 px-4">
         <Card className="w-full max-w-md shadow-card">
           <CardHeader className="text-center space-y-2">
-            <div className="w-16 h-16 bg-gradient-primary rounded-lg flex items-center justify-center mx-auto">
-              <ChefHat className="w-8 h-8 text-primary-foreground" />
-            </div>
-            <CardTitle className="text-2xl">Welcome to Tampa APP</CardTitle>
+            <TampaIcon className="w-16 h-16 mx-auto" />
+            <CardTitle className="text-2xl">Welcome to Tampa Hospo</CardTitle>
             <CardDescription>
               Sign in to your account or create a new one to get started
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {showForgot ? (
+              <div className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {resetSent ? (
+                  <div className="text-center space-y-4 py-4">
+                    <p className="text-sm text-muted-foreground">
+                      If an account exists for that email, we've sent a link to reset your password.
+                      Check your inbox (and spam folder).
+                    </p>
+                    <Button variant="outline" className="w-full" onClick={() => { setShowForgot(false); setResetSent(false); }}>
+                      Back to sign in
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <div className="space-y-1 text-center">
+                      <h2 className="text-lg font-semibold">Reset your password</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Enter your email and we'll send you a reset link.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-email">Email</Label>
+                      <Input id="forgot-email" name="email" type="email" placeholder="Enter your email" required />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? "Sending..." : "Send reset link"}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowForgot(false); setError(null); }}
+                      className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      Back to sign in
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : (
             <Tabs defaultValue="signin" className="space-y-4">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
@@ -156,13 +220,20 @@ const Auth = () => {
                       required
                     />
                   </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={isLoading}
                   >
                     {isLoading ? "Signing in..." : "Sign In"}
                   </Button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgot(true); setError(null); setResetSent(false); }}
+                    className="w-full text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    Forgot your password?
+                  </button>
                 </form>
               </TabsContent>
 
@@ -209,6 +280,7 @@ const Auth = () => {
                 </form>
               </TabsContent>
             </Tabs>
+            )}
           </CardContent>
         </Card>
       </div>

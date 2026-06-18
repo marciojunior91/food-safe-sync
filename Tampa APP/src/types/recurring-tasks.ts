@@ -99,6 +99,7 @@ export interface TaskSeries {
   title: string;
   description: string | null;
   task_type: TaskType;
+  icon?: string | null; // Custom emoji/icon (falls back to task_type icon)
   priority: TaskPriority;
 
   // Assignment (array of profile IDs or empty for "everyone")
@@ -133,6 +134,7 @@ export interface TaskSeriesInsert {
   title: string;
   description?: string | null;
   task_type: TaskType;
+  icon?: string | null;
   priority?: TaskPriority;
   assigned_to?: string[];
   estimated_minutes?: number | null;
@@ -150,6 +152,7 @@ export interface TaskSeriesUpdate {
   title?: string;
   description?: string | null;
   task_type?: TaskType;
+  icon?: string | null;
   priority?: TaskPriority;
   assigned_to?: string[];
   estimated_minutes?: number | null;
@@ -179,6 +182,7 @@ export interface TaskOccurrence {
   title: string;
   description: string | null;
   task_type: TaskType;
+  icon?: string | null; // Custom emoji/icon (falls back to task_type icon)
   priority: TaskPriority;
 
   // Assignment (can override series)
@@ -256,6 +260,7 @@ export interface TaskOccurrenceUpdate {
   title?: string;
   description?: string | null;
   task_type?: TaskType;
+  icon?: string | null;
   priority?: TaskPriority;
   assigned_to?: string[];
   estimated_minutes?: number | null;

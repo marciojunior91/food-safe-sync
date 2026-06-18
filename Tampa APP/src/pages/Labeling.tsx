@@ -155,6 +155,8 @@ export default function Labeling() {
         .from('printed_labels')
         .select('product_id, id, expiry_date, condition, created_at')
         .eq('organization_id', profile.organization_id)
+        // Ignore consumed/discarded labels so deleting them clears the expiry badge
+        .or('status.is.null,status.eq.active')
         .order('created_at', { ascending: false });
       
       // Group labels by product_id and keep only the latest
@@ -225,6 +227,8 @@ export default function Labeling() {
         .from("printed_labels")
         .select("*", { count: "exact", head: true })
         .eq("organization_id", profile.organization_id)
+        // Exclude consumed/discarded labels
+        .or('status.is.null,status.eq.active')
         .gte("expiry_date", now.toISOString().split('T')[0])
         .lte("expiry_date", next24Hours.toISOString().split('T')[0]);
 
@@ -400,10 +404,8 @@ export default function Labeling() {
     };
 
     try {
-      // Save to database first — capture labelId for QR code URL
-      const savedLabelId = await saveLabelToDatabase(labelData);
-      
-      // Print using new printer system - pass complete label data with CORRECT field names
+      // Print FIRST — only persist a printed_labels row if the print actually
+      // succeeds, so failed/cancelled prints don't create phantom history.
       const success = await print({
         productName: product.name,
         categoryName: product.label_categories?.name || "Quick Print",
@@ -414,10 +416,10 @@ export default function Labeling() {
         condition: details?.condition || "refrigerated",
         quantity: details?.quantity || "1",
         unit: details?.unit || product.measuring_units?.abbreviation || "Unit",
-        labelId: savedLabelId || undefined,
       });
-      
+
       if (success) {
+        await saveLabelToDatabase(labelData);
         toast({
           title: "Label Sent to Printer",
           description: `Printing label for ${product.name} prepared by ${selectedUserData.display_name}`,
@@ -636,77 +638,11 @@ export default function Labeling() {
             {products.length} products available
           </div>
         </div>
-        <QuickPrintGrid 
+        <QuickPrintGrid
           products={products}
           onQuickPrint={handleQuickPrintFromGrid}
         />
       </div>
-
-      {/* SECTION 3: Recent Labels */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-lg">Recent Labels</h3>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <Input 
-                  placeholder="Search" 
-                  className="pl-12 w-48 md:w-64"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Button variant="outline" size="icon">
-                <Filter className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {recentPrintedLabels.length === 0 ? (
-              <div className="bg-card rounded-lg border shadow-card p-8 text-center">
-                <Printer className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No labels printed yet</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Start printing labels to see them here
-                </p>
-              </div>
-            ) : (
-              recentPrintedLabels
-                .filter(label => 
-                  searchTerm === "" || 
-                  label.product_name.toLowerCase().includes(searchTerm.toLowerCase())
-                )
-                .map((label) => {
-                  const expiryStatus = getExpiryStatus(label.expiry_date);
-                  const statusColor = getStatusColor(expiryStatus);
-                  
-                  return (
-                    <div key={label.id} className="bg-card rounded-lg border shadow-card p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium">{label.product_name}</h4>
-                        <span className={`px-2 py-1 rounded-md text-xs font-medium`}
-                          style={{ 
-                            backgroundColor: `${statusColor}20`, 
-                            color: statusColor 
-                          }}
-                        >
-                          {expiryStatus}
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-sm text-muted-foreground">
-                        <p>Category: {label.category_name || "N/A"}</p>
-                        <p>Condition: {label.condition}</p>
-                        <p>Prep: {new Date(label.prep_date).toLocaleDateString()} | Expires: {new Date(label.expiry_date).toLocaleDateString()}</p>
-                        <p>By: {label.prepared_by_name} at {new Date(label.created_at).toLocaleTimeString()}</p>
-                        {label.quantity && <p>Qty: {label.quantity} {label.unit}</p>}
-                      </div>
-                    </div>
-                  );
-                })
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Print Queue Components */}

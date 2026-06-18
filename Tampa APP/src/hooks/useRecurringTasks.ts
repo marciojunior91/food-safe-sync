@@ -649,6 +649,46 @@ export function useRecurringTasks({
   }, [autoFetch, organizationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----------------------------------------------------------------
+  // BULK SERIES EDIT — update the whole recurrence + regenerate future occ.
+  // ----------------------------------------------------------------
+  const updateSeries = async (
+    seriesId: string,
+    updates: TaskSeriesUpdate
+  ): Promise<boolean> => {
+    try {
+      // Update the series template WITHOUT regenerating — editing a recurrence
+      // should ALTER the tasks that already exist, not delete + recreate them.
+      await updateTaskSeries(seriesId, updates);
+
+      // Apply the shared content fields to existing, not-yet-done occurrences.
+      const occFields: Record<string, unknown> = {};
+      if (updates.title !== undefined) occFields.title = updates.title;
+      if (updates.description !== undefined) occFields.description = updates.description;
+      if (updates.task_type !== undefined) occFields.task_type = updates.task_type;
+      if (updates.icon !== undefined) occFields.icon = updates.icon;
+      if (updates.priority !== undefined) occFields.priority = updates.priority;
+      if (updates.assigned_to !== undefined) occFields.assigned_to = updates.assigned_to;
+      if (updates.estimated_minutes !== undefined) occFields.estimated_minutes = updates.estimated_minutes;
+      if (updates.requires_approval !== undefined) occFields.requires_approval = updates.requires_approval;
+      if (Object.keys(occFields).length > 0) {
+        await supabase
+          .from('task_occurrences' as any)
+          .update(occFields as any)
+          .eq('series_id', seriesId)
+          .in('status', ['not_started', 'in_progress']);
+      }
+
+      setSeries((prev) => prev.map((s) => (s.id === seriesId ? { ...s, ...updates } : s)));
+      await refresh();
+      return true;
+    } catch (err) {
+      console.error('[useRecurringTasks] updateSeries error:', err);
+      setError(err as Error);
+      return false;
+    }
+  };
+
+  // ----------------------------------------------------------------
   // DERIVED STATE
   // ----------------------------------------------------------------
 
@@ -685,6 +725,7 @@ export function useRecurringTasks({
 
     // Update (with edit context)
     updateOccurrence,
+    updateSeries,
 
     // Delete (with delete context)
     deleteOccurrence,

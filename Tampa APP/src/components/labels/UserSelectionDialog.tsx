@@ -13,12 +13,13 @@
 // ============================================================================
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Search, User, CheckCircle2, AlertCircle } from "lucide-react";
+import { Search, User, CheckCircle2, AlertCircle, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { TeamMember } from "@/types/teamMembers";
@@ -45,6 +46,7 @@ export function UserSelectionDialog({
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (open) {
@@ -192,9 +194,31 @@ export function UserSelectionDialog({
             {loading ? (
               <div className="text-center py-8 text-muted-foreground">Loading team members...</div>
             ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                {searchTerm ? "No team members found matching your search" : "No team members found"}
-              </div>
+              searchTerm ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No team members found matching your search
+                </div>
+              ) : (
+                <div className="text-center py-8 px-4 space-y-4">
+                  <User className="w-10 h-10 mx-auto text-muted-foreground/50" />
+                  <div className="space-y-1">
+                    <p className="font-medium">No team members yet</p>
+                    <p className="text-sm text-muted-foreground">
+                      Add your team in the People section so they can be selected here.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      onOpenChange(false);
+                      navigate("/people");
+                    }}
+                    className="gap-2"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Go to People
+                  </Button>
+                </div>
+              )
             ) : (
               filteredUsers.map(user => (
                 <button
@@ -233,6 +257,12 @@ export function UserSelectionDialog({
             )}
           </div>
         </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Continue without selecting
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

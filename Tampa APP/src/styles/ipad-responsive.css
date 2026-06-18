@@ -272,7 +272,19 @@
     min-height: 44px !important;
     padding: 0.5rem !important;
   }
-  
+
+  /* Toggle switches (Radix renders <button role="switch">) must keep their own
+     compact pill size — the 48px touch floor + padding above otherwise inflates
+     them into a big round "ball" on tablets. [class] bumps specificity so this
+     wins over button:not(.icon-only). */
+  button[role="switch"][class] {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    height: 1.5rem !important;  /* h-6 */
+    width: 2.75rem !important;  /* w-11 */
+    padding: 0 !important;
+  }
+
   /* Header buttons specifically - ensure they fit */
   header button,
   div[class*="flex items-start"] > div > button,
@@ -456,41 +468,12 @@
     min-height: 48px !important;
   }
   
-  /* Recipe page — categories grid: 3 cols on iPad portrait */
+  /* Recipe page — categories grid: 3 cols on iPad portrait (tiles now share the
+     Quick Print label tile styling, so no per-tile resets are needed). */
   [data-page="recipes"] .recipe-categories-grid {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 1rem !important;
-  }
-
-  /* Recipe page — category tile buttons: fully reset Quick Print overrides */
-  [data-page="recipes"] .recipe-categories-grid > button {
-    min-height: auto !important;
-    height: auto !important;
-    padding: 1.25rem 0.75rem !important;
-    font-size: inherit !important;
-  }
-
-  /* Recipe page — emoji inside category tiles: reset the 5rem override */
-  [data-page="recipes"] .recipe-categories-grid > button span[class*="text-3xl"],
-  [data-page="recipes"] .recipe-categories-grid > button span[class*="text-4xl"],
-  [data-page="recipes"] .recipe-categories-grid > button > span,
-  [data-page="recipes"] .recipe-categories-grid > button div[class*="text-"] {
-    font-size: revert !important;
-    line-height: normal !important;
-  }
-
-  /* Recipe page — category tile emoji: proper size */
-  [data-page="recipes"] .recipe-categories-grid > button .recipe-category-emoji {
-    font-size: 2rem !important;
-    line-height: 1.2 !important;
-  }
-
-  /* Recipe page — category tile label */
-  [data-page="recipes"] .recipe-categories-grid > button .recipe-category-label {
-    font-size: 0.875rem !important;
-    font-weight: 600 !important;
-    line-height: 1.4 !important;
   }
 
   /* Recipe page — recipe cards grid: 2 cols on iPad portrait */

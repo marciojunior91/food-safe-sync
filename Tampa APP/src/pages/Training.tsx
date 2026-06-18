@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import {
   Trophy, BookOpen, Clock, Users, CheckCircle, Star, Play, Award, Plus,
-  Download, Loader2, Pencil, AlertCircle,
+  Download, Loader2, Pencil, AlertCircle, BarChart3, UserCog, Target,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -23,29 +23,55 @@ import {
   useTrainingCourses,
   useTrainingEnrollments,
   useEnrollmentActions,
+  useTrainingObligations,
   categoryIcon,
   difficultyColor,
   type TrainingCourse,
   type TrainingEnrollment,
 } from '@/hooks/useTraining';
+import { useTeamMemberSelection } from '@/hooks/useTeamMemberSelection';
+import { UserSelectionDialog } from '@/components/labels/UserSelectionDialog';
 import { CourseEditorDialog } from '@/components/training/CourseEditorDialog';
 import { CoursePlayerDialog } from '@/components/training/CoursePlayerDialog';
+import { CourseObligationsDialog } from '@/components/training/CourseObligationsDialog';
+import { TrainingReport } from '@/components/training/TrainingReport';
 import { generateCertificatePdf } from '@/utils/trainingCertificate';
 
 export default function Training() {
   const { isAdmin } = useUserRole();
   const { context, organization } = useUserContext();
+  // Shared-tablet identity: the individual using Training picks who they are.
+  const {
+    teamMember: selectedMember,
+    isModalOpen: memberModalOpen,
+    openModal: openMemberModal,
+    closeModal: closeMemberModal,
+    selectTeamMember,
+  } = useTeamMemberSelection();
   const { courses, loading: coursesLoading, refetch: refetchCourses } =
     useTrainingCourses({ includeUnpublished: isAdmin });
   const { enrollments, loading: enrollLoading, refetch: refetchEnrollments } =
-    useTrainingEnrollments();
+    useTrainingEnrollments(selectedMember?.id);
   const { enroll } = useEnrollmentActions();
+  const { obligations } = useTrainingObligations();
 
   const [activeTab, setActiveTab] = useState('courses');
   const [enrollingId, setEnrollingId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<TrainingCourse | null>(null);
+  const [obligationsCourse, setObligationsCourse] = useState<TrainingCourse | null>(null);
   const [player, setPlayer] = useState<{ course: TrainingCourse; enrollment: TrainingEnrollment } | null>(null);
+
+  // Course IDs this member is obliged to complete (by their dept or individually).
+  const obligatedCourseIds = useMemo(() => {
+    const memberDept = (selectedMember as any)?.department_id ?? null;
+    const ids = new Set<string>();
+    obligations.forEach(o => {
+      if (o.team_member_id && o.team_member_id === selectedMember?.id) ids.add(o.course_id);
+      if (o.department_id && memberDept && o.department_id === memberDept) ids.add(o.course_id);
+    });
+    return ids;
+  }, [obligations, selectedMember]);
 
   const loading = coursesLoading || enrollLoading;
   const publishedCourses = useMemo(() => courses.filter(c => c.is_published), [courses]);
@@ -66,9 +92,10 @@ export default function Training() {
   const refetchAll = () => { refetchCourses(); refetchEnrollments(); };
 
   const handleEnroll = async (course: TrainingCourse) => {
+    if (!selectedMember) { openMemberModal(); return; }
     setEnrollingId(course.id);
     try {
-      await enroll(course.id);
+      await enroll(course.id, selectedMember.id);
       await refetchEnrollments();
       toast.success(`Enrolled in ${course.title}`);
     } catch (e) {
@@ -83,7 +110,7 @@ export default function Training() {
 
   const downloadCertificate = (e: TrainingEnrollment) => {
     generateCertificatePdf({
-      recipientName: context?.display_name || 'Team member',
+      recipientName: selectedMember?.display_name || context?.display_name || 'Team member',
       courseTitle: e.course.title,
       organizationName: organization?.name || context?.organization_name || 'Tampa',
       score: e.score,
@@ -92,19 +119,31 @@ export default function Training() {
     });
   };
 
-  const tabCount = isAdmin ? 4 : 3;
+  const tabCount = isAdmin ? 5 : 3;
 
   return (
     <div className="p-6 md:p-8 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Trophy className="h-8 w-8 text-yellow-500" />
-          Training Center
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Courses, certification tracking, and team training compliance.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Trophy className="h-8 w-8 text-yellow-500" />
+            Training Center
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Courses, certification tracking, and team training compliance.
+          </p>
+        </div>
+        {/* Shared-tablet identity */}
+        <Button
+          variant={selectedMember ? 'outline' : 'default'}
+          size="sm"
+          className="gap-2"
+          onClick={openMemberModal}
+        >
+          <UserCog className="h-4 w-4" />
+          {selectedMember ? selectedMember.display_name : 'Who are you?'}
+        </Button>
       </div>
 
       {/* Stats */}
@@ -126,6 +165,9 @@ export default function Training() {
           {isAdmin && (
             <TabsTrigger value="manage" className="gap-2"><Users className="h-4 w-4" /> Manage</TabsTrigger>
           )}
+          {isAdmin && (
+            <TabsTrigger value="report" className="gap-2"><BarChart3 className="h-4 w-4" /> Report</TabsTrigger>
+          )}
         </TabsList>
 
         {/* ── Courses ── */}
@@ -142,9 +184,9 @@ export default function Training() {
                 const isCompleted = !!enrollment?.completed_at;
                 return (
                   <Card key={course.id} className="relative flex flex-col">
-                    {course.is_required && (
+                    {(course.is_required || obligatedCourseIds.has(course.id)) && (
                       <Badge className="absolute top-2 right-2 bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">
-                        Required
+                        {obligatedCourseIds.has(course.id) ? 'Required for you' : 'Required'}
                       </Badge>
                     )}
                     <CardHeader className="pb-3">
@@ -299,9 +341,12 @@ export default function Training() {
                 <h3 className="font-semibold text-lg">Course Management</h3>
                 <p className="text-sm text-muted-foreground">Create, edit, publish, and remove courses.</p>
               </div>
-              <Button className="gap-2" onClick={() => { setEditingCourse(null); setEditorOpen(true); }}>
-                <Plus className="h-4 w-4" /> New Course
-              </Button>
+              {/* Create is restricted to admin-type auth users only */}
+              {isAdmin && (
+                <Button className="gap-2" onClick={() => { setEditingCourse(null); setEditorOpen(true); }}>
+                  <Plus className="h-4 w-4" /> New Course
+                </Button>
+              )}
             </div>
 
             {courses.length === 0 ? (
@@ -330,15 +375,28 @@ export default function Training() {
                           </p>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="gap-2 flex-shrink-0"
-                        onClick={() => { setEditingCourse(course); setEditorOpen(true); }}>
-                        <Pencil className="h-4 w-4" /> Edit
-                      </Button>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button variant="outline" size="sm" className="gap-2"
+                          onClick={() => setObligationsCourse(course)}>
+                          <Target className="h-4 w-4" /> Assign
+                        </Button>
+                        <Button variant="outline" size="sm" className="gap-2"
+                          onClick={() => { setEditingCourse(course); setEditorOpen(true); }}>
+                          <Pencil className="h-4 w-4" /> Edit
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
               </div>
             )}
+          </TabsContent>
+        )}
+
+        {/* ── Report (admin only) ── */}
+        {isAdmin && (
+          <TabsContent value="report" className="space-y-4 mt-6">
+            <TrainingReport />
           </TabsContent>
         )}
       </Tabs>
@@ -359,6 +417,23 @@ export default function Training() {
           course={player.course}
           enrollment={player.enrollment}
           onChanged={refetchEnrollments}
+        />
+      )}
+
+      {/* Shared-tablet identity picker */}
+      <UserSelectionDialog
+        open={memberModalOpen}
+        onOpenChange={(open) => { if (!open) closeMemberModal(); }}
+        onSelectUser={selectTeamMember}
+        title="Who are you?"
+        description="Select your name to track your training"
+      />
+
+      {isAdmin && obligationsCourse && (
+        <CourseObligationsDialog
+          open={!!obligationsCourse}
+          onOpenChange={(open) => { if (!open) setObligationsCourse(null); }}
+          course={obligationsCourse}
         />
       )}
     </div>

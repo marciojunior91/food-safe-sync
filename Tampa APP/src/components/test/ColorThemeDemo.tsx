@@ -9,7 +9,7 @@ export function ColorThemeDemo() {
   return (
     <div className="p-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold mb-2">Tampa APP - Color Theme</h1>
+        <h1 className="text-3xl font-bold mb-2">Tampa Hospo - Color Theme</h1>
         <p className="text-muted-foreground">
           New secondary color: Tampa Orange
         </p>

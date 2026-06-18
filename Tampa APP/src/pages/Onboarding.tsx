@@ -162,7 +162,7 @@ export default function Onboarding() {
 
       if (result.success) {
         toast({
-          title: "🎉 Welcome to Tampa APP!",
+          title: "🎉 Welcome to Tampa Hospo!",
           description: `Successfully created your account and organization. ${result.productsImported || 0} products, ${result.teamMembersCreated || 0} team members, and ${result.invitationsSent || 0} invitations sent.`,
         });
         goToNextStep('invite-users');
@@ -198,7 +198,7 @@ export default function Onboarding() {
       <div className="container mx-auto max-w-4xl">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">Welcome to Tampa APP</h1>
+          <h1 className="text-4xl font-bold mb-2">Welcome to Tampa Hospo</h1>
           <p className="text-muted-foreground">
             Let's get your kitchen management system set up in just a few minutes
           </p>
@@ -292,7 +292,7 @@ export default function Onboarding() {
                 <div className="text-6xl mb-4">🎉</div>
                 <h3 className="text-2xl font-bold">You're All Set!</h3>
                 <p className="text-muted-foreground max-w-md mx-auto">
-                  Your Tampa APP account is ready to use. Start managing your kitchen operations with confidence.
+                  Your Tampa Hospo account is ready to use. Start managing your kitchen operations with confidence.
                 </p>
                 <button
                   onClick={handleComplete}

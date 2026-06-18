@@ -409,6 +409,8 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
             .select('id, expiry_date, condition')
             .eq('product_id', product.id)
             .eq('organization_id', profile.organization_id)
+            // Ignore consumed/discarded labels so deleting them clears the badge
+            .or('status.is.null,status.eq.active')
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -858,7 +860,7 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                             variant="outline"
                             disabled={isLoading}
                             className={cn(
-                              "h-full w-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
+                              "quick-print-card h-full w-full flex flex-col items-center justify-between p-3 sm:p-4 gap-2 transition-all duration-200 group active:scale-95 touch-manipulation shadow-sm hover:shadow-md relative",
                               isSuccess 
                                 ? "bg-green-500 text-white border-green-600 hover:bg-green-600" 
                                 : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
@@ -1044,7 +1046,6 @@ export function QuickPrintGrid({ products, onQuickPrint, className }: QuickPrint
                               </div>
                             </div>
                           </div>
-                          <Zap className="w-5 h-5 opacity-60 shrink-0" />
                         </Button>
                       );
                     })}

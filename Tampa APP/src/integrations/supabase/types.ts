@@ -1491,6 +1491,7 @@ export type Database = {
           dietary_requirements: string[] | null
           estimated_prep_minutes: number | null
           hold_time_days: number | null
+          icon: string | null
           id: string
           ingredients: Json
           name: string
@@ -1510,6 +1511,7 @@ export type Database = {
           dietary_requirements?: string[] | null
           estimated_prep_minutes?: number | null
           hold_time_days?: number | null
+          icon?: string | null
           id?: string
           ingredients?: Json
           name: string
@@ -1529,6 +1531,7 @@ export type Database = {
           dietary_requirements?: string[] | null
           estimated_prep_minutes?: number | null
           hold_time_days?: number | null
+          icon?: string | null
           id?: string
           ingredients?: Json
           name?: string

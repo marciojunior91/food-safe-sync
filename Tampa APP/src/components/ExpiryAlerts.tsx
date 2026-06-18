@@ -116,6 +116,8 @@ export default function ExpiryAlerts() {
         .from('printed_labels')
         .select('id, product_name, prep_date, expiry_date, prepared_by_name, allergens')
         .eq('organization_id', profile.organization_id)
+        // Exclude consumed/discarded labels
+        .or('status.is.null,status.eq.active')
         .order('expiry_date', { ascending: true })
         .limit(10);
 

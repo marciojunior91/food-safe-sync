@@ -55,12 +55,10 @@ export function useTeamMemberSelection(): TeamMemberSelection {
   };
 
   const openModal = () => setIsModalOpen(true);
-  const closeModal = () => {
-    // Only close if team member is selected
-    if (teamMember) {
-      setIsModalOpen(false);
-    }
-  };
+  // Always allow dismissing the modal. Operational flows (e.g. printing) re-open
+  // it on demand when a team member is actually required, so blocking the close
+  // here only traps accounts that have no team members yet.
+  const closeModal = () => setIsModalOpen(false);
 
   return {
     teamMember,

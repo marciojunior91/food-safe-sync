@@ -36,6 +36,8 @@ export function ExpiringTodayCard() {
         .from('printed_labels')
         .select('id')
         .eq('organization_id', profile.organization_id)
+        // Exclude consumed/discarded labels
+        .or('status.is.null,status.eq.active')
         .gte('expiry_date', `${today}T00:00:00`)
         .lt('expiry_date', `${today}T23:59:59`);
 

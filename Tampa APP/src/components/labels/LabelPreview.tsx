@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { QRCodeSVG } from "qrcode.react";
-import { format } from "date-fns";
 import { Eye } from "lucide-react";
 
 import { useAllergens } from "@/hooks/useAllergens";
+import { formatDateDMY } from "@/utils/labelZpl";
 
 interface LabelPreviewProps {
   productName: string;
@@ -25,15 +24,6 @@ interface LabelPreviewProps {
   allergens?: Array<{ id: string; name: string; icon?: string | null; severity?: string }>; // Pre-fetched allergens (overrides internal fetch)
 }
 
-const CONDITION_COLORS = {
-  fresh: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  cooked: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
-  frozen: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-  dry: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-  refrigerated: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300",
-  thawed: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
-};
-
 export function LabelPreview({
   productName,
   categoryName,
@@ -43,10 +33,7 @@ export function LabelPreview({
   expiryDate,
   quantity,
   unit,
-  batchNumber,
   productId,
-  labelId,
-  templateType = "default",
   templateName,
   isBlankTemplate = false,
   allergens: allergensProp,
@@ -83,24 +70,9 @@ export function LabelPreview({
     }
   };
 
-  // Generate QR code data — URL when labelId available, JSON fallback
-  const qrData = labelId
-    ? `${window.location.origin}/labels/${labelId}/preview`
-    : JSON.stringify({
-        productId: productId || "",
-        productName,
-        prepDate,
-        expiryDate,
-        batchNumber,
-        timestamp: new Date().toISOString(),
-      });
-
-  // Format dates for display
-  const formattedPrepDate = prepDate ? format(new Date(prepDate), "MMM dd, yyyy") : "";
-  const formattedExpiryDate = expiryDate ? format(new Date(expiryDate), "MMM dd, yyyy") : "";
-
-  // Get condition color
-  const conditionColor = CONDITION_COLORS[condition as keyof typeof CONDITION_COLORS] || "bg-gray-100 text-gray-800";
+  // Format dates as DD/MM/YYYY to match the printed label exactly.
+  const formattedPrepDate = formatDateDMY(prepDate);
+  const formattedExpiryDate = formatDateDMY(expiryDate);
 
   // Check if this is a blank template (either by name or explicit flag)
   const isBlank = isBlankTemplate || templateName?.toLowerCase() === "blank";
@@ -137,116 +109,61 @@ export function LabelPreview({
             </div>
           ) : (
             <>
-              {/* Header Section */}
-              <div className="text-center border-b-2 border-gray-200 dark:border-gray-800 pb-4">
-                <h3 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{productName || "Product Name"}</h3>
+              {/* PRODUCT NAME + CATEGORY — mirrors the printed ZPL header */}
+              <div className="text-center border-b-2 border-gray-300 dark:border-gray-700 pb-3">
+                <h3 className="text-3xl font-bold uppercase text-gray-900 dark:text-gray-100 leading-tight">
+                  {productName || "Product Name"}
+                </h3>
                 {categoryName && (
-                  <p className="text-base text-muted-foreground mt-1">{categoryName}</p>
+                  <p className="text-sm text-muted-foreground mt-1 uppercase">{categoryName}</p>
                 )}
               </div>
 
-          {/* Main Content Section */}
-          <div className="grid grid-cols-2 gap-4">
-            {/* Left Column - Info */}
-            <div className="space-y-3">
-              {/* Condition Badge */}
-              {condition && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">CONDITION</p>
-                  <Badge className={`${conditionColor} font-semibold uppercase text-xs`}>
-                    {condition}
-                  </Badge>
+              {/* DATES (bold) */}
+              <div className="space-y-1">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300">PREPARED DATE</span>
+                  <span className="text-base font-bold text-gray-900 dark:text-gray-100">{formattedPrepDate}</span>
                 </div>
-              )}
-
-              {/* Prepared By */}
-              {preparedByName && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">PREPARED BY</p>
-                  <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{preparedByName}</p>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300">EXPIRE DATE</span>
+                  <span className="text-base font-bold text-red-600 dark:text-red-400">{formattedExpiryDate}</span>
                 </div>
-              )}
-
-              {/* Prep Date */}
-              {prepDate && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">PREP DATE</p>
-                  <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{formattedPrepDate}</p>
-                </div>
-              )}
-
-              {/* Expiry Date */}
-              {expiryDate && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">USE BY</p>
-                  <p className="text-base font-bold text-red-600 dark:text-red-400">{formattedExpiryDate}</p>
-                </div>
-              )}
-
-              {/* Quantity */}
-              {quantity && unit && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400">QUANTITY</p>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                    {quantity} {unit}
-                  </p>
-                </div>
-              )}
-
-              {/* Allergens — inline with other label fields */}
-              {allergens.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">ALLERGENS</p>
-                  <div className="flex flex-wrap gap-1">
-                    {allergens.map((a: any) => (
-                      <span key={a.id} className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-1.5 py-0.5 rounded font-semibold">
-                        ⚠️ {a.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {loadingAllergens && (
-                <p className="text-xs text-muted-foreground animate-pulse">Loading allergens...</p>
-              )}
-            </div>
-
-            {/* Right Column - QR Code */}
-            <div className="flex flex-col items-center justify-center">
-              {productName && prepDate && expiryDate ? (
-                <>
-                  <QRCodeSVG
-                    value={qrData}
-                    size={90}
-                    level="H"
-                    includeMargin={false}
-                    className="border-2 border-gray-200 dark:border-gray-700 rounded"
-                  />
-                  <p className="text-xs text-center text-muted-foreground mt-1">
-                    Scan for details
-                  </p>
-                </>
-              ) : (
-                <div className="w-36 h-36 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded flex items-center justify-center">
-                  <p className="text-xs text-center text-muted-foreground px-2">
-                    Fill in required fields to generate QR code
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-
-
-              {/* Footer - Template Type Badge */}
-              <div className="border-t-2 border-gray-200 dark:border-gray-800 pt-3 flex justify-between items-center">
-                <Badge variant="outline" className="text-xs">
-                  {templateType.toUpperCase()} TEMPLATE
-                </Badge>
-                <p className="text-xs text-muted-foreground">
-                  {format(new Date(), "yyyy-MM-dd HH:mm")}
-                </p>
               </div>
+
+              {/* BODY — printed by / quantity / condition */}
+              <div className="border-t-2 border-gray-300 dark:border-gray-700 pt-3 space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm font-medium text-gray-500 dark:text-gray-400">PRINTED BY</span>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{preparedByName || "Unknown"}</span>
+                </div>
+                {quantity && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">QUANTITY</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase">
+                      {quantity}{unit ? ` ${unit}` : ""}
+                    </span>
+                  </div>
+                )}
+                {condition && (
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium text-gray-500 dark:text-gray-400">CONDITION</span>
+                    <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase">{condition}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* ALLERGENS */}
+              {loadingAllergens ? (
+                <p className="text-xs text-muted-foreground animate-pulse">Loading allergens...</p>
+              ) : allergens.length > 0 && (
+                <div className="border-t-2 border-gray-300 dark:border-gray-700 pt-3">
+                  <p className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">ALLERGENS</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase">
+                    {allergens.map((a: any) => a.name).join(", ")}
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

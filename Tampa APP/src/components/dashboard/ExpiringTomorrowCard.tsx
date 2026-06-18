@@ -38,6 +38,8 @@ export function ExpiringTomorrowCard() {
         .from('printed_labels')
         .select('id')
         .eq('organization_id', profile.organization_id)
+        // Exclude consumed/discarded labels
+        .or('status.is.null,status.eq.active')
         .gte('expiry_date', `${tomorrowStr}T00:00:00`)
         .lt('expiry_date', `${tomorrowStr}T23:59:59`);
 

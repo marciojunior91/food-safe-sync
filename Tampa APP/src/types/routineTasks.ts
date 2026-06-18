@@ -54,6 +54,7 @@ export interface RoutineTask {
   title: string;
   description?: string;
   task_type: TaskType;
+  icon?: string | null; // Custom emoji/icon (falls back to task_type icon)
   priority: TaskPriority;
   status: TaskStatus;
   assigned_to?: string; // LEGACY: auth user_id
@@ -120,6 +121,7 @@ export interface CreateTaskInput {
     completed: boolean;
   }>;
   task_type: TaskType;
+  icon?: string | null; // Custom emoji/icon (falls back to task_type icon)
   priority?: TaskPriority;
   assigned_to?: string; // LEGACY: auth user_id - kept for backward compatibility
   team_member_id?: string; // NEW: team member ID - preferred

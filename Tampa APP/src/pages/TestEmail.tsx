@@ -28,11 +28,11 @@ export default function TestEmail() {
 
     const result = await sendEmail({
       to,
-      subject: 'Email de Teste - Tampa APP',
+      subject: 'Email de Teste - Tampa Hospo',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <h1 style="color: #ea580c;">🧪 Email de Teste</h1>
-          <p style="color: #374151;">Este é um email de teste do <strong>Tampa APP</strong>.</p>
+          <p style="color: #374151;">Este é um email de teste do <strong>Tampa Hospo</strong>.</p>
           <p style="color: #6b7280; font-size: 14px;">Enviado em: ${new Date().toLocaleString('pt-BR')}</p>
         </div>
       `,

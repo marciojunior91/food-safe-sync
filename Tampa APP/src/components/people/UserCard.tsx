@@ -79,7 +79,10 @@ export default function UserCard({
   const StatusIcon = statusConfig.icon;
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card
+      onClick={onEdit ? () => onEdit(user) : undefined}
+      className={cn("hover:shadow-md transition-shadow", onEdit && "cursor-pointer")}
+    >
       <CardContent className="p-6">
         <div className="flex flex-col items-center text-center space-y-4">
           {/* Avatar */}
@@ -162,7 +165,7 @@ export default function UserCard({
                 variant="outline"
                 size="sm"
                 className="flex-1"
-                onClick={() => onEdit(user)}
+                onClick={(e) => { e.stopPropagation(); onEdit(user); }}
               >
                 <Edit className="w-4 h-4 mr-1" />
                 Edit
