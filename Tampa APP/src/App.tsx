@@ -16,6 +16,7 @@ import Inventory from "./pages/Inventory";
 import Analytics from "./pages/Analytics";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import Onboarding from "./pages/Onboarding";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import RoutineTasks from "./pages/RoutineTasks";
@@ -48,6 +49,11 @@ const App = () => (
               <Route path="/welcome" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/onboarding" element={
+                <ProtectedRoute>
+                  <Onboarding />
+                </ProtectedRoute>
+              } />
               <Route path="/" element={
                 <ProtectedRoute>
                   <Layout />

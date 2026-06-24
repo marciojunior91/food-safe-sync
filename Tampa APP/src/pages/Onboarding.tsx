@@ -1,182 +1,177 @@
-// Main Onboarding Page - Immersive Client Journey
-// Iteration 13 - MVP Sprint
-// Multi-step onboarding flow for new customers
+// Main Onboarding Page — Backbone Customisation Journey
+// Every new user passes through this after signing up. It guides them through
+// setting up the system's backbone: business info, label categories &
+// subcategories, team members and venues. A recommended default layout is
+// offered so users who don't want to customise can simply continue.
 
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import OnboardingSteps from "@/components/onboarding/OnboardingSteps";
-import RegistrationStep from "@/components/onboarding/steps/RegistrationStep";
 import CompanyInfoStep from "@/components/onboarding/steps/CompanyInfoStep";
-import ProductsStep from "@/components/onboarding/steps/ProductsStep";
+import CategoriesStep from "@/components/onboarding/steps/CategoriesStep";
 import TeamMembersStep from "@/components/onboarding/steps/TeamMembersStep";
-import InviteUsersStep from "@/components/onboarding/steps/InviteUsersStep";
-import { useOnboardingDb } from "@/hooks/useOnboardingDb";
+import VenuesStep from "@/components/onboarding/steps/VenuesStep";
+import { TampaIcon } from "@/components/TampaIcon";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  createOrganization,
+  seedCategories,
+  createTeamMembers,
+  saveVenues,
+  markOnboardingComplete,
+} from "@/lib/onboardingDb";
 import {
   OnboardingStep,
-  RegistrationData,
   CompanyData,
-  ProductImportData,
+  CategoriesData,
   TeamMembersData,
-  InviteUsersData,
+  VenuesData,
+  DEFAULT_TAXONOMY,
 } from "@/types/onboarding";
-import { FEATURES } from "@/lib/featureFlags";
+
+const STEPS: OnboardingStep[] = [
+  "company-info",
+  "categories",
+  "team-members",
+  "venues",
+  "complete",
+];
 
 export default function Onboarding() {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const {
-    loading,
-    error,
-    userId,
-    organizationId,
-    submitOnboarding,
-    clearError,
-  } = useOnboardingDb();
-  
-  const [currentStep, setCurrentStep] = useState<OnboardingStep>('registration');
+  const { user, loading: authLoading } = useAuth();
+
+  const [profileLoaded, setProfileLoaded] = useState(false);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [currentStep, setCurrentStep] = useState<OnboardingStep>("company-info");
   const [completedSteps, setCompletedSteps] = useState<OnboardingStep[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasSubscription, setHasSubscription] = useState(false);
-  
-  // Feature Flag: Redirect if onboarding disabled (MVP mode)
-  useEffect(() => {
-    if (!FEATURES.ONBOARDING_ENABLED) {
-      navigate('/dashboard');
-      toast({
-        title: "Self-Service Onboarding Disabled",
-        description: "Please contact support to set up your account.",
-        variant: "destructive",
-      });
-    }
-  }, [navigate, toast]);
-  
-  // Check if user came from Stripe checkout
-  useEffect(() => {
-    const subscriptionParam = searchParams.get('subscription');
-    if (subscriptionParam === 'success') {
-      setHasSubscription(true);
-      toast({
-        title: "🎉 Payment Successful!",
-        description: "Your subscription is active. Complete setup to link it to your organization.",
-      });
-    }
-  }, [searchParams, toast]);
-  
+
   // Form data state
-  const [registrationData, setRegistrationData] = useState<Partial<RegistrationData>>({});
   const [companyData, setCompanyData] = useState<Partial<CompanyData>>({
-    address: {
-      street: '',
-      city: '',
-      state: '',
-      postcode: '',
-      country: 'Australia',
-    },
+    address: { street: "", city: "", state: "", postcode: "", country: "Australia" },
   });
-  const [productsData, setProductsData] = useState<Partial<ProductImportData>>({
-    importMethod: 'manual',
-    products: [],
+  const [categoriesData, setCategoriesData] = useState<Partial<CategoriesData>>({
+    categories: DEFAULT_TAXONOMY,
+    usedDefault: true,
   });
   const [teamMembersData, setTeamMembersData] = useState<Partial<TeamMembersData>>({
     teamMembers: [],
     skipForNow: false,
   });
-  const [inviteUsersData, setInviteUsersData] = useState<Partial<InviteUsersData>>({
-    invitations: [],
+  const [venuesData, setVenuesData] = useState<Partial<VenuesData>>({
+    venues: [],
     skipForNow: false,
   });
 
-  const handleStepComplete = (step: OnboardingStep) => {
-    if (!completedSteps.includes(step)) {
-      setCompletedSteps([...completedSteps, step]);
-    }
+  // Load the signed-in user's profile. If onboarding is already done, leave.
+  // If an organisation already exists, skip the business-info step.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) return;
+
+    (async () => {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name, organization_id, onboarding_completed")
+        .eq("user_id", user.id)
+        .single();
+
+      if (profile?.onboarding_completed) {
+        navigate("/", { replace: true });
+        return;
+      }
+
+      if (profile?.organization_id) {
+        setOrganizationId(profile.organization_id);
+        setCurrentStep("categories");
+        setCompletedSteps(["company-info"]);
+        if (!companyData.businessName) {
+          setCompanyData((prev) => ({ ...prev, businessName: profile.display_name || "" }));
+        }
+      }
+
+      setProfileLoaded(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
+
+  const markComplete = (step: OnboardingStep) => {
+    setCompletedSteps((prev) => (prev.includes(step) ? prev : [...prev, step]));
   };
 
   const goToNextStep = (from: OnboardingStep) => {
-    handleStepComplete(from);
-    
-    const steps: OnboardingStep[] = [
-      'registration',
-      'company-info',
-      'products',
-      'team-members',
-      'invite-users',
-      'complete',
-    ];
-    
-    const currentIndex = steps.indexOf(from);
-    if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1]);
-    }
+    markComplete(from);
+    const index = STEPS.indexOf(from);
+    if (index < STEPS.length - 1) setCurrentStep(STEPS[index + 1]);
   };
 
   const goToPreviousStep = () => {
-    const steps: OnboardingStep[] = [
-      'registration',
-      'company-info',
-      'products',
-      'team-members',
-      'invite-users',
-      'complete',
-    ];
-    
-    const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex > 0) {
-      setCurrentStep(steps[currentIndex - 1]);
+    const index = STEPS.indexOf(currentStep);
+    if (index > 0) setCurrentStep(STEPS[index - 1]);
+  };
+
+  // Ensure an organisation exists; create one from the company form if needed.
+  const ensureOrganization = async (): Promise<string | null> => {
+    if (organizationId) return organizationId;
+    if (!user) return null;
+
+    const result = await createOrganization(companyData as CompanyData, user.id);
+    if (!result.success || !result.organizationId) {
+      toast({
+        title: "Couldn't create your business",
+        description: result.error || "Please try again.",
+        variant: "destructive",
+      });
+      return null;
     }
+    setOrganizationId(result.organizationId);
+    return result.organizationId;
   };
 
-  const handleRegistrationNext = () => {
-    goToNextStep('registration');
-  };
-
-  const handleCompanyInfoNext = () => {
-    goToNextStep('company-info');
-  };
-
-  const handleProductsNext = () => {
-    goToNextStep('products');
-  };
-
-  const handleTeamMembersNext = () => {
-    goToNextStep('team-members');
-  };
-
-  const handleInviteUsersNext = async () => {
-    // This is the final step - submit everything to database
+  const handleCompanyInfoNext = async () => {
     setIsSubmitting(true);
-    
-    try {
-      // Ensure all data is properly typed before submission
-      const result = await submitOnboarding(
-        registrationData as RegistrationData,
-        companyData as CompanyData,
-        productsData as ProductImportData,
-        teamMembersData as TeamMembersData,
-        inviteUsersData as InviteUsersData
-      );
+    const orgId = await ensureOrganization();
+    setIsSubmitting(false);
+    if (orgId) goToNextStep("company-info");
+  };
 
-      if (result.success) {
-        toast({
-          title: "🎉 Welcome to Tampa Hospo!",
-          description: `Successfully created your account and organization. ${result.productsImported || 0} products, ${result.teamMembersCreated || 0} team members, and ${result.invitationsSent || 0} invitations sent.`,
-        });
-        goToNextStep('invite-users');
-      } else {
-        toast({
-          title: "Onboarding Error",
-          description: result.error || "Failed to complete onboarding. Please try again.",
-          variant: "destructive",
-        });
+  const handleCategoriesNext = () => goToNextStep("categories");
+  const handleTeamMembersNext = () => goToNextStep("team-members");
+
+  // Final step: persist categories, team members and venues, then finish.
+  const handleFinish = async () => {
+    if (!user) return;
+    setIsSubmitting(true);
+    try {
+      const orgId = await ensureOrganization();
+      if (!orgId) {
+        setIsSubmitting(false);
+        return;
       }
+
+      const catResult = await seedCategories(orgId, categoriesData.categories || []);
+      if (!catResult.success) throw new Error(catResult.error || "Failed to save categories");
+
+      await createTeamMembers(teamMembersData as TeamMembersData, orgId);
+      await saveVenues(orgId, venuesData.venues || []);
+      await markOnboardingComplete(user.id);
+
+      toast({
+        title: "🎉 Welcome to Tampa Hospo!",
+        description: `Your setup is ready — ${catResult.categoriesCreated} categories created.`,
+      });
+      goToNextStep("venues");
     } catch (error: any) {
       toast({
-        title: "Unexpected Error",
-        description: error.message || "An unexpected error occurred.",
+        title: "Setup error",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -184,132 +179,120 @@ export default function Onboarding() {
     }
   };
 
-  const handleComplete = () => {
-    // Redirect to dashboard
-    toast({
-      title: "Welcome!",
-      description: "Your setup is complete. Let's get started!",
-    });
-    navigate('/dashboard');
-  };
+  const handleComplete = () => navigate("/", { replace: true });
+
+  if (authLoading || (user && !profileLoaded)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-background to-muted/20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 py-12 px-4">
-      <div className="container mx-auto max-w-4xl">
-        {/* Logo/Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">Welcome to Tampa Hospo</h1>
-          <p className="text-muted-foreground">
-            Let's get your kitchen management system set up in just a few minutes
-          </p>
-          
-          {/* Subscription Badge */}
-          {hasSubscription && (
-            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full">
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-700">
-                Premium Plan Active
-              </span>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      {/* Header */}
+      <header className="border-b bg-card/80 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center h-16">
+            <div className="flex items-center gap-2">
+              <TampaIcon className="w-8 h-8" />
+              <h1 className="font-bold text-xl">Tampa Hospo</h1>
             </div>
-          )}
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto max-w-4xl py-12 px-4">
+        {/* Intro */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold mb-2">Let's set up your kitchen</h1>
+          <p className="text-muted-foreground">
+            A few quick steps to customise the backbone of your system. Prefer the defaults?
+            Just keep clicking continue.
+          </p>
         </div>
 
         {/* Progress Steps */}
         <OnboardingSteps currentStep={currentStep} completedSteps={completedSteps} />
 
-        {/* Error Alert */}
-        {error && (
-          <div className="mt-6 p-4 bg-destructive/10 border border-destructive rounded-lg flex items-center justify-between">
-            <p className="text-destructive text-sm">{error}</p>
-            <button
-              onClick={clearError}
-              className="text-destructive hover:text-destructive/80"
-            >
-              ×
-            </button>
-          </div>
-        )}
-
-        {/* Loading Overlay */}
+        {/* Loading overlay */}
         {isSubmitting && (
           <div className="mt-6 p-8 bg-card rounded-lg border flex flex-col items-center justify-center space-y-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-lg font-medium">Setting up your account...</p>
+            <p className="text-lg font-medium">Saving your setup...</p>
             <p className="text-sm text-muted-foreground">This may take a moment</p>
           </div>
         )}
 
-        {/* Step Content */}
+        {/* Step content */}
         {!isSubmitting && (
           <Card className="mt-8">
             <CardContent className="p-8">
-            {currentStep === 'registration' && (
-              <RegistrationStep
-                data={registrationData}
-                onChange={setRegistrationData}
-                onNext={handleRegistrationNext}
-              />
-            )}
+              {currentStep === "company-info" && (
+                <CompanyInfoStep
+                  data={companyData}
+                  onChange={setCompanyData}
+                  onNext={handleCompanyInfoNext}
+                  onBack={goToPreviousStep}
+                />
+              )}
 
-            {currentStep === 'company-info' && (
-              <CompanyInfoStep
-                data={companyData}
-                onChange={setCompanyData}
-                onNext={handleCompanyInfoNext}
-                onBack={goToPreviousStep}
-              />
-            )}
+              {currentStep === "categories" && (
+                <CategoriesStep
+                  data={categoriesData}
+                  onChange={setCategoriesData}
+                  onNext={handleCategoriesNext}
+                  onBack={goToPreviousStep}
+                />
+              )}
 
-            {currentStep === 'products' && (
-              <ProductsStep
-                data={productsData}
-                onChange={setProductsData}
-                onNext={handleProductsNext}
-                onBack={goToPreviousStep}
-              />
-            )}
+              {currentStep === "team-members" && (
+                <TeamMembersStep
+                  data={teamMembersData}
+                  onChange={setTeamMembersData}
+                  onNext={handleTeamMembersNext}
+                  onBack={goToPreviousStep}
+                />
+              )}
 
-            {currentStep === 'team-members' && (
-              <TeamMembersStep
-                data={teamMembersData}
-                onChange={setTeamMembersData}
-                onNext={handleTeamMembersNext}
-                onBack={goToPreviousStep}
-              />
-            )}
+              {currentStep === "venues" && (
+                <VenuesStep
+                  data={venuesData}
+                  onChange={setVenuesData}
+                  onNext={handleFinish}
+                  onBack={goToPreviousStep}
+                  businessName={companyData.businessName}
+                />
+              )}
 
-            {currentStep === 'invite-users' && (
-              <InviteUsersStep
-                data={inviteUsersData}
-                onChange={setInviteUsersData}
-                onNext={handleInviteUsersNext}
-                onBack={goToPreviousStep}
-              />
-            )}
-
-            {currentStep === 'complete' && (
-              <div className="text-center py-12 space-y-6">
-                <div className="text-6xl mb-4">🎉</div>
-                <h3 className="text-2xl font-bold">You're All Set!</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  Your Tampa Hospo account is ready to use. Start managing your kitchen operations with confidence.
-                </p>
-                <button
-                  onClick={handleComplete}
-                  className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-lg font-semibold"
-                >
-                  Go to Dashboard
-                </button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              {currentStep === "complete" && (
+                <div className="text-center py-12 space-y-6">
+                  <div className="text-6xl mb-4">🎉</div>
+                  <h3 className="text-2xl font-bold">You're All Set!</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    Your Tampa Hospo account is ready to use. Start managing your kitchen
+                    operations with confidence.
+                  </p>
+                  <button
+                    onClick={handleComplete}
+                    className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 text-lg font-semibold"
+                  >
+                    Go to Dashboard
+                  </button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
-        {/* Help section */}
+        {/* Help */}
         <div className="text-center mt-8">
           <p className="text-sm text-muted-foreground">
-            Need help?{' '}
+            Need help?{" "}
             <a href="/support" className="text-primary hover:underline">
               Contact our support team
             </a>

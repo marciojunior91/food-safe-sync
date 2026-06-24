@@ -9,6 +9,8 @@ import {
   ProductImportData,
   TeamMembersData,
   InviteUsersData,
+  CategoryEntry,
+  VenueEntry,
 } from "@/types/onboarding";
 
 // Hash PIN using Web Crypto API (browser-compatible)
@@ -239,6 +241,130 @@ export async function createTeamMembers(data: TeamMembersData, organizationId: s
       created: 0,
     };
   }
+}
+
+// Backbone Step: Seed Label Categories & Subcategories (scoped to the org)
+export async function seedCategories(organizationId: string, categories: CategoryEntry[]) {
+  try {
+    if (!categories || categories.length === 0) {
+      return { success: true, categoriesCreated: 0, subcategoriesCreated: 0 };
+    }
+
+    let categoriesCreated = 0;
+    let subcategoriesCreated = 0;
+
+    // Idempotency: don't recreate categories that already exist for this org
+    // (protects existing orgs / re-runs from getting duplicate categories).
+    const { data: existing } = await supabase
+      .from('label_categories')
+      .select('name')
+      .eq('organization_id', organizationId);
+    const existingNames = new Set((existing || []).map((c) => c.name.toLowerCase()));
+
+    // Insert sequentially so each subcategory batch can reference its parent id.
+    for (const category of categories) {
+      if (existingNames.has(category.name.toLowerCase())) continue;
+
+      const { data: catRow, error: catError } = await supabase
+        .from('label_categories')
+        .insert({
+          name: category.name,
+          icon: category.icon || null,
+          organization_id: organizationId,
+        })
+        .select()
+        .single();
+
+      if (catError) throw catError;
+      categoriesCreated++;
+
+      if (category.subcategories && category.subcategories.length > 0) {
+        const subsToInsert = category.subcategories.map((sub, index) => ({
+          name: sub.name,
+          icon: sub.icon || null,
+          category_id: catRow.id,
+          organization_id: organizationId,
+          display_order: index,
+        }));
+
+        const { error: subError } = await supabase
+          .from('label_subcategories')
+          .insert(subsToInsert);
+
+        if (subError) throw subError;
+        subcategoriesCreated += subsToInsert.length;
+      }
+    }
+
+    return { success: true, categoriesCreated, subcategoriesCreated };
+  } catch (error: any) {
+    console.error('Seed categories error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to create categories',
+      categoriesCreated: 0,
+      subcategoriesCreated: 0,
+    };
+  }
+}
+
+// Backbone Step: Save Venues.
+// Full multi-venue (franchise) wiring is gated behind a paid plan (Stripe, later).
+// For now we persist the declared venues on organizations.settings.venues so the
+// data is captured without depending on franchise columns/RLS that aren't in place yet.
+export async function saveVenues(organizationId: string, venues: VenueEntry[]) {
+  try {
+    if (!venues || venues.length === 0) {
+      return { success: true, venuesSaved: 0 };
+    }
+
+    // Merge into existing settings rather than overwriting.
+    const { data: orgRow, error: fetchError } = await supabase
+      .from('organizations')
+      .select('settings')
+      .eq('id', organizationId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const settings = (orgRow?.settings as Record<string, any>) || {};
+    const cleaned = venues
+      .filter((v) => v.name && v.name.trim())
+      .map((v) => ({ name: v.name.trim(), venueLabel: v.venueLabel?.trim() || null }));
+
+    const { error: updateError } = await supabase
+      .from('organizations')
+      .update({ settings: { ...settings, venues: cleaned } })
+      .eq('id', organizationId);
+
+    if (updateError) throw updateError;
+
+    return { success: true, venuesSaved: cleaned.length };
+  } catch (error: any) {
+    console.error('Save venues error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to save venues',
+      venuesSaved: 0,
+    };
+  }
+}
+
+// Mark the current user's onboarding as complete.
+export async function markOnboardingComplete(userId: string) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      onboarding_completed: true,
+      onboarding_completed_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Failed to mark onboarding complete:', error);
+    return { success: false, error: error.message };
+  }
+  return { success: true };
 }
 
 // Step 5: Send User Invitations

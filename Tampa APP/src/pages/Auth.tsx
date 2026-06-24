@@ -10,6 +10,7 @@ import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { TampaIcon } from '@/components/TampaIcon';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const Auth = () => {
   const { user, signIn, signUp, resetPassword, loading } = useAuth();
@@ -126,6 +127,9 @@ const Auth = () => {
               <TampaIcon className="w-8 h-8" />
               <h1 className="font-bold text-xl">Tampa Hospo</h1>
             </div>
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </header>
@@ -186,9 +190,19 @@ const Auth = () => {
               </div>
             ) : (
             <Tabs defaultValue="signin" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 h-11 bg-muted border border-border rounded-lg p-1">
+                <TabsTrigger
+                  value="signin"
+                  className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                >
+                  Sign In
+                </TabsTrigger>
+                <TabsTrigger
+                  value="signup"
+                  className="rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                >
+                  Sign Up
+                </TabsTrigger>
               </TabsList>
 
               {error && (
