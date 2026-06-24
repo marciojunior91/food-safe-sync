@@ -89,27 +89,34 @@ export function Layout() {
     loading: contextLoading
   } = useUserContext();
 
-  // Onboarding guard: every user must complete the backbone setup first.
-  // null = still loading, true/false = profile flag value.
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  // Onboarding guard: new users must complete the backbone setup first.
+  // We only force the journey for accounts that haven't finished onboarding AND
+  // don't yet have an organisation — so already-configured customers (with an
+  // org) are never pulled back into the wizard.
+  // null = still loading, true = needs onboarding, false = good to proceed.
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
   useEffect(() => {
     if (!user) return;
     let active = true;
     supabase
       .from("profiles")
-      .select("onboarding_completed")
+      .select("onboarding_completed, organization_id")
       .eq("user_id", user.id)
       .single()
       .then(({ data }) => {
-        if (active) setOnboardingComplete(data?.onboarding_completed ?? false);
+        if (active) {
+          setNeedsOnboarding(
+            data?.onboarding_completed !== true && !data?.organization_id
+          );
+        }
       });
     return () => {
       active = false;
     };
   }, [user]);
 
-  // Send users who haven't completed onboarding to the setup journey.
-  if (user && onboardingComplete === false) {
+  // Send users who still need onboarding to the setup journey.
+  if (user && needsOnboarding === true) {
     return <Navigate to="/onboarding" replace />;
   }
 
