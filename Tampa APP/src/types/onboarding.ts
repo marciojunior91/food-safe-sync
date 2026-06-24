@@ -1,12 +1,11 @@
 // Onboarding types for the immersive client journey
 // Iteration 13 - MVP Sprint
 
-export type OnboardingStep = 
-  | 'registration'
+export type OnboardingStep =
   | 'company-info'
-  | 'products'
+  | 'categories'
   | 'team-members'
-  | 'invite-users'
+  | 'venues'
   | 'complete';
 
 export interface OnboardingState {
@@ -87,6 +86,35 @@ export interface TeamMembersData {
   skipForNow: boolean;
 }
 
+// Backbone Step: Label Categories & Subcategories
+export interface SubcategoryEntry {
+  name: string;
+  icon: string;
+}
+
+export interface CategoryEntry {
+  name: string;
+  icon: string;
+  subcategories: SubcategoryEntry[];
+}
+
+export interface CategoriesData {
+  categories: CategoryEntry[];
+  // Whether the user kept the recommended default layout (didn't customise)
+  usedDefault: boolean;
+}
+
+// Backbone Step: Venues (gated by plan once Stripe is live)
+export interface VenueEntry {
+  name: string;
+  venueLabel?: string;
+}
+
+export interface VenuesData {
+  venues: VenueEntry[];
+  skipForNow: boolean;
+}
+
 // Step 5: Invite Auth Users
 export interface UserInvitation {
   email: string;
@@ -151,18 +179,12 @@ export const BUSINESS_TYPES: { value: BusinessType; label: string; icon: string 
 ];
 
 // Step configuration
-export const ONBOARDING_STEPS: { 
-  id: OnboardingStep; 
-  title: string; 
+export const ONBOARDING_STEPS: {
+  id: OnboardingStep;
+  title: string;
   description: string;
   optional: boolean;
 }[] = [
-  {
-    id: 'registration',
-    title: 'Create Account',
-    description: 'Set up your user account',
-    optional: false,
-  },
   {
     id: 'company-info',
     title: 'Business Information',
@@ -170,10 +192,10 @@ export const ONBOARDING_STEPS: {
     optional: false,
   },
   {
-    id: 'products',
-    title: 'Products & Recipes',
-    description: 'Import or add your products',
-    optional: true,
+    id: 'categories',
+    title: 'Categories',
+    description: 'Set up your label categories & subcategories',
+    optional: false,
   },
   {
     id: 'team-members',
@@ -182,9 +204,9 @@ export const ONBOARDING_STEPS: {
     optional: true,
   },
   {
-    id: 'invite-users',
-    title: 'Invite Users',
-    description: 'Invite managers and admins',
+    id: 'venues',
+    title: 'Venues',
+    description: 'Add the locations you operate',
     optional: true,
   },
   {
@@ -192,5 +214,88 @@ export const ONBOARDING_STEPS: {
     title: 'Complete',
     description: 'You\'re all set!',
     optional: false,
+  },
+];
+
+// Recommended default label taxonomy offered to new users who don't want to
+// customise. Each category carries an emoji icon and a set of subcategories.
+export const DEFAULT_TAXONOMY: CategoryEntry[] = [
+  {
+    name: 'Proteins',
+    icon: '🥩',
+    subcategories: [
+      { name: 'Beef', icon: '🐄' },
+      { name: 'Poultry', icon: '🍗' },
+      { name: 'Pork', icon: '🥓' },
+      { name: 'Seafood', icon: '🐟' },
+      { name: 'Eggs', icon: '🥚' },
+    ],
+  },
+  {
+    name: 'Dairy',
+    icon: '🧀',
+    subcategories: [
+      { name: 'Milk', icon: '🥛' },
+      { name: 'Cheese', icon: '🧀' },
+      { name: 'Yoghurt', icon: '🍦' },
+      { name: 'Butter', icon: '🧈' },
+    ],
+  },
+  {
+    name: 'Produce',
+    icon: '🥬',
+    subcategories: [
+      { name: 'Vegetables', icon: '🥕' },
+      { name: 'Fruits', icon: '🍎' },
+      { name: 'Herbs', icon: '🌿' },
+      { name: 'Salads', icon: '🥗' },
+    ],
+  },
+  {
+    name: 'Bakery',
+    icon: '🥖',
+    subcategories: [
+      { name: 'Bread', icon: '🍞' },
+      { name: 'Pastry', icon: '🥐' },
+      { name: 'Dough', icon: '🥯' },
+    ],
+  },
+  {
+    name: 'Sauces & Stocks',
+    icon: '🥫',
+    subcategories: [
+      { name: 'Sauces', icon: '🥫' },
+      { name: 'Dressings', icon: '🫙' },
+      { name: 'Stocks', icon: '🍲' },
+      { name: 'Marinades', icon: '🧂' },
+    ],
+  },
+  {
+    name: 'Mise en place',
+    icon: '🍱',
+    subcategories: [
+      { name: 'Cooked', icon: '♨️' },
+      { name: 'Thawing', icon: '🧊' },
+      { name: 'Marinating', icon: '⏲️' },
+      { name: 'Cut / Prepped', icon: '🔪' },
+    ],
+  },
+  {
+    name: 'Dry Goods',
+    icon: '🌾',
+    subcategories: [
+      { name: 'Grains', icon: '🌾' },
+      { name: 'Pasta', icon: '🍝' },
+      { name: 'Flour', icon: '🌽' },
+      { name: 'Spices', icon: '🌶️' },
+    ],
+  },
+  {
+    name: 'Beverages',
+    icon: '🥤',
+    subcategories: [
+      { name: 'Juices', icon: '🧃' },
+      { name: 'Syrups', icon: '🍯' },
+    ],
   },
 ];

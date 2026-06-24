@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet, useLocation, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Outlet, useLocation, Link, Navigate } from "react-router-dom";
 import { BarChart3, ClipboardList, Package, Tags, Settings, Menu, X, LogOut, Users, Calendar, GraduationCap, Bell, AlertTriangle, BookOpen, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useUserContext } from "@/hooks/useUserContext";
 import { TampaIcon } from "@/components/TampaIcon";
 import { VenueSelector } from "@/components/VenueSelector";
+import { supabase } from "@/integrations/supabase/client";
 const navigation = [{
   name: "Dashboard",
   href: "/dashboard",
@@ -87,6 +88,37 @@ export function Layout() {
     department,
     loading: contextLoading
   } = useUserContext();
+
+  // Onboarding guard: new users must complete the backbone setup first.
+  // We only force the journey for accounts that haven't finished onboarding AND
+  // don't yet have an organisation — so already-configured customers (with an
+  // org) are never pulled back into the wizard.
+  // null = still loading, true = needs onboarding, false = good to proceed.
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    supabase
+      .from("profiles")
+      .select("onboarding_completed, organization_id")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (active) {
+          setNeedsOnboarding(
+            data?.onboarding_completed !== true && !data?.organization_id
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  // Send users who still need onboarding to the setup journey.
+  if (user && needsOnboarding === true) {
+    return <Navigate to="/onboarding" replace />;
+  }
 
   // Filter nav items based on role
   const filteredNav = navigation.filter(item => {
